@@ -1,0 +1,22 @@
+root = "."
+tmp_dir = "tmp"
+
+[build]
+# 每次變更後執行的編譯指令
+cmd = "go build -o ./tmp/main ./cmd/main.go"
+# 編譯成功後執行的二進位檔
+bin = "./tmp/main"
+# 監聽的副檔名
+include_ext = ["go", "tpl", "tmpl", "html"]
+# 忽略的目錄
+exclude_dir = ["assets", "tmp", "vendor", "frontend"]
+# 延遲重啟 (毫秒)，避免頻繁存檔導致多次編譯
+delay = 1000
+# 編譯錯誤時停止運行舊進程
+stop_on_error = true
+
+[log]
+time = true
+
+[misc]
+clean_on_exit = true

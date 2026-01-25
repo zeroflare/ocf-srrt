@@ -1,0 +1,67 @@
+package geoip
+
+import (
+	"log"
+	"net"
+
+	"github.com/oschwald/geoip2-golang"
+)
+
+var (
+	countryDB *geoip2.Reader
+	asnDB     *geoip2.Reader
+)
+
+func init() {
+	var err error
+	countryDB, err = geoip2.Open("data/GeoLite2-City.mmdb")
+	if err != nil {
+		countryDB, err = geoip2.Open("data/GeoLite2-Country.mmdb")
+		if err != nil {
+			log.Printf("Warning: Could not open Country/City GeoIP database: %v. Country features will be disabled.", err)
+		}
+	}
+
+	asnDB, err = geoip2.Open("data/GeoLite2-ASN.mmdb")
+	if err != nil {
+		log.Printf("Warning: Could not open ASN GeoIP database: %v. ASN features will be disabled.", err)
+	}
+}
+
+// GetCountry 根據 IP 位址查找國家代碼
+func GetCountry(ipStr string) (string, error) {
+	if countryDB == nil {
+		return "XX", nil
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return "", &net.ParseError{Type: "IP address", Text: ipStr}
+	}
+
+	record, err := countryDB.Country(ip)
+	if err != nil {
+		return "", err
+	}
+
+	return record.Country.IsoCode, nil
+}
+
+// GetASN 根據 IP 位址查找 ASN 和 ISP 名稱 (B-05)
+func GetASN(ipStr string) (uint, string, error) {
+	if asnDB == nil {
+		return 0, "Unknown", nil
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return 0, "", &net.ParseError{Type: "IP address", Text: ipStr}
+	}
+
+	record, err := asnDB.ASN(ip)
+	if err != nil {
+		return 0, "", err
+	}
+
+	return record.AutonomousSystemNumber, record.AutonomousSystemOrganization, nil
+}

@@ -1,0 +1,54 @@
+# ========================
+# General / IDE
+# ========================
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.log
+
+# ========================
+# Backend (Go)
+# ========================
+# Binaries
+backend/bin/
+backend/dist/
+backend/srrt-backend
+backend/srrt-server
+backend/dns-analyzer
+*.exe
+*.test
+
+# Data Files (Crucial: Ignore MMDB but keep the folder structure)
+backend/data/*.mmdb
+backend/data/*.dat
+
+# Go Workspace
+go.work
+go.work.sum
+
+# ========================
+# Frontend (Node/React)
+# ========================
+frontend/node_modules/
+frontend/dist/
+frontend/build/
+frontend/.output/
+
+# Environment variables
+frontend/.env
+frontend/.env.local
+frontend/.env.*.local
+
+# Logs
+frontend/npm-debug.log*
+frontend/yarn-error.log*
+frontend/pnpm-debug.log*
+
+# Editor directories and files
+frontend/.idea
+frontend/*.suo
+frontend/*.ntvs*
+frontend/*.njsproj
+frontend/*.sln
+frontend/*.sw?

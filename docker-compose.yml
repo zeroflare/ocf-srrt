@@ -1,0 +1,59 @@
+services:
+  # =========================================
+  # Backend Service (Go + Packet Sniffer)
+  # =========================================
+  backend:
+    build:
+      context: ./backend
+    container_name: srrt-backend
+    # 賦予容器網路權限
+    # 這是為了讓 gopacket/libpcap 能在容器內運作，而不需要開危險的 privileged: true
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+    # [網路模式]
+    # 開發環境 (Mac/Win): 使用預設 Bridge 模式 + Ports 映射
+    # 生產環境 (Linux): 建議取消註解 network_mode: "host"，效能最好且能抓到真實流量
+    # network_mode: "host"
+
+    ports:
+      - "53:53/tcp"   # DNS Server
+      - "53:53/udp"   # DNS Server
+      - "8080:8080"   # WebSocket (即使有 Nginx，留著 debug 也方便)
+
+    volumes:
+      - ./backend/data/GeoLite2-ASN.mmdb:/app/data/GeoLite2-ASN.mmdb
+      - ./backend/data/GeoLite2-City.mmdb:/app/data/GeoLite2-City.mmdb
+
+    environment:
+      - LOCAL_COUNTRY=TW
+      - NETWORK_INTERFACE=eth0
+      - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
+      - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
+
+    # 健康檢查：確保後端掛掉時 Docker 會知道
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+    restart: unless-stopped
+
+  # =========================================
+  # Frontend Service (Vite + Nginx)
+  # =========================================
+  frontend:
+    build:
+      context: ./frontend
+    container_name: srrt-frontend
+
+    ports:
+      - "80:80" # 瀏覽器入口
+
+    # 讓 Nginx 啟動前先等後端準備好
+    depends_on:
+      - backend
+
+    restart: unless-stopped

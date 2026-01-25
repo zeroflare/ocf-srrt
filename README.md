@@ -1,127 +1,142 @@
 # SRRT - DNS Analyzer (ocf-srrt)
 
 這是一個專為資安分析設計的 **即時 DNS 流量監控系統 (Real-time DNS Traffic Analyzer)**。
-採用 Monorepo 架構，結合底層封包擷取與現代化前端視覺化技術，旨在提供隱私優先、無狀態的網路可觀測性。
+採用 Monorepo 架構，結合底層封包擷取 (Packet Sniffing) 與現代化前端視覺化技術，旨在提供隱私優先、無狀態的網路可觀測性。
 
 ---
 
-## 技術棧 (Tech Stack)
+## 🛠 技術棧 (Tech Stack)
 
 ### Backend (Golang)
-- **核心**: Go 1.24+, `gopacket` (libpcap), `miekg/dns`.
+- **核心**: Go 1.23+, `gopacket` (libpcap), `miekg/dns`.
+- **開發體驗**: `Air` (Live Reload) 實現程式碼熱重載.
 - **通訊**: `gorilla/websocket` 實現即時資料推送.
 - **豐富化**: `geoip2-golang` (MaxMind) 進行地理位置與 ASN 標記.
+- **識別引擎**: 三層識別邏輯 (Exact Match -> Regex -> Heuristic Guessing).
 - **架構**: In-Memory Ring Buffer, 無資料庫設計 (RAM Only).
 
 ### Frontend (React Ecosystem)
-- **核心**: React 19, TypeScript, Vite.
-- **樣式**: Tailwind CSS v4.
-- **狀態**: Zustand (Global State), TanStack Table (Data Grid).
-- **視覺化**: Recharts, React Simple Maps (Cyber Map).
+- **核心**: React 19, TypeScript, Vite (HMR Enabled).
+- **樣式**: Tailwind CSS v4, Lucide Icons.
+- **狀態**: Zustand (Global Store), TanStack Table (Data Grid).
+- **視覺化**: React Simple Maps (Mercator Projection + Pulse Animation).
 - **多國語言**: i18next (支援中/英切換).
 
 ### Deployment
-- **容器化**: Docker, Docker Compose.
-- **網絡模式**: 支援 `host` 與 `bridge` 模式 (優化 UDP 效能).
+- **容器化**: Docker, Docker Compose (Multi-stage build).
+- **架構分離**: 獨立的開發 (`dev.yml`) 與生產 (`prod.yml`) 配置.
+- **網絡模式**: 支援 `host` 模式 (穿透 Docker NAT 獲取真實 Client IP).
 
 ---
 
-## 目錄結構
+## 📂 目錄結構
 
 ```bash
 .
-├── backend/            # Go 模組：負責 DNS 監聽、GeoIP 查詢及 WebSocket 廣播
+├── backend/            # Go 核心服務
 │   ├── cmd/            # 程式進入點 (main.go)
-│   ├── internal/       # 內部核心邏輯 (DNS, Buffer, GeoIP, Recognition)
-│   └── data/           # 靜態資源 (MMDB 與 apps.json)
-├── frontend/           # React 應用：負責顯示即時 DNS 紀錄及統計面板
-│   ├── src/            # 前端原始碼
-│   └── public/locales  # i18n 翻譯檔
-├── terraform/          # IaC 設定檔 (GCP/AWS 部署參考)
-└── docker-compose.yml  # 服務編排配置
-```
+│   ├── internal/       # 核心邏輯 (DNS Sniffer, Buffer, GeoIP, Recognition)
+│   ├── data/           # 靜態資源 (MMDB 與 apps.json)
+│   └── .air.toml       # Hot Reload 設定檔
+├── frontend/           # React 前端應用
+│   ├── src/            # 原始碼 (Components, Stores, Types)
+│   └── nginx.conf      # 生產環境 Nginx 設定 (Reverse Proxy)
+├── docker-compose.dev.yml   # [開發用] Hot Reload, Source Mount
+├── docker-compose.prod.yml  # [生產用] Binary + Nginx, Host Network
+└── README.md
 
----
 
-## 快速啟動 (Quick Start)
+## 🚀 快速啟動 (Quick Start)
 
-### 1. 準備環境與資料
+### 1. 準備資料庫
 本專案依賴 MaxMind GeoLite2 資料庫，請自行下載以下檔案並放置於 `backend/data/` 目錄：
 - `GeoLite2-City.mmdb`
 - `GeoLite2-ASN.mmdb`
 
-### 2. 使用 Docker Compose 啟動
-```bash
-# 建置並啟動服務
-docker-compose up --build
-```
-- **Frontend**: [http://localhost:80](http://localhost:80)
-- **Backend API**: [http://localhost:8080](http://localhost:8080)
+---
 
-### 3. 驗證與測試流量
-在 macOS 或 Docker 環境下，需手動發送 DNS 查詢至容器以查看效果：
+### 2. 選擇運行模式
+
+#### 🛠 模式 A：開發環境 (Development)
+支援 Hot Reload。修改 Go 或 React 程式碼後，瀏覽器與後端會自動更新，無需重啟容器。
+
 ```bash
-# 指定向本機 Port 53 查詢
-dig @localhost -p 53 google.com
+# 啟動開發環境 (掛載原始碼)
+docker-compose -f docker-compose.dev.yml up --build
+```
+- **Frontend**: http://localhost (Vite Dev Server)
+- **Backend**: http://localhost:8080 (Air Runner)
+
+#### 🏭 模式 B：生產環境 (Production)
+最佳化效能與安全性。使用編譯後的 Go Binary 與 Nginx 靜態服務，並啟用 host 網路模式以獲取真實來源 IP。
+
+```bash
+# 啟動生產環境 (Host Mode)
+docker-compose -f docker-compose.prod.yml up -d --build
+```
+- **Dashboard**: http://<YOUR_VM_IP>
+
+---
+
+## ☁️ 雲端部署指南 (GCP/AWS)
+由於生產環境需要監聽 UDP 53 並獲取真實 Client IP，建議使用以下標準流程：
+
+### 1. 基礎設施準備
+- **VM 規格**: 建議 e2-medium (2 vCPU, 4GB RAM) 以上。
+- **防火牆規則 (Firewall)**: 必須開啟 `UDP:53`, `TCP:53`, `TCP:80`。
+- **網路標記**: 確保 VM 套用上述防火牆規則。
+
+### 2. 打包與上傳 (No-Git Strategy)
+在本機將專案打包 (排除 node_modules) 並上傳至 VM，確保本地測試過的 mmdb 資料庫一同上線。
+
+```bash
+# 1. 本機打包
+tar -czf deploy.tar.gz --exclude='node_modules' --exclude='.git' --exclude='frontend/dist' .
+
+# 2. 上傳至 VM (GCP 範例)
+gcloud compute scp deploy.tar.gz <VM_NAME>:~
+
+# 3. VM 內解壓與啟動
+ssh <VM_NAME>
+mkdir srrt && tar -xzf deploy.tar.gz -C srrt/
+cd srrt
+sudo docker compose -f docker-compose.prod.yml up -d --build
+```
+
+### 3. DNS 測試
+在任意機器上測試 DNS 解析是否通暢：
+
+```bash
+# 測試 GCP VM 的 Public IP
+dig @<GCP_PUBLIC_IP> google.com
 ```
 
 ---
 
-## 系統特性 (SRRT 規格)
+## ✨ 系統特性 (SRRT 規格)
 
-### 核心功能
-- **隱私優先**: 數據純 In-Memory，重啟服務即銷毀，不留痕跡。
-- **高效能 UDP**: 基於 `miekg/dns` 的非同步處理邏輯。
-- **記憶體管理**:
-    - **Ring Buffer**: 每個 Session (來源 IP) 限制 5000 筆紀錄，防止 OOM。
-    - **TTL 清理**: 背景 GC 每分鐘執行，自動釋放超過 10 分鐘未活躍的 Session。
-    - **Circuit Breaker**: 全域最大 2000 個併發 Session 保護。
+### 🛡 核心與隱私
+- **隱私優先**: 數據純 In-Memory (Ring Buffer)，服務重啟即銷毀。
+- **真實 IP 還原**: 生產環境採用 Docker host 模式，繞過 NAT 直接讀取 Layer 3 IP Header。
+- **智慧緩衝管理**:
+    - 單一 IP 限制 5000 筆紀錄 (防止 OOM)。
+    - 背景 GC 每分鐘自動清理閒置 10 分鐘的 Session。
 
-### 智慧分析
-- **ASN Enrichment**: 自動識別 ISP 資訊 (如 Google, CHT, Akamai)。
-- **App Recognition**: 根據 `apps.json` 的正則表達式自動歸類流量來源。
-- **跨境流量標記**: 根據 `LOCAL_COUNTRY` (預設 `TW`) 自動判斷並標記跨境連線。
+### 🧠 智慧分析
+- **三層識別引擎**:
+    1. **Exact Match**: 精準比對 `apps.json` 規則。
+    2. **Regex Pattern**: 支援 `*.google.com` 等萬用字元。
+    3. **Heuristic Guessing**: 自動提取未知網域的 SLD (e.g., `api.notion.so` -> `Notion`)，大幅減少 "Unknown"。
+- **ASN & GeoIP**: 自動標記 ISP (Google, Akamai, CHT) 與國家/城市。
 
-### 現代化介面
-- **Cyber Map**: 視覺化台灣連出至全球的動態路徑。
-- **Throttling**: 前端實作節流機制，確保高頻查詢下 UI 依然流暢。
-- **多國語言**: 支援繁體中文與英文即時切換。
-- **數據導出**: 支援將當前緩衝區紀錄匯出為 CSV。
-
----
-
-## 開發者指南
-
-### 1. 使用 Docker Compose (推薦)
-這是最快且最一致的開發環境，會自動處理網路與依賴。
-```bash
-# 啟動所有服務 (包含自動編譯)
-docker-compose up --build
-
-# 若只需重啟前端 (加速開發)
-docker-compose up -d frontend
-```
-
-### 2. 本地原生開發 (Native Development)
-若需要進行深度偵錯，可分別在後端與前端執行：
-
-#### Backend (Go)
-```bash
-cd backend
-go mod tidy
-# 執行 (需要 sudo 權限以監聽 Port 53)
-# 可透過 NETWORK_INTERFACE 環境變數指定網卡 (macOS 通常為 en0)
-sudo NETWORK_INTERFACE=en0 go run cmd/main.go
-```
-
-#### Frontend (React)
-```bash
-cd frontend
-pnpm install
-pnpm dev
-```
+### 📊 視覺化戰情室
+- **Cyber Map**:
+    - 採用 Mercator 投影，呈現真實航線感。
+    - 擴充全球座標庫 (G7/BRICS/Asia)，解決地圖連線遺失問題。
+    - 實作 SVG Pulse 動畫，即時呈現威脅擴散效果。
+- **Live Table**: 支援 Source IP 追蹤、DNS 類型 (A/AAAA) 顯示與 CSV 匯出。
 
 ---
 
 ## ⚖️ 授權 (License)
-MIT License. GeoIP data provided by [MaxMind](https://www.maxmind.com).
+MIT License. GeoIP data provided by MaxMind. Icons provided by Lucide.

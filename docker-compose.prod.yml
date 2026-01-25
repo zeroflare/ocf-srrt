@@ -15,12 +15,7 @@ services:
     # [網路模式]
     # 開發環境 (Mac/Win): 使用預設 Bridge 模式 + Ports 映射
     # 生產環境 (Linux): 建議取消註解 network_mode: "host"，效能最好且能抓到真實流量
-    # network_mode: "host"
-
-    ports:
-      - "53:53/tcp"   # DNS Server
-      - "53:53/udp"   # DNS Server
-      - "8080:8080"   # WebSocket (即使有 Nginx，留著 debug 也方便)
+    network_mode: "host"
 
     volumes:
       - ./backend/data/GeoLite2-ASN.mmdb:/app/data/GeoLite2-ASN.mmdb
@@ -28,16 +23,10 @@ services:
 
     environment:
       - LOCAL_COUNTRY=TW
-      - NETWORK_INTERFACE=eth0
+      - NETWORK_INTERFACE=ens4
       - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
-
-    # 健康檢查：確保後端掛掉時 Docker 會知道
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - GIN_MODE=release
 
     restart: unless-stopped
 
@@ -49,8 +38,7 @@ services:
       context: ./frontend
     container_name: srrt-frontend
 
-    ports:
-      - "80:80" # 瀏覽器入口
+    network_mode: "host"
 
     # 讓 Nginx 啟動前先等後端準備好
     depends_on:

@@ -22,7 +22,7 @@ const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boole
   set((state: DnsState) => {
     // 1. 計算新進資料的統計數據 (注意欄位是 snake_case: is_foreign)
     const newForeignCount = newRecords.reduce(
-        (count, r) => count + (r.is_foreign ? 1 : 0),
+        (count, r) => count + (r.isForeign ? 1 : 0),
         0
     );
 
@@ -74,7 +74,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
         // 重新計算歷史數據的統計
         const historyForeignCount = sortedRecords.reduce(
-            (acc, r) => acc + (r.is_foreign ? 1 : 0), 0
+            (acc, r) => acc + (r.isForeign ? 1 : 0), 0
         );
 
         return {

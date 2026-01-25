@@ -5,9 +5,12 @@ import (
 	"net/http"
 	"ocf-srrt/backend/internal/api"
 	"ocf-srrt/backend/internal/dns"
+	"ocf-srrt/backend/internal/recognition"
 )
 
 func main() {
+	recognition.LoadRules("data/apps.json")
+
 	// 初始化 WebSocket Hub
 	hub := api.NewHub()
 	go hub.Run()

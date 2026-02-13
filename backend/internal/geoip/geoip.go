@@ -22,9 +22,13 @@ func init() {
 		}
 	}
 
-	asnDB, err = geoip2.Open("data/GeoLite2-ASN.mmdb")
+	asnDBPath := os.Getenv("ASN_DB_PATH")
+	if asnDBPath == "" {
+		asnDBPath = "data/GeoLite2-ASN.mmdb"
+	}
+	asnDB, err = geoip2.Open(asnDBPath)
 	if err != nil {
-		log.Printf("Warning: Could not open ASN GeoIP database: %v. ASN features will be disabled.", err)
+		log.Printf("Warning: Could not open ASN GeoIP database at %s. ASN features will be disabled.", asnDBPath)
 	}
 }
 
@@ -45,6 +49,25 @@ func GetCountry(ipStr string) (string, error) {
 	}
 
 	return record.Country.IsoCode, nil
+}
+
+// GetCoords 根據 IP 位址查找經緯度 [lon, lat]
+func GetCoords(ipStr string) ([]float64, error) {
+	if countryDB == nil {
+		return nil, nil
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return nil, &net.ParseError{Type: "IP address", Text: ipStr}
+	}
+
+	record, err := countryDB.City(ip)
+	if err != nil {
+		return nil, err
+	}
+
+	return []float64{record.Location.Longitude, record.Location.Latitude}, nil
 }
 
 // GetASN 根據 IP 位址查找 ASN 和 ISP 名稱 (B-05)

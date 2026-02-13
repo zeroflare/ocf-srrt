@@ -1,15 +1,24 @@
 package main
 
 import (
+	"context"
+	"encoding/json"
 	"log"
 	"net/http"
 	"ocf-srrt/backend/internal/api"
 	"ocf-srrt/backend/internal/dns"
 	"ocf-srrt/backend/internal/recognition"
+	"ocf-srrt/backend/internal/traceroute"
+	"os"
+	"time"
 )
 
 func main() {
-	recognition.LoadRules("data/apps.json")
+	rulesPath := os.Getenv("RULES_PATH")
+	if rulesPath == "" {
+		rulesPath = "data/app.json"
+	}
+	recognition.LoadRules(rulesPath)
 
 	// 初始化 WebSocket Hub
 	hub := api.NewHub()
@@ -29,6 +38,27 @@ func main() {
 	// 設定 WebSocket API 端點
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		api.ServeWs(hub, w, r)
+	})
+
+	// 設定 Traceroute API 端點
+	http.HandleFunc("/api/traceroute", func(w http.ResponseWriter, r *http.Request) {
+		target := r.URL.Query().Get("target")
+		if target == "" {
+			http.Error(w, "target is required", http.StatusBadRequest)
+			return
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
+		defer cancel()
+
+		result, err := traceroute.Run(ctx, target)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(result)
 	})
 
 	// 啟動 HTTP 伺服器

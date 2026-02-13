@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"math/rand"
@@ -10,6 +11,9 @@ import (
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/types"
 	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/miekg/dns"
@@ -58,6 +62,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	sourceIp, _, _ := net.SplitHostPort(w.RemoteAddr().String())
+	log.Printf("[DNS] Request from %s: %s", sourceIp, r.Question[0].Name)
 
 	// 2. Rate Limiting
 	limiter := s.getLimiter(sourceIp)
@@ -146,6 +151,16 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		// 這些查詢可能涉及 File IO 或大量運算
 		resultCountry, _ := geoip.GetCountry(resultIP)
 		isForeign := localCountry != "" && resultCountry != localCountry
+
+		// 國內外判斷機制：如果國家在國外，再用 ping 判斷 (Ping < 10ms 視為國內)
+		latency := -1.0
+		if isForeign {
+			latency = pingIP(resultIP)
+			if latency > 0 && latency < 10 {
+				isForeign = false
+			}
+		}
+
 		asn, isp, _ := geoip.GetASN(resultIP)
 		appName, appCat := recognition.IdentifyApp(question.Name)
 
@@ -155,6 +170,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			Type:        recordType,
 			ResultIP:    resultIP,
 			IsForeign:   isForeign,
+			Latency:     latency,
 			SourceIP:    sourceIp,
 			Country:     resultCountry,
 			ASN:         asn,
@@ -162,6 +178,8 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			AppName:     appName,
 			AppCategory: appCat,
 		}
+
+		log.Printf("[DNS] Processed: %s -> %s (%s) [%s] from %s", question.Name, resultIP, resultCountry, appName, sourceIp)
 
 		// 存入 Ring Buffer
 		buffer.Add(sourceIp, record)
@@ -177,4 +195,37 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			}
 		}
 	}
+}
+
+// pingIP 執行簡單的 ping 並傳回延遲 (ms)
+func pingIP(ip string) float64 {
+	// 建立 context 避免 ping 太久 (1秒)
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	// 使用系統 ping 指令
+	// -c 1: 只 ping 一次
+	// -t 1 (或 -W 1): 等待時間
+	// 注意: macOS 是 -t, Linux 是 -W，這裡為了通用性可能需要判斷或使用封裝庫
+	// 簡單起見先假設是 macOS (符合專案環境說明)
+	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-t", "1", ip)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return -1
+	}
+
+	// 解析輸出，尋找 "time=X.XXX ms"
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "time=") {
+			parts := strings.Split(line, "time=")
+			if len(parts) > 1 {
+				msStr := strings.Split(parts[1], " ")[0]
+				ms, _ := strconv.ParseFloat(msStr, 64)
+				return ms
+			}
+		}
+	}
+
+	return -1
 }

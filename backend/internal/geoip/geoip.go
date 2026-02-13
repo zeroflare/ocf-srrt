@@ -3,6 +3,7 @@ package geoip
 import (
 	"log"
 	"net"
+	"os"
 
 	"github.com/oschwald/geoip2-golang"
 )
@@ -14,11 +15,18 @@ var (
 
 func init() {
 	var err error
-	countryDB, err = geoip2.Open("data/GeoLite2-City.mmdb")
+	countryDBPath := os.Getenv("GEOIP_DB_PATH")
+	if countryDBPath == "" {
+		countryDBPath = "data/GeoLite2-City.mmdb"
+	}
+	countryDB, err = geoip2.Open(countryDBPath)
 	if err != nil {
-		countryDB, err = geoip2.Open("data/GeoLite2-Country.mmdb")
-		if err != nil {
-			log.Printf("Warning: Could not open Country/City GeoIP database: %v. Country features will be disabled.", err)
+		// Fallback for default Country DB if City DB not found
+		if countryDBPath == "data/GeoLite2-City.mmdb" {
+			countryDB, _ = geoip2.Open("data/GeoLite2-Country.mmdb")
+		}
+		if countryDB == nil {
+			log.Printf("Warning: Could not open Country/City GeoIP database at %s. Country features will be disabled.", countryDBPath)
 		}
 	}
 

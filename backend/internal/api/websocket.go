@@ -118,6 +118,7 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 	// 1. 取得 Client IP (注意：若有經過 Nginx/Docker Proxy，這裡拿到的可能是內網 IP)
 	// 若要精準，需讀取 X-Forwarded-For Header，但在 host mode 下 RemoteAddr 通常是準的
 	clientIP, _, _ := net.SplitHostPort(r.RemoteAddr)
+	log.Printf("[WS] New connection from %s", clientIP)
 
 	// 2. 從 Ring Buffer 撈取該 IP 的歷史紀錄
 	history := buffer.Get(clientIP)

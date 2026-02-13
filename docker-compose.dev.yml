@@ -33,6 +33,7 @@ services:
       - NETWORK_INTERFACE=eth0
       - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
+      - RULES_PATH=/app/data/app.json
       - CGO_ENABLED=1
     restart: unless-stopped
 

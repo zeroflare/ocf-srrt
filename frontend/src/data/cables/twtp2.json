@@ -1,0 +1,14 @@
+{
+  "id": "twtp2",
+  "name": "TWTP2",
+  "color": "#428FFF",
+  "available_path": [
+    [
+      "TW",
+      "twtp2-ph",
+      "TW-PH"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"twtp2-ph\",\n    hidden: !1,\n    coordinates: [[119.6597065786648, 23.56154353030588]"
+}

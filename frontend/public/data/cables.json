@@ -1,0 +1,53 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "id": 1,
+      "properties": {
+        "name": "Chunghwa Telecom Cable A",
+        "status": "Active"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [121.5, 25.0],
+          [125.0, 30.0],
+          [130.0, 35.0]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 2,
+      "properties": {
+        "name": "Asia-Pacific Gateway (APG)",
+        "status": "Maintenance"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [121.0, 24.5],
+          [115.0, 20.0],
+          [110.0, 15.0]
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "id": 3,
+      "properties": {
+        "name": "SeaMeWe-3",
+        "status": "Active"
+      },
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [121.8, 25.1],
+          [128.0, 26.0],
+          [140.0, 35.0]
+        ]
+      }
+    }
+  ]
+}

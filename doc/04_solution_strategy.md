@@ -1,0 +1,11 @@
+# 04. Solution Strategy
+
+## Technology Decisions
+- 使用 Go 的 `gopacket` 進行高效能封包擷取。
+- 使用 WebSocket 確保低延遲的資料推送。
+- 前端採用 Zustand 管理全域狀態，並使用 React Simple Maps 進行地理視覺化。
+
+## Architecture Patterns
+- **Monorepo**: 後端與前端代碼存放在同一個倉庫中。
+- **In-Memory Ring Buffer**: 使用循環緩衝區管理內存中的 DNS 記錄，防止 OOM 並實現自動過期。
+- **Host Network Mode**: 生產環境下使用 Docker host 模式以獲取原始 IP 資訊。

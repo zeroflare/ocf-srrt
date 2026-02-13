@@ -1,47 +1,35 @@
 services:
-  # =========================================
-  # Backend Service (Go + Packet Sniffer)
-  # =========================================
   backend:
     build:
       context: ./backend
     container_name: srrt-backend
-    # 賦予容器網路權限
-    # 這是為了讓 gopacket/libpcap 能在容器內運作，而不需要開危險的 privileged: true
     cap_add:
       - NET_ADMIN
       - NET_RAW
-
-    # [網路模式]
-    # 開發環境 (Mac/Win): 使用預設 Bridge 模式 + Ports 映射
-    # 生產環境 (Linux): 建議取消註解 network_mode: "host"，效能最好且能抓到真實流量
     network_mode: "host"
-
     volumes:
       - ./backend/data/GeoLite2-ASN.mmdb:/app/data/GeoLite2-ASN.mmdb
       - ./backend/data/GeoLite2-City.mmdb:/app/data/GeoLite2-City.mmdb
-
     environment:
       - LOCAL_COUNTRY=TW
-      - NETWORK_INTERFACE=ens4
+      - NETWORK_INTERFACE=ens4 # GCP 預設網卡
       - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
+      - RULES_PATH=/app/data/apps.json
       - GIN_MODE=release
-
     restart: unless-stopped
 
-  # =========================================
-  # Frontend Service (Vite + Nginx)
-  # =========================================
   frontend:
     build:
       context: ./frontend
     container_name: srrt-frontend
-
     network_mode: "host"
-
-    # 讓 Nginx 啟動前先等後端準備好
     depends_on:
       - backend
-
+    environment:
+      - NGINX_PORT=80
+      - NGINX_HOST=_
+      - BACKEND_ADDR=127.0.0.1:8080
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
     restart: unless-stopped

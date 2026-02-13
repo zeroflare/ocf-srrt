@@ -32,9 +32,13 @@ RUN rm -rf /usr/share/nginx/html/*
 # 複製編譯好的靜態檔案
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 複製自訂的 Nginx 設定 (解決 SPA 路由問題)
-# 請在 Dockerfile 同層目錄建立 nginx.conf
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+# 複製自訂的 Nginx 設定 (支援環境變數)
+# 將 template 放入 templates 目錄，Nginx 啟動時會自動 envsubst 並產出到 /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/templates/default.conf.template
+
+# 預設環境變數
+ENV NGINX_PORT=80
+ENV BACKEND_ADDR=127.0.0.1:8080
 
 EXPOSE 80
 

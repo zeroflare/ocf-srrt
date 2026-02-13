@@ -1,149 +1,296 @@
-import React, { useMemo } from 'react';
-import {
-  ComposableMap,
-  Geographies,
-  Geography,
-  Line,
-  Marker,
-  ZoomableGroup
-} from 'react-simple-maps';
-import { useDnsStore } from '../stores/useDnsStore';
-import { scaleLinear } from 'd3-scale';
-import { useTranslation } from 'react-i18next';
-import { Globe } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import maplibregl from 'maplibre-gl';
+import 'maplibre-gl/dist/maplibre-gl.css';
+import { useCableStore } from '../stores/useCableStore';
 
-// 使用較為詳細的 TopoJSON
-const geoUrl = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
-
-// 台灣中心點
-const TAIWAN_COORDS: [number, number] = [121, 23.5];
-
-// [SRE] 擴充後的國家座標庫 (ISO 3166-1 alpha-2)
-// 包含常見的亞洲、歐美、澳洲等區域，避免 Unknown 導致不畫線
-const countryCoords: Record<string, [number, number]> = {
-  // Asia
-  'TW': [121, 23.5], 'CN': [104.1, 35.8], 'JP': [138.2, 36.2], 'KR': [127.7, 35.9],
-  'HK': [114.1, 22.3], 'SG': [103.8, 1.35], 'IN': [78.9, 20.5], 'ID': [113.9, -0.7],
-  'TH': [100.9, 15.8], 'VN': [108.2, 14.0], 'MY': [101.9, 4.2], 'PH': [121.7, 12.8],
-
-  // Americas
-  'US': [-95.7, 37.0], 'CA': [-106.3, 56.1], 'BR': [-51.9, -14.2], 'MX': [-102.5, 23.6],
-  'AR': [-63.6, -38.4], 'CL': [-71.5, -35.6],
-
-  // Europe
-  'GB': [-3.4, 55.3], 'DE': [10.4, 51.1], 'FR': [2.2, 46.2], 'NL': [5.2, 52.1],
-  'IT': [12.5, 41.8], 'ES': [-3.7, 40.4], 'RU': [105.3, 61.5], 'UA': [31.1, 48.3],
-  'PL': [19.1, 51.9], 'SE': [18.6, 60.1], 'NO': [8.4, 60.4], 'FI': [25.7, 61.9],
-  'IE': [-8.2, 53.4], 'CH': [8.2, 46.8], 'AT': [14.5, 47.5], 'BE': [4.4, 50.5],
-
-  // Oceania
-  'AU': [133.7, -25.2], 'NZ': [174.8, -40.9],
-
-  // Others
-  'ZA': [22.9, -30.5], 'EG': [30.8, 26.8], 'TR': [35.2, 38.9], 'IL': [34.8, 31.0],
-  'SA': [45.0, 23.8], 'AE': [53.8, 23.4]
-};
+const TAIWAN_CENTER: [number, number] = [121.5, 23.5];
+const ZOOM_LEVEL = 5;
 
 export const CyberMap: React.FC = () => {
-  const { t } = useTranslation();
-  const { records } = useDnsStore();
+  const mapContainer = useRef<HTMLDivElement>(null);
+  const map = useRef<maplibregl.Map | null>(null);
+  const popup = useRef<maplibregl.Popup | null>(null);
 
-  const foreignConnections = useMemo(() => {
-    // 排除本地 (TW) 和未知的 (XX)
-    const foreignRecords = records.filter(r => r.isForeign && r.country !== 'XX' && r.country !== 'TW');
-    const counts: Record<string, { count: number, country: string }> = {};
+  const { geoJSON, selectedCableId, initialize, setSelectedCableId, toggleCableSelection } = useCableStore();
 
-    foreignRecords.forEach(r => {
-      // 容錯：如果該國家不在座標庫，暫時對應到 US 或忽略
-      // 這裡選擇忽略，避免畫錯
-      if (countryCoords[r.country]) {
-        if (!counts[r.country]) {
-          counts[r.country] = { count: 0, country: r.country };
-        }
-        counts[r.country].count++;
-      }
+  useEffect(() => {
+    if (!geoJSON) {
+      initialize();
+    }
+  }, [geoJSON, initialize]);
+
+  useEffect(() => {
+    if (!mapContainer.current) return;
+
+    map.current = new maplibregl.Map({
+      container: mapContainer.current,
+      style: {
+        version: 8,
+        sources: {
+          map: {
+            type: "vector",
+            url: "https://lb.exptech.dev/api/v1/map/tiles/tiles.json",
+          },
+        },
+        layers: [
+          {
+            id: "background",
+            type: "background",
+            paint: { "background-color": "#1f2025" },
+          },
+          {
+            id: "county",
+            type: "fill",
+            source: "map",
+            "source-layer": "city",
+            paint: { "fill-color": "#3F4045" },
+          },
+          {
+            id: "county-outline",
+            type: "line",
+            source: "map",
+            "source-layer": "city",
+            paint: { "line-color": "#a9b4bc" },
+          },
+          {
+            id: "town",
+            type: "fill",
+            source: "map",
+            "source-layer": "town",
+            paint: { "fill-color": "transparent" },
+          },
+          {
+            id: "global",
+            type: "fill",
+            source: "map",
+            "source-layer": "global",
+            paint: {
+              "fill-color": "#3F4045",
+              "fill-opacity": 1,
+            },
+          },
+        ],
+      },
+      center: TAIWAN_CENTER,
+      zoom: ZOOM_LEVEL,
     });
 
-    return Object.values(counts);
-  }, [records]);
+    popup.current = new maplibregl.Popup({
+      closeButton: false,
+      closeOnClick: false,
+      className: 'custom-popup',
+    });
 
-  // 調整線條粗細比例，讓它細緻一點
-  const lineScale = scaleLinear().domain([0, 50]).range([0.5, 2]).clamp(true);
+    map.current.on('load', () => {
+      if (!map.current) return;
+
+      map.current.addSource('cables', {
+        type: 'geojson',
+        data: geoJSON!,
+        generateId: true,
+      });
+
+      // 1) 全部海纜（更淡）
+      map.current.addLayer({
+        id: 'cables-line',
+        type: 'line',
+        source: 'cables',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            3,
+            1.5,
+          ],
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            0.8,
+            0.15,
+          ],
+        },
+        filter: ['==', ['get', 'hidden'], false],
+      });
+
+      // 2) 強調「可用路徑」（更亮更粗）
+      map.current.addLayer({
+        id: 'cables-line-available',
+        type: 'line',
+        source: 'cables',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            5,
+            3,
+          ],
+          'line-opacity': [
+            'case',
+            ['boolean', ['feature-state', 'hover'], false],
+            1.0,
+            0.85,
+          ],
+        },
+        filter: ['all',
+          ['==', ['get', 'hidden'], false],
+          ['==', ['get', 'isAvailablePath'], true],
+        ],
+      });
+
+      // 3) 被選取的整條海纜（覆蓋在最上面）
+      map.current.addLayer({
+        id: 'cables-line-selected',
+        type: 'line',
+        source: 'cables',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': ['get', 'color'],
+          'line-width': 5,
+          'line-opacity': 0.95,
+        },
+        filter: ['all',
+          ['==', ['get', 'hidden'], false],
+          ['==', ['get', 'cableId'], '___none___'],
+        ],
+      });
+
+      // 4) 動畫流動層 (僅在選取時顯示)
+      map.current.addLayer({
+        id: 'cables-line-animation',
+        type: 'line',
+        source: 'cables',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: {
+          'line-color': '#ffffff',
+          'line-width': 2,
+          'line-opacity': 0.8,
+          'line-dasharray': [2, 4],
+        },
+        filter: ['all',
+          ['==', ['get', 'hidden'], false],
+          ['==', ['get', 'cableId'], '___none___'],
+        ],
+      });
+
+      let dashOffset = 0;
+      const animate = () => {
+        if (!map.current || !map.current.getLayer('cables-line-animation')) return;
+        dashOffset -= 0.1;
+        map.current.setPaintProperty('cables-line-animation', 'line-dash-offset', dashOffset);
+        requestAnimationFrame(animate);
+      };
+      animate();
+
+      let hoveredFeatureId: string | number | null = null;
+
+      map.current.on('mousemove', 'cables-line', (e) => handleMouseMove(e));
+      map.current.on('mousemove', 'cables-line-available', (e) => handleMouseMove(e));
+
+      const handleMouseMove = (e: any) => {
+        if (!map.current || !e.features?.length) return;
+
+        map.current.getCanvas().style.cursor = 'pointer';
+
+        const f = e.features[0];
+        const props = (f.properties ?? {}) as Record<string, unknown>;
+        const cableName = String(props.cableName ?? props.name ?? 'Unknown');
+        const segmentId = String(props.segmentId ?? '');
+        const isAvailable = props.isAvailablePath === true;
+
+        if (hoveredFeatureId !== null) {
+          map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: false });
+        }
+
+        hoveredFeatureId = f.id as string | number;
+        map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: true });
+
+        const content = `
+          <div class="p-2 bg-gray-900/90 text-white rounded shadow-lg border border-gray-700">
+            <div class="font-bold text-blue-300 font-sans">${cableName}</div>
+            <div class="text-xs mt-1 font-sans text-gray-300">Segment: ${segmentId}</div>
+            ${isAvailable ? '<div class="text-xs mt-1 font-sans text-green-400 font-semibold">✓ 台灣可用路徑</div>' : ''}
+            <div class="text-xs mt-1 font-sans text-gray-400">點擊可鎖定整條海纜</div>
+          </div>
+        `;
+
+        popup.current?.setLngLat(e.lngLat).setHTML(content).addTo(map.current);
+      };
+
+      map.current.on('mouseleave', 'cables-line', () => handleMouseLeave());
+      map.current.on('mouseleave', 'cables-line-available', () => handleMouseLeave());
+
+      const handleMouseLeave = () => {
+        if (!map.current) return;
+
+        map.current.getCanvas().style.cursor = '';
+        if (hoveredFeatureId !== null) {
+          map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: false });
+        }
+        hoveredFeatureId = null;
+        popup.current?.remove();
+      };
+
+      // 點擊選取海纜（同 cableId 全部高亮）
+      const handleClick = (e: any) => {
+        if (!map.current || !e.features?.length) return;
+        const f = e.features[0];
+        const props = (f.properties ?? {}) as Record<string, unknown>;
+        const cableId = String(props.cableId ?? '');
+
+        toggleCableSelection(cableId);
+      };
+
+      map.current.on('click', 'cables-line', handleClick);
+      map.current.on('click', 'cables-line-available', handleClick);
+
+      // 點空白取消選取
+      map.current.on('click', (e) => {
+        if (!map.current) return;
+        const features = map.current.queryRenderedFeatures(e.point, { layers: ['cables-line'] });
+        if (features.length === 0) setSelectedCableId(null);
+      });
+    });
+
+    return () => {
+      map.current?.remove();
+    };
+  }, [geoJSON]);
+
+  // 依 selectedCableId 更新 selected layer filter
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    const filter: any =
+        selectedCableId
+            ? ['all', ['==', ['get', 'hidden'], false], ['==', ['get', 'cableId'], selectedCableId]]
+            : ['all', ['==', ['get', 'hidden'], false], ['==', ['get', 'cableId'], '___none___']];
+
+    map.current.setFilter('cables-line-selected', filter);
+    map.current.setFilter('cables-line-animation', filter);
+  }, [selectedCableId]);
 
   return (
-      <div className="bg-gray-800 rounded-lg shadow-lg p-4 h-[400px] flex flex-col border border-gray-700">
-        <h2 className="text-xl font-bold mb-2 text-gray-200 flex items-center">
-          <Globe className="mr-2 h-5 w-5 text-blue-400" />
-          {t('cyber_map')}
-        </h2>
+      <div className="fixed inset-0 w-full h-full z-0">
+        <div ref={mapContainer} className="w-full h-full" />
 
-        <div className="flex-1 w-full h-full overflow-hidden bg-gray-900/50 rounded-lg border border-gray-700/50 relative">
-          <ComposableMap
-              // [SRE] 改用 Mercator 投影，看起來比較像一般的地圖
-              projection="geoMercator"
-              projectionConfig={{
-                scale: 100, // 縮放比例
-                center: [0, 20] // 中心點設在赤道北方一點，讓亞洲和美洲比較平衡
-              }}
-              style={{ width: "100%", height: "100%", background: "#0f172a" }}
-          >
-            <ZoomableGroup zoom={1}>
-              {/* 1. 地圖底層 */}
-              <Geographies geography={geoUrl}>
-                {({ geographies }) =>
-                    geographies.map((geo) => (
-                        <Geography
-                            key={geo.rsmKey}
-                            geography={geo}
-                            fill="#1e293b" // slate-800
-                            stroke="#334155" // slate-700
-                            strokeWidth={0.5}
-                            style={{
-                              default: { outline: "none" },
-                              hover: { fill: "#334155", outline: "none" },
-                              pressed: { outline: "none" },
-                            }}
-                        />
-                    ))
-                }
-              </Geographies>
-
-              {/* 2. 連線層 */}
-              {foreignConnections.map((conn, i) => {
-                const dest = countryCoords[conn.country];
-
-                return (
-                    <React.Fragment key={`line-${i}`}>
-                      <Line
-                          from={TAIWAN_COORDS}
-                          to={dest}
-                          stroke="#ef4444" // red-500
-                          strokeWidth={lineScale(conn.count)}
-                          strokeOpacity={0.6}
-                          // 這裡不設 curve，讓 Mercator 投影自己決定最短路徑，通常會是自然的弧線
-                      />
-                      {/* 目標點的光暈效果 */}
-                      <Marker coordinates={dest}>
-                        <circle r={2} fill="#f87171" />
-                        <circle r={6} fill="none" stroke="#f87171" strokeOpacity={0.5}>
-                          <animate attributeName="r" from="2" to="8" dur="1.5s" repeatCount="indefinite" />
-                          <animate attributeName="opacity" from="1" to="0" dur="1.5s" repeatCount="indefinite" />
-                        </circle>
-                      </Marker>
-                    </React.Fragment>
-                );
-              })}
-
-              {/* 3. 台灣中心點 (雷達波紋效果) */}
-              <Marker coordinates={TAIWAN_COORDS}>
-                <circle r={3} fill="#60a5fa" /> {/* blue-400 */}
-                <circle r={8} fill="none" stroke="#60a5fa" strokeWidth={1} opacity={0.5}>
-                  <animate attributeName="r" from="3" to="12" dur="2s" repeatCount="indefinite" />
-                  <animate attributeName="opacity" from="0.8" to="0" dur="2s" repeatCount="indefinite" />
-                </circle>
-              </Marker>
-            </ZoomableGroup>
-          </ComposableMap>
+        {/* 小型狀態條（可再擴充成 cable list / search / legend） */}
+        <div className="absolute left-3 top-3 bg-gray-900/80 text-gray-100 text-sm px-3 py-2 rounded border border-gray-700">
+          <div className="font-semibold">海纜地圖</div>
+          <div className="flex items-center gap-2 mt-1">
+            <div className="w-4 h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+            <div className="text-[10px] text-gray-300">台灣可用路徑</div>
+          </div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <div className="w-4 h-0.5 bg-gray-500 opacity-30"></div>
+            <div className="text-[10px] text-gray-300">其他海纜路徑</div>
+          </div>
+          <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-700">
+            {selectedCableId ? `已選取：${selectedCableId}` : '提示：滑過看資訊、點擊鎖定海纜'}
+          </div>
         </div>
       </div>
   );

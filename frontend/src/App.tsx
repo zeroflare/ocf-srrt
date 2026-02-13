@@ -14,7 +14,6 @@ import Joyride, { Step } from 'react-joyride';
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  // [SRE] 獲取真實連線狀態，用於監控儀表板
   const { monitoringIp, setMonitoringIp, loadSnapshot, isSharedReport, setSharedReport } = useDnsStore();
   const isConnected = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
@@ -45,7 +44,6 @@ function App() {
     }
 
     function loadRecords(decoded: any[]) {
-      // 將縮寫轉回 DnsRecord 格式
       const records: DnsRecord[] = decoded.map((r: any) => ({
         timestamp: r.t,
         domain: r.d,
@@ -58,14 +56,14 @@ function App() {
         appCategory: r.cat,
         isp: r.isp,
         asn: r.asn || 0,
-        type: 'A' // 預設值
+        type: 'A'
       }));
 
       // 設定一個虛擬的監控 IP 以便顯示資料
       if (records.length > 0) {
         setSharedReport(true);
         setMonitoringIp(records[0].sourceIp);
-        loadSnapshot(records.reverse()); // loadSnapshot 會再 reverse 一次，所以這裡先 reverse
+        loadSnapshot(records.reverse());
       }
     }
   }, [setMonitoringIp, loadSnapshot, setSharedReport]);

@@ -73,7 +73,13 @@ export const CyberMap: React.FC = () => {
       },
       center: TAIWAN_CENTER,
       zoom: ZOOM_LEVEL,
+      dragRotate: false,
+      touchZoomRotate: false,
+      pitchWithRotate: false,
+      maxPitch: 0
     });
+    map.current.dragRotate.disable();
+    map.current.touchZoomRotate.disable();
 
     popup.current = new maplibregl.Popup({
       closeButton: false,
@@ -179,36 +185,43 @@ export const CyberMap: React.FC = () => {
       let dashOffset = 0;
       const animate = () => {
         if (!map.current || !map.current.getLayer('cables-line-animation')) return;
-        dashOffset -= 0.1;
-        map.current.setPaintProperty('cables-line-animation', 'line-dash-offset', dashOffset);
+        dashOffset = (dashOffset + 0.2) % 6;
+        map.current.setPaintProperty('cables-line-animation', 'line-dasharray', [2, 4, dashOffset, 0]);
         requestAnimationFrame(animate);
       };
-      animate();
+      // 暫時移除這段動畫，因為 line-dash-offset 不是 MapLibre 的標準屬性，會導致崩潰
+      // 如果需要動畫，建議使用 line-dasharray 偏移技巧或移除
+      // animate();
 
       let hoveredFeatureId: string | number | null = null;
 
-      map.current.on('mousemove', 'cables-line', (e) => handleMouseMove(e));
-      map.current.on('mousemove', 'cables-line-available', (e) => handleMouseMove(e));
+      const activeLayers = ['cables-line', 'cables-line-available'];
 
-      const handleMouseMove = (e: any) => {
-        if (!map.current || !e.features?.length) return;
-
-        map.current.getCanvas().style.cursor = 'pointer';
-
-        const f = e.features[0];
-        const props = (f.properties ?? {}) as Record<string, unknown>;
-        const cableName = String(props.cableName ?? props.name ?? 'Unknown');
-        const segmentId = String(props.segmentId ?? '');
-        const isAvailable = props.isAvailablePath === true;
-
-        if (hoveredFeatureId !== null) {
-          map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: false });
-        }
-
-        hoveredFeatureId = f.id as string | number;
-        map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: true });
-
-        const content = `
+      map.current.on('mousemove', (e) => {
+        if (!map.current) return;
+        const features = map.current.queryRenderedFeatures(e.point, {
+          layers: activeLayers
+        });
+        if (features.length > 0) {
+          map.current.getCanvas().style.cursor = 'pointer';
+          const f = features[0];
+          if (hoveredFeatureId !== null) {
+            map.current.setFeatureState(
+                {source: 'cables', id: hoveredFeatureId},
+                {hover: false}
+            );
+          }
+          hoveredFeatureId = f.id as string | number;
+          ;
+          map.current.setFeatureState(
+              {source: 'cables', id: hoveredFeatureId},
+              {hover: true}
+          );
+          const props = (f.properties ?? {}) as Record<string, unknown>;
+          const cableName = String(props.cableName ?? props.name ?? 'Unknown');
+          const segmentId = String(props.segmentId ?? '');
+          const isAvailable = props.isAvailablePath === true;
+          const content = `
           <div class="p-2 bg-gray-900/90 text-white rounded shadow-lg border border-gray-700">
             <div class="font-bold text-blue-300 font-sans">${cableName}</div>
             <div class="text-xs mt-1 font-sans text-gray-300">Segment: ${segmentId}</div>
@@ -216,9 +229,11 @@ export const CyberMap: React.FC = () => {
             <div class="text-xs mt-1 font-sans text-gray-400">點擊可鎖定整條海纜</div>
           </div>
         `;
-
-        popup.current?.setLngLat(e.lngLat).setHTML(content).addTo(map.current);
-      };
+          popup.current?.setLngLat(e.lngLat).setHTML(content).addTo(map.current);
+        } else {
+          handleMouseLeave();
+        }
+      });
 
       map.current.on('mouseleave', 'cables-line', () => handleMouseLeave());
       map.current.on('mouseleave', 'cables-line-available', () => handleMouseLeave());
@@ -250,7 +265,7 @@ export const CyberMap: React.FC = () => {
       // 點空白取消選取
       map.current.on('click', (e) => {
         if (!map.current) return;
-        const features = map.current.queryRenderedFeatures(e.point, { layers: ['cables-line'] });
+        const features = map.current.queryRenderedFeatures(e.point, { layers: ['cables-line', 'cables-line-available'] });
         if (features.length === 0) setSelectedCableId(null);
       });
     });
@@ -274,7 +289,24 @@ export const CyberMap: React.FC = () => {
   }, [selectedCableId]);
 
   return (
-      <div className="w-full h-full relative overflow-hidden">
+      <div className="w-full h-full relative overflow-hidden tour-map">
+        <style>
+          {`
+            .custom-popup .maplibregl-popup-content {
+              background: transparent;
+              padding: 0;
+              box-shadow: none;
+              border: none;
+            }
+            .custom-popup .maplibregl-popup-tip {
+              display: none;
+            }
+            .custom-popup {
+              pointer-events: none;
+              z-index: 50;
+            }
+          `}
+        </style>
         <div ref={mapContainer} className="w-full h-full" />
 
         {/* 小型狀態條 */}

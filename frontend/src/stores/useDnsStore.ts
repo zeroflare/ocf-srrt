@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { throttle } from 'lodash-es';
+import pako from 'pako';
 import { DnsRecord } from '../types'; // 引入剛剛定義好的 Type
 
 interface DnsState {
@@ -7,32 +8,50 @@ interface DnsState {
   totalQueries: number;
   foreignQueries: number;
   isPaused: boolean;
+  monitoringIp: string | null;
+  maxRecords: number;
+  isSharedReport: boolean;
 
   // Actions
   addRecord: (record: DnsRecord) => void;
-  loadSnapshot: (records: DnsRecord[]) => void; // [新增] 用於載入歷史資料
+  loadSnapshot: (records: DnsRecord[]) => void;
   setPaused: (paused: boolean) => void;
+  setMonitoringIp: (ip: string | null) => void;
+  setSharedReport: (isShared: boolean) => void;
   clearRecords: () => void;
+  exportToUrl: () => string;
 }
 
+const MAX_RECORDS_FOR_SHARE = 50;
+
 // 實際執行 State 更新的邏輯 (Pure Function)
-const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boolean) => {
+const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boolean, monitoringIp: string | null, maxRecords: number) => {
   if (isPaused || newRecords.length === 0) return;
 
+  // 過濾 IP
+  const filteredRecords = monitoringIp
+    ? newRecords.filter(r => r.sourceIp === monitoringIp)
+    : [];
+
+  if (filteredRecords.length === 0 && monitoringIp !== null) return;
+
+  // 如果 monitoringIp 為 null，則表示不監控任何封包 (預設關閉)
+  if (monitoringIp === null) return;
+
   set((state: DnsState) => {
-    // 1. 計算新進資料的統計數據 (注意欄位是 snake_case: is_foreign)
-    const newForeignCount = newRecords.reduce(
+    // 1. 計算新進資料的統計數據
+    const newForeignCount = filteredRecords.reduce(
         (count, r) => count + (r.isForeign ? 1 : 0),
         0
     );
 
     // 2. 合併列表 (最新的放在最上面)
-    // SRE 優化：限制只留 1000 筆，避免長時間掛著導致瀏覽器記憶體洩漏
-    const combinedRecords = [...newRecords, ...state.records].slice(0, 1000);
+    // SRE 優化：限制只留指定筆數，避免長時間掛著導致瀏覽器記憶體洩漏
+    const combinedRecords = [...filteredRecords, ...state.records].slice(0, maxRecords);
 
     return {
       records: combinedRecords,
-      totalQueries: state.totalQueries + newRecords.length,
+      totalQueries: state.totalQueries + filteredRecords.length,
       foreignQueries: state.foreignQueries + newForeignCount,
     };
   });
@@ -48,7 +67,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     batchBuffer = []; // 立刻清空，避免重複處理
 
     // 呼叫更新邏輯
-    updateStateWithBatch(currentBatch, set, get().isPaused);
+    updateStateWithBatch(currentBatch, set, get().isPaused, get().monitoringIp, get().maxRecords);
   }, 500, { leading: false, trailing: true });
 
   return {
@@ -56,10 +75,13 @@ export const useDnsStore = create<DnsState>((set, get) => {
     totalQueries: 0,
     foreignQueries: 0,
     isPaused: false,
+    monitoringIp: null,
+    maxRecords: MAX_RECORDS_FOR_SHARE,
+    isSharedReport: false,
 
     addRecord: (record: DnsRecord) => {
-      // 只要不暫停，就推入緩衝區
-      if (!get().isPaused) {
+      // 只要不暫停且不是分享報告模式，就推入緩衝區
+      if (!get().isPaused && !get().isSharedReport) {
         batchBuffer.push(record);
         flushBuffer(); // 嘗試觸發更新 (會被 throttle 擋住直到時間到)
       }
@@ -67,10 +89,14 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     // 這是給 WebSocket 一連線時用的，直接替換當前列表
     loadSnapshot: (historyRecords: DnsRecord[]) => {
+      const { monitoringIp, maxRecords } = get();
+      if (!monitoringIp) return;
+
       set(() => {
+        // 過濾歷史資料
+        const filtered = historyRecords.filter(r => r.sourceIp === monitoringIp);
         // 歷史資料通常是 舊->新，但 UI 顯示習慣 新->舊，所以反轉
-        // 或者看後端傳過來的順序決定是否要 .reverse()
-        const sortedRecords = [...historyRecords].reverse();
+        const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
 
         // 重新計算歷史數據的統計
         const historyForeignCount = sortedRecords.reduce(
@@ -87,6 +113,58 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     setPaused: (paused: boolean) => set({ isPaused: paused }),
 
-    clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0 }),
+    setMonitoringIp: (ip: string | null) => {
+      // 如果 ip 為 null 或與當前不同，則重置 (除了 isSharedReport)
+      set((state) => ({
+        monitoringIp: ip,
+        records: [],
+        totalQueries: 0,
+        foreignQueries: 0,
+        // 如果是主動設定新 IP (非分享模式下)，則取消分享模式
+        isSharedReport: state.isSharedReport && ip === state.monitoringIp
+      }));
+    },
+
+    setSharedReport: (isShared: boolean) => set({ isSharedReport: isShared }),
+
+    clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0, isSharedReport: false }),
+
+    exportToUrl: () => {
+      const { records } = get();
+      if (records.length === 0) return window.location.origin + window.location.pathname;
+
+      try {
+        // 為了分享，我們將資料轉為縮寫格式
+        const minimalRecords = records.map(r => ({
+          t: r.timestamp,
+          d: r.domain,
+          ip: r.resultIp,
+          f: r.isForeign ? 1 : 0,
+          l: r.latency,
+          s: r.sourceIp,
+          c: r.country,
+          a: r.appName,
+          cat: r.appCategory,
+          isp: r.isp,
+          asn: r.asn
+        }));
+
+        const json = JSON.stringify(minimalRecords);
+        // 使用 pako 進行壓縮
+        const compressed = pako.deflate(json);
+        // 將 Uint8Array 轉為 base64 (使用可選的 URL 安全字元處理更好，這裡先用基礎 btoa)
+        const base64 = btoa(String.fromCharCode.apply(null, Array.from(compressed)))
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_')
+            .replace(/=+$/, '');
+
+        const url = new URL(window.location.href);
+        url.searchParams.set('zdata', base64);
+        return url.toString();
+      } catch (e) {
+        console.error('Failed to export data:', e);
+        return window.location.origin + window.location.pathname;
+      }
+    }
   };
 });

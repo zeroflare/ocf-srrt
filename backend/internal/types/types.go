@@ -9,6 +9,7 @@ type DNSQueryRecord struct {
 	Type        string    `json:"type"`
 	ResultIP    string    `json:"resultIp"`
 	IsForeign   bool      `json:"isForeign"`
+	Latency     float64   `json:"latency"` // 新增延遲欄位 (ms)
 	SourceIP    string    `json:"sourceIp"`
 	Country     string    `json:"country"`
 	ASN         uint      `json:"asn"`

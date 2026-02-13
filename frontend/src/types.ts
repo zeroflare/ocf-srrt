@@ -14,6 +14,9 @@ export interface DnsRecord {
     // 對應 Go: IsForeign bool
     isForeign: boolean;
 
+    // 對應 Go: Latency float64
+    latency: number;
+
     // 對應 Go: SourceIP string
     sourceIp: string;
 

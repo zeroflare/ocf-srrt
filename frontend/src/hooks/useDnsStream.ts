@@ -16,10 +16,10 @@ const getWebSocketUrl = () => {
   // 2. 自動判斷 (適合直接跑在 Host Network 或前後端整合部署)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.hostname;
-  return `${protocol}//${host}:8080/ws`;
+  return `${protocol}//${host}/ws`;
 };
 
-export const useDnsStream = () => {
+export const useDnsStream = (enabled: boolean = true) => {
   const { addRecord, loadSnapshot } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
@@ -28,6 +28,11 @@ export const useDnsStream = () => {
   const reconnectTimeout = useRef<number | undefined>(undefined);
 
   useEffect(() => {
+    if (!enabled) {
+      setIsConnected(false);
+      return;
+    }
+
     const connect = () => {
       const url = getWebSocketUrl();
       console.log(`Connecting to WebSocket: ${url}`);
@@ -94,7 +99,7 @@ export const useDnsStream = () => {
         clearTimeout(reconnectTimeout.current);
       }
     };
-  }, [addRecord, loadSnapshot]);
+  }, [addRecord, loadSnapshot, enabled]);
 
   return isConnected;
 };

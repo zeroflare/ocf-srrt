@@ -3,8 +3,8 @@ import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCableStore } from '../stores/useCableStore';
 
-const TAIWAN_CENTER: [number, number] = [121.5, 23.5];
-const ZOOM_LEVEL = 5;
+const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
+const ZOOM_LEVEL = 6.5;
 
 export const CyberMap: React.FC = () => {
   const mapContainer = useRef<HTMLDivElement>(null);
@@ -36,21 +36,21 @@ export const CyberMap: React.FC = () => {
           {
             id: "background",
             type: "background",
-            paint: { "background-color": "#1f2025" },
+            paint: { "background-color": "#020617" },
           },
           {
             id: "county",
             type: "fill",
             source: "map",
             "source-layer": "city",
-            paint: { "fill-color": "#3F4045" },
+            paint: { "fill-color": "#0f172a" },
           },
           {
             id: "county-outline",
             type: "line",
             source: "map",
             "source-layer": "city",
-            paint: { "line-color": "#a9b4bc" },
+            paint: { "line-color": "#1e293b", "line-width": 1 },
           },
           {
             id: "town",
@@ -65,7 +65,7 @@ export const CyberMap: React.FC = () => {
             source: "map",
             "source-layer": "global",
             paint: {
-              "fill-color": "#3F4045",
+              "fill-color": "#0f172a",
               "fill-opacity": 1,
             },
           },
@@ -274,22 +274,22 @@ export const CyberMap: React.FC = () => {
   }, [selectedCableId]);
 
   return (
-      <div className="fixed inset-0 w-full h-full z-0">
+      <div className="w-full h-full relative overflow-hidden">
         <div ref={mapContainer} className="w-full h-full" />
 
-        {/* 小型狀態條（可再擴充成 cable list / search / legend） */}
-        <div className="absolute left-3 top-3 bg-gray-900/80 text-gray-100 text-sm px-3 py-2 rounded border border-gray-700">
-          <div className="font-semibold">海纜地圖</div>
-          <div className="flex items-center gap-2 mt-1">
-            <div className="w-4 h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-            <div className="text-[10px] text-gray-300">台灣可用路徑</div>
+        {/* 小型狀態條 */}
+        <div className="absolute left-6 top-6 bg-slate-950/80 backdrop-blur-md text-slate-100 text-[10px] px-4 py-3 rounded-xl border border-white/10 shadow-2xl z-10 pointer-events-none">
+          <div className="font-bold uppercase tracking-widest text-cyan-400 mb-2">海底電纜監控網</div>
+          <div className="flex items-center gap-3 mt-1.5">
+            <div className="w-3 h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+            <div className="text-slate-400 uppercase tracking-tighter">台灣可用路徑</div>
           </div>
-          <div className="flex items-center gap-2 mt-0.5">
-            <div className="w-4 h-0.5 bg-gray-500 opacity-30"></div>
-            <div className="text-[10px] text-gray-300">其他海纜路徑</div>
+          <div className="flex items-center gap-3 mt-1">
+            <div className="w-3 h-0.5 bg-slate-700"></div>
+            <div className="text-slate-500 uppercase tracking-tighter">其他國際海纜</div>
           </div>
-          <div className="text-xs text-gray-400 mt-2 pt-2 border-t border-gray-700">
-            {selectedCableId ? `已選取：${selectedCableId}` : '提示：滑過看資訊、點擊鎖定海纜'}
+          <div className="text-[9px] text-slate-600 mt-3 pt-3 border-t border-white/5 font-mono">
+            {selectedCableId ? `SELECTED: ${selectedCableId}` : 'HINT: HOVER TO INSPECT'}
           </div>
         </div>
       </div>

@@ -2,7 +2,7 @@ package recognition
 
 import (
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"regexp"
 	"strings"
@@ -36,7 +36,7 @@ func LoadRules(path string) {
 		// 1. 讀取檔案
 		data, err := os.ReadFile(path)
 		if err != nil {
-			log.Printf("[Warning] Could not read app recognition rules from %s: %v", path, err)
+			slog.Warn("Could not read app recognition rules", "component", "recognition", "path", path, "error", err)
 			return
 		}
 
@@ -46,7 +46,7 @@ func LoadRules(path string) {
 		if err := json.Unmarshal(data, &config); err != nil {
 			// 相容舊格式：如果直接是 Array
 			if err := json.Unmarshal(data, &rules); err != nil {
-				log.Printf("[Warning] Could not parse rules: %v", err)
+				slog.Warn("Could not parse rules", "component", "recognition", "error", err)
 				return
 			}
 		} else {
@@ -74,7 +74,7 @@ func LoadRules(path string) {
 				}
 			}
 		}
-		log.Printf("[Recognition] Loaded %d rules from %s", len(rules), path)
+		slog.Info("Loaded app recognition rules", "component", "recognition", "count", len(rules), "path", path)
 	})
 }
 

@@ -13,6 +13,8 @@ require (
 )
 
 require (
+	github.com/go-ping/ping v1.2.0 // indirect
+	github.com/google/uuid v1.2.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.1 // indirect
 	github.com/patrickmn/go-cache v2.1.0+incompatible // indirect
 	github.com/stretchr/testify v1.11.1 // indirect

@@ -1,17 +1,26 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useCableStore } from '../stores/useCableStore';
+import { useTracerouteStore } from '../stores/useTracerouteStore';
+import { useDnsStore } from '../stores/useDnsStore';
+import { calculateDistance, createCurve } from '../utils/geo';
+import { addCableSources, addCableLayers, setupCableInteractions } from '../utils/cableLayer';
+import { useTranslation } from 'react-i18next';
+import { Radio, Search } from 'lucide-react';
 
 const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
 const ZOOM_LEVEL = 6.5;
 
 export const CyberMap: React.FC = () => {
+  const { t } = useTranslation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const popup = useRef<maplibregl.Popup | null>(null);
 
   const { geoJSON, selectedCableId, initialize, setSelectedCableId, toggleCableSelection } = useCableStore();
+  const { activeResult } = useTracerouteStore();
+  const { records, monitoringIp, theme } = useDnsStore();
 
   useEffect(() => {
     if (!geoJSON) {
@@ -36,21 +45,21 @@ export const CyberMap: React.FC = () => {
           {
             id: "background",
             type: "background",
-            paint: { "background-color": "#020617" },
+            paint: { "background-color": theme === 'dark' ? "#020617" : "#f8fafc" },
           },
           {
             id: "county",
             type: "fill",
             source: "map",
             "source-layer": "city",
-            paint: { "fill-color": "#0f172a" },
+            paint: { "fill-color": theme === 'dark' ? "#0f172a" : "#e2e8f0" },
           },
           {
             id: "county-outline",
             type: "line",
             source: "map",
             "source-layer": "city",
-            paint: { "line-color": "#1e293b", "line-width": 1 },
+            paint: { "line-color": theme === 'dark' ? "#1e293b" : "#cbd5e1", "line-width": 1 },
           },
           {
             id: "town",
@@ -65,7 +74,7 @@ export const CyberMap: React.FC = () => {
             source: "map",
             "source-layer": "global",
             paint: {
-              "fill-color": "#0f172a",
+              "fill-color": theme === 'dark' ? "#0f172a" : "#e2e8f0",
               "fill-opacity": 1,
             },
           },
@@ -90,183 +99,45 @@ export const CyberMap: React.FC = () => {
     map.current.on('load', () => {
       if (!map.current) return;
 
-      map.current.addSource('cables', {
+      addCableSources(map.current, geoJSON!);
+      addCableLayers(map.current, theme);
+      setupCableInteractions(map.current, popup.current!, theme, toggleCableSelection, setSelectedCableId, {
+        availablePath: t('cable_available_path'),
+        clickToSelect: t('cable_click_to_select'),
+      });
+
+      // DNS query points source
+      map.current.addSource('dns-points', {
         type: 'geojson',
-        data: geoJSON!,
-        generateId: true,
+        data: { type: 'FeatureCollection', features: [] },
       });
 
-      // 1) 全部海纜（更淡）
+      // Pulse ring (outer glow)
       map.current.addLayer({
-        id: 'cables-line',
-        type: 'line',
-        source: 'cables',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        id: 'dns-points-pulse',
+        type: 'circle',
+        source: 'dns-points',
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            3,
-            1.5,
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            0.8,
-            0.15,
-          ],
+          'circle-radius': 12,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.15,
+          'circle-blur': 1,
         },
-        filter: ['==', ['get', 'hidden'], false],
       });
 
-      // 2) 強調「可用路徑」（更亮更粗）
+      // Core dot
       map.current.addLayer({
-        id: 'cables-line-available',
-        type: 'line',
-        source: 'cables',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        id: 'dns-points-core',
+        type: 'circle',
+        source: 'dns-points',
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            5,
-            3,
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1.0,
-            0.85,
-          ],
+          'circle-radius': 4,
+          'circle-color': ['get', 'color'],
+          'circle-opacity': 0.9,
+          'circle-stroke-width': 1,
+          'circle-stroke-color': ['get', 'color'],
+          'circle-stroke-opacity': 0.4,
         },
-        filter: ['all',
-          ['==', ['get', 'hidden'], false],
-          ['==', ['get', 'isAvailablePath'], true],
-        ],
-      });
-
-      // 3) 被選取的整條海纜（覆蓋在最上面）
-      map.current.addLayer({
-        id: 'cables-line-selected',
-        type: 'line',
-        source: 'cables',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': ['get', 'color'],
-          'line-width': 5,
-          'line-opacity': 0.95,
-        },
-        filter: ['all',
-          ['==', ['get', 'hidden'], false],
-          ['==', ['get', 'cableId'], '___none___'],
-        ],
-      });
-
-      // 4) 動畫流動層 (僅在選取時顯示)
-      map.current.addLayer({
-        id: 'cables-line-animation',
-        type: 'line',
-        source: 'cables',
-        layout: { 'line-join': 'round', 'line-cap': 'round' },
-        paint: {
-          'line-color': '#ffffff',
-          'line-width': 2,
-          'line-opacity': 0.8,
-          'line-dasharray': [2, 4],
-        },
-        filter: ['all',
-          ['==', ['get', 'hidden'], false],
-          ['==', ['get', 'cableId'], '___none___'],
-        ],
-      });
-
-      let dashOffset = 0;
-      const animate = () => {
-        if (!map.current || !map.current.getLayer('cables-line-animation')) return;
-        dashOffset = (dashOffset + 0.2) % 6;
-        map.current.setPaintProperty('cables-line-animation', 'line-dasharray', [2, 4, dashOffset, 0]);
-        requestAnimationFrame(animate);
-      };
-      // 暫時移除這段動畫，因為 line-dash-offset 不是 MapLibre 的標準屬性，會導致崩潰
-      // 如果需要動畫，建議使用 line-dasharray 偏移技巧或移除
-      // animate();
-
-      let hoveredFeatureId: string | number | null = null;
-
-      const activeLayers = ['cables-line', 'cables-line-available'];
-
-      map.current.on('mousemove', (e) => {
-        if (!map.current) return;
-        const features = map.current.queryRenderedFeatures(e.point, {
-          layers: activeLayers
-        });
-        if (features.length > 0) {
-          map.current.getCanvas().style.cursor = 'pointer';
-          const f = features[0];
-          if (hoveredFeatureId !== null) {
-            map.current.setFeatureState(
-                {source: 'cables', id: hoveredFeatureId},
-                {hover: false}
-            );
-          }
-          hoveredFeatureId = f.id as string | number;
-          ;
-          map.current.setFeatureState(
-              {source: 'cables', id: hoveredFeatureId},
-              {hover: true}
-          );
-          const props = (f.properties ?? {}) as Record<string, unknown>;
-          const cableName = String(props.cableName ?? props.name ?? 'Unknown');
-          const segmentId = String(props.segmentId ?? '');
-          const isAvailable = props.isAvailablePath === true;
-          const content = `
-          <div class="p-2 bg-gray-900/90 text-white rounded shadow-lg border border-gray-700">
-            <div class="font-bold text-blue-300 font-sans">${cableName}</div>
-            <div class="text-xs mt-1 font-sans text-gray-300">Segment: ${segmentId}</div>
-            ${isAvailable ? '<div class="text-xs mt-1 font-sans text-green-400 font-semibold">✓ 台灣可用路徑</div>' : ''}
-            <div class="text-xs mt-1 font-sans text-gray-400">點擊可鎖定整條海纜</div>
-          </div>
-        `;
-          popup.current?.setLngLat(e.lngLat).setHTML(content).addTo(map.current);
-        } else {
-          handleMouseLeave();
-        }
-      });
-
-      map.current.on('mouseleave', 'cables-line', () => handleMouseLeave());
-      map.current.on('mouseleave', 'cables-line-available', () => handleMouseLeave());
-
-      const handleMouseLeave = () => {
-        if (!map.current) return;
-
-        map.current.getCanvas().style.cursor = '';
-        if (hoveredFeatureId !== null) {
-          map.current.setFeatureState({ source: 'cables', id: hoveredFeatureId }, { hover: false });
-        }
-        hoveredFeatureId = null;
-        popup.current?.remove();
-      };
-
-      // 點擊選取海纜（同 cableId 全部高亮）
-      const handleClick = (e: any) => {
-        if (!map.current || !e.features?.length) return;
-        const f = e.features[0];
-        const props = (f.properties ?? {}) as Record<string, unknown>;
-        const cableId = String(props.cableId ?? '');
-
-        toggleCableSelection(cableId);
-      };
-
-      map.current.on('click', 'cables-line', handleClick);
-      map.current.on('click', 'cables-line-available', handleClick);
-
-      // 點空白取消選取
-      map.current.on('click', (e) => {
-        if (!map.current) return;
-        const features = map.current.queryRenderedFeatures(e.point, { layers: ['cables-line', 'cables-line-available'] });
-        if (features.length === 0) setSelectedCableId(null);
       });
     });
 
@@ -274,6 +145,68 @@ export const CyberMap: React.FC = () => {
       map.current?.remove();
     };
   }, [geoJSON]);
+
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    const isDark = theme === 'dark';
+    const bgColor = isDark ? '#020617' : '#f8fafc';
+    const landColor = isDark ? '#0f172a' : '#e2e8f0';
+    const borderColor = isDark ? '#1e293b' : '#cbd5e1';
+
+    map.current.setPaintProperty('background', 'background-color', bgColor);
+    map.current.setPaintProperty('county', 'fill-color', landColor);
+    map.current.setPaintProperty('county-outline', 'line-color', borderColor);
+    map.current.setPaintProperty('global', 'fill-color', landColor);
+
+    // Update cable layers for theme — light mode needs higher opacity/width
+    if (map.current.getLayer('cables-line')) {
+      map.current.setPaintProperty('cables-line', 'line-opacity', [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        0.9,
+        isDark ? 0.15 : 0.35,
+      ]);
+      map.current.setPaintProperty('cables-line', 'line-width', [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        3,
+        isDark ? 1.5 : 2,
+      ]);
+    }
+    if (map.current.getLayer('cables-line-available')) {
+      map.current.setPaintProperty('cables-line-available', 'line-opacity', [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        1.0,
+        isDark ? 0.85 : 1.0,
+      ]);
+      map.current.setPaintProperty('cables-line-available', 'line-width', [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        5,
+        isDark ? 3 : 3.5,
+      ]);
+    }
+    if (map.current.getLayer('cables-line-animation')) {
+      map.current.setPaintProperty('cables-line-animation', 'line-color', isDark ? '#ffffff' : '#0e7490');
+      map.current.setPaintProperty('cables-line-animation', 'line-opacity', isDark ? 0.8 : 0.6);
+    }
+
+    // Update DNS point visuals
+    if (map.current.getLayer('dns-points-pulse')) {
+      map.current.setPaintProperty('dns-points-pulse', 'circle-opacity', isDark ? 0.15 : 0.25);
+    }
+    if (map.current.getLayer('dns-points-core')) {
+      map.current.setPaintProperty('dns-points-core', 'circle-opacity', isDark ? 0.9 : 1.0);
+      map.current.setPaintProperty('dns-points-core', 'circle-stroke-opacity', isDark ? 0.4 : 0.6);
+    }
+
+    // Update traceroute node stroke for visibility
+    if (map.current.getLayer('trace-nodes')) {
+      map.current.setPaintProperty('trace-nodes', 'circle-stroke-color', isDark ? '#0f172a' : '#ffffff');
+    }
+  }, [theme]);
 
   // 依 selectedCableId 更新 selected layer filter
   useEffect(() => {
@@ -287,6 +220,144 @@ export const CyberMap: React.FC = () => {
     map.current.setFilter('cables-line-selected', filter);
     map.current.setFilter('cables-line-animation', filter);
   }, [selectedCableId]);
+
+  // 更新 Traceroute 視覺化
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    const source = map.current.getSource('traceroute') as maplibregl.GeoJSONSource;
+    if (!source) return;
+
+    if (!activeResult || activeResult.hops.length === 0) {
+      source.setData({ type: 'FeatureCollection', features: [] });
+      if (map.current.getLayer('trace-nodes')) map.current.removeLayer('trace-nodes');
+      if (map.current.getLayer('trace-lines')) map.current.removeLayer('trace-lines');
+      return;
+    }
+
+    const features: any[] = [];
+    const hops = activeResult.hops.filter(h => h.coords && h.coords.length === 2);
+
+    // 1. Add Hop Nodes
+    hops.forEach(hop => {
+      features.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: hop.coords },
+        properties: { ...hop, type: 'hop' }
+      });
+    });
+
+    // 2. Add Segments (Lines)
+    for (let i = 0; i < hops.length - 1; i++) {
+      const start = hops[i];
+      const end = hops[i+1];
+      
+      // Calculate distance for visual logic
+      const dist = calculateDistance(start.coords, end.coords);
+      const isSubmarine = dist > 1000;
+
+      if (isSubmarine) {
+        // Curved line for submarine cables
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: createCurve(start.coords, end.coords)
+          },
+          properties: { type: 'submarine', distance: dist }
+        });
+      } else {
+        // Straight line for normal segments
+        features.push({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: [start.coords, end.coords]
+          },
+          properties: { type: 'normal', distance: dist }
+        });
+      }
+    }
+
+    source.setData({ type: 'FeatureCollection', features });
+
+    // Ensure layers exist
+    if (!map.current.getLayer('trace-lines')) {
+      map.current.addLayer({
+        id: 'trace-lines',
+        type: 'line',
+        source: 'traceroute',
+        paint: {
+          'line-color': [
+            'case',
+            ['==', ['get', 'type'], 'submarine'], '#8b5cf6',
+            '#22d3ee'
+          ],
+          'line-width': [
+            'case',
+            ['==', ['get', 'type'], 'submarine'], 3,
+            2
+          ],
+          'line-dasharray': [2, 4],
+          'line-blur': [
+            'case',
+            ['==', ['get', 'type'], 'submarine'], 2,
+            0
+          ]
+        },
+        filter: ['==', ['geometry-type'], 'LineString']
+      });
+    }
+
+    if (!map.current.getLayer('trace-nodes')) {
+      map.current.addLayer({
+        id: 'trace-nodes',
+        type: 'circle',
+        source: 'traceroute',
+        paint: {
+          'circle-radius': 5,
+          'circle-color': '#22d3ee',
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#0f172a'
+        },
+        filter: ['==', ['geometry-type'], 'Point']
+      });
+    }
+
+    // Zoom to fit the trace
+    if (hops.length > 0) {
+      const bounds = new maplibregl.LngLatBounds();
+      hops.forEach(h => bounds.extend(h.coords));
+      map.current.fitBounds(bounds, { padding: 100, maxZoom: 8 });
+    }
+  }, [activeResult]);
+
+  // Deduplicate DNS points by resultIp (keep most recent per IP)
+  const dnsPointFeatures = useMemo(() => {
+    const seen = new Map<string, typeof records[0]>();
+    for (const r of records) {
+      if (r.longitude && r.latitude && !seen.has(r.resultIp)) {
+        seen.set(r.resultIp, r);
+      }
+    }
+    return Array.from(seen.values()).map(r => ({
+      type: 'Feature' as const,
+      geometry: { type: 'Point' as const, coordinates: [r.longitude!, r.latitude!] },
+      properties: {
+        color: r.isForeign ? '#ef4444' : '#10b981',
+        ip: r.resultIp,
+        domain: r.domain,
+      },
+    }));
+  }, [records]);
+
+  // Update dns-points source reactively
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    const source = map.current.getSource('dns-points') as maplibregl.GeoJSONSource;
+    if (!source) return;
+    source.setData({ type: 'FeatureCollection', features: dnsPointFeatures });
+  }, [dnsPointFeatures]);
 
   return (
       <div className="w-full h-full relative overflow-hidden tour-map">
@@ -310,20 +381,62 @@ export const CyberMap: React.FC = () => {
         <div ref={mapContainer} className="w-full h-full" />
 
         {/* 小型狀態條 */}
-        <div className="absolute left-6 top-6 bg-slate-950/80 backdrop-blur-md text-slate-100 text-[10px] px-4 py-3 rounded-xl border border-white/10 shadow-2xl z-10 pointer-events-none">
-          <div className="font-bold uppercase tracking-widest text-cyan-400 mb-2">海底電纜監控網</div>
+        <div className="absolute left-6 top-6 bg-white/90 dark:bg-slate-950/80 backdrop-blur-md text-slate-700 dark:text-slate-100 text-xs px-5 py-4 rounded-xl border border-slate-300 dark:border-white/10 shadow-xl dark:shadow-2xl z-10 pointer-events-none transition-colors">
+          <div className="font-bold uppercase tracking-widest text-cyan-700 dark:text-cyan-400 mb-2.5 text-[13px]">{t('cable_monitor')}</div>
+          <div className="flex items-center gap-3 mt-2">
+            <div className="w-4 h-0.5 bg-blue-600 dark:bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
+            <div className="text-slate-700 dark:text-slate-400 tracking-tight font-medium">{t('cable_tw_routes')}</div>
+          </div>
           <div className="flex items-center gap-3 mt-1.5">
-            <div className="w-3 h-0.5 bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.8)]"></div>
-            <div className="text-slate-400 uppercase tracking-tighter">台灣可用路徑</div>
+            <div className="w-4 h-0.5 bg-slate-400 dark:bg-slate-700"></div>
+            <div className="text-slate-500 dark:text-slate-500 tracking-tight font-medium">{t('cable_international')}</div>
           </div>
-          <div className="flex items-center gap-3 mt-1">
-            <div className="w-3 h-0.5 bg-slate-700"></div>
-            <div className="text-slate-500 uppercase tracking-tighter">其他國際海纜</div>
+          <div className="flex items-center gap-3 mt-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-emerald-500"></div>
+            <div className="text-slate-700 dark:text-slate-400 tracking-tight font-medium">{t('dns_local')}</div>
           </div>
-          <div className="text-[9px] text-slate-600 mt-3 pt-3 border-t border-white/5 font-mono">
-            {selectedCableId ? `SELECTED: ${selectedCableId}` : 'HINT: HOVER TO INSPECT'}
+          <div className="flex items-center gap-3 mt-1.5">
+            <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+            <div className="text-slate-700 dark:text-slate-400 tracking-tight font-medium">{t('dns_foreign')}</div>
+          </div>
+          <div className="text-[10px] text-slate-500 dark:text-slate-600 mt-3 pt-3 border-t border-slate-300 dark:border-white/5 font-mono">
+            {selectedCableId ? t('cable_selected', { id: selectedCableId }) : t('cable_hint').toUpperCase()}
+          </div>
+          <div className="text-[10px] text-slate-400 dark:text-slate-600/60 mt-1.5 pointer-events-auto">
+            {t('cable_source')}{' '}
+            <a href="https://smc.peering.tw/" target="_blank" rel="noopener noreferrer" className="underline hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
+              smc.peering.tw
+            </a>
           </div>
         </div>
+
+        {/* Empty state overlay — no monitoring IP */}
+        {!monitoringIp && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/60 dark:bg-slate-950/50 backdrop-blur-[3px] pointer-events-none">
+            <div className="flex flex-col items-center gap-4 text-center px-8 py-6 rounded-2xl bg-white/70 dark:bg-slate-900/70 border border-slate-200 dark:border-white/10 shadow-2xl backdrop-blur-md">
+              <div className="p-3 bg-cyan-100 dark:bg-cyan-500/20 rounded-xl">
+                <Search className="h-8 w-8 text-cyan-600 dark:text-cyan-400" />
+              </div>
+              <div>
+                <p className="text-base font-bold text-slate-700 dark:text-slate-100 tracking-wide">{t('map_empty_hint_no_ip')}</p>
+                <p className="text-xs text-slate-400 dark:text-slate-500 mt-1.5">{t('map_empty_setup_hint')}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state overlay — monitoring active but no records yet */}
+        {monitoringIp && records.length === 0 && (
+          <div className="absolute inset-0 z-20 flex items-center justify-center bg-white/40 dark:bg-slate-950/30 backdrop-blur-[1px] pointer-events-none">
+            <div className="flex flex-col items-center gap-4 text-center">
+              <Radio className="h-12 w-12 text-cyan-600 dark:text-cyan-400 animate-pulse" />
+              <div>
+                <p className="text-lg font-bold text-slate-700 dark:text-slate-100 tracking-wide">{t('map_empty_title')}</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{t('map_empty_hint_waiting')}</p>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
   );
 };

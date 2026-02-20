@@ -1,7 +1,7 @@
 package geoip
 
 import (
-	"log"
+	"log/slog"
 	"net"
 	"os"
 
@@ -26,7 +26,7 @@ func init() {
 			countryDB, _ = geoip2.Open("data/GeoLite2-Country.mmdb")
 		}
 		if countryDB == nil {
-			log.Printf("Warning: Could not open Country/City GeoIP database at %s. Country features will be disabled.", countryDBPath)
+			slog.Warn("Could not open Country/City GeoIP database, country features disabled", "component", "geoip", "path", countryDBPath)
 		}
 	}
 
@@ -36,7 +36,7 @@ func init() {
 	}
 	asnDB, err = geoip2.Open(asnDBPath)
 	if err != nil {
-		log.Printf("Warning: Could not open ASN GeoIP database at %s. ASN features will be disabled.", asnDBPath)
+		slog.Warn("Could not open ASN GeoIP database, ASN features disabled", "component", "geoip", "path", asnDBPath)
 	}
 }
 

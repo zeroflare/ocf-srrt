@@ -2,44 +2,75 @@ package api
 
 import (
 	"encoding/json"
-	"log"
-	"net"
+	"log/slog"
 	"net/http"
-	"ocf-srrt/backend/internal/buffer" // 引入 buffer 套件以讀取歷史紀錄
+	"ocf-srrt/backend/internal/auth"
+	"ocf-srrt/backend/internal/buffer"
+	"os"
+	"strings"
 	"sync"
 
 	"github.com/gorilla/websocket"
 )
 
+var allowedOrigins []string
+
+func init() {
+	if env := os.Getenv("ALLOWED_ORIGINS"); env != "" {
+		for _, o := range strings.Split(env, ",") {
+			allowedOrigins = append(allowedOrigins, strings.TrimSpace(o))
+		}
+	}
+}
+
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
 	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
-		return true
+		if len(allowedOrigins) == 0 {
+			return true
+		}
+		origin := r.Header.Get("Origin")
+		for _, allowed := range allowedOrigins {
+			if origin == allowed {
+				return true
+			}
+		}
+		slog.Warn("WebSocket origin rejected", "component", "ws", "origin", origin)
+		return false
 	},
+}
+
+// BroadcastMessage 攜帶來源 IP 以供 Hub 過濾
+type BroadcastMessage struct {
+	SourceIP string
+	Data     []byte
 }
 
 // Client 是 WebSocket 連線的抽象
 type Client struct {
-	hub  *Hub
-	conn *websocket.Conn
-	send chan []byte
+	hub      *Hub
+	conn     *websocket.Conn
+	send     chan []byte
+	clientIP string // token 對應的 IP
 }
 
 // Hub 管理所有 WebSocket 連線
 type Hub struct {
 	clients    map[*Client]bool
-	broadcast  chan []byte
+	broadcast  chan BroadcastMessage
 	register   chan *Client
 	unregister chan *Client
+	done       chan struct{}
 	mu         sync.RWMutex
 }
 
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan []byte),
+		broadcast:  make(chan BroadcastMessage),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
+		done:       make(chan struct{}),
 		clients:    make(map[*Client]bool),
 	}
 }
@@ -47,6 +78,16 @@ func NewHub() *Hub {
 func (h *Hub) Run() {
 	for {
 		select {
+		case <-h.done:
+			h.mu.Lock()
+			for client := range h.clients {
+				client.conn.WriteMessage(websocket.CloseMessage,
+					websocket.FormatCloseMessage(websocket.CloseGoingAway, "server shutting down"))
+				close(client.send)
+				delete(h.clients, client)
+			}
+			h.mu.Unlock()
+			return
 		case client := <-h.register:
 			h.mu.Lock()
 			h.clients[client] = true
@@ -58,11 +99,14 @@ func (h *Hub) Run() {
 				close(client.send)
 			}
 			h.mu.Unlock()
-		case message := <-h.broadcast:
+		case msg := <-h.broadcast:
 			h.mu.RLock()
 			for client := range h.clients {
+				if client.clientIP != msg.SourceIP {
+					continue
+				}
 				select {
-				case client.send <- message:
+				case client.send <- msg.Data:
 				default:
 					close(client.send)
 					delete(h.clients, client)
@@ -73,12 +117,19 @@ func (h *Hub) Run() {
 	}
 }
 
-func (h *Hub) Broadcast(message []byte) {
-	h.broadcast <- message
+// Shutdown 優雅地關閉 Hub
+func (h *Hub) Shutdown() {
+	close(h.done)
 }
 
-func (h *Hub) GetBroadcastChan() chan []byte {
+func (h *Hub) GetBroadcastChan() chan BroadcastMessage {
 	return h.broadcast
+}
+
+func (h *Hub) ClientCount() int {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return len(h.clients)
 }
 
 func (c *Client) writePump() {
@@ -103,30 +154,36 @@ func (c *Client) writePump() {
 	}
 }
 
-// ServeWs 處理 WebSocket 請求
-func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Println("Upgrade failed:", err)
+// ServeWs 處理 WebSocket 請求，需驗證 token
+func ServeWs(hub *Hub, tokenStore *auth.TokenStore, w http.ResponseWriter, r *http.Request) {
+	// 驗證 token
+	token := r.URL.Query().Get("token")
+	if token == "" {
+		http.Error(w, "missing token", http.StatusUnauthorized)
 		return
 	}
 
-	// 建立 Client 物件
-	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 512)}
+	clientIP, ok := tokenStore.ValidateToken(token)
+	if !ok {
+		http.Error(w, "invalid token", http.StatusUnauthorized)
+		return
+	}
+
+	conn, err := upgrader.Upgrade(w, r, nil)
+	if err != nil {
+		slog.Error("WebSocket upgrade failed", "component", "ws", "error", err)
+		return
+	}
+
+	client := &Client{hub: hub, conn: conn, send: make(chan []byte, 512), clientIP: clientIP}
 	client.hub.register <- client
 
-	// 1. 取得 Client IP (注意：若有經過 Nginx/Docker Proxy，這裡拿到的可能是內網 IP)
-	// 若要精準，需讀取 X-Forwarded-For Header，但在 host mode 下 RemoteAddr 通常是準的
-	clientIP, _, _ := net.SplitHostPort(r.RemoteAddr)
-	log.Printf("[WS] New connection from %s", clientIP)
+	slog.Info("New WebSocket connection", "component", "ws", "clientIp", clientIP)
 
-	// 2. 從 Ring Buffer 撈取該 IP 的歷史紀錄
+	// 從 Ring Buffer 撈取該 IP 的歷史紀錄
 	history := buffer.Get(clientIP)
 
-	// 3. 如果有歷史資料，打包傳送
 	if len(history) > 0 {
-		// 定義一個簡單的結構來包裝 snapshot，方便前端區分這是「歷史」還是「即時」
-		// 前端收到 type: "snapshot" 時，應直接取代目前的列表
 		snapshotMsg := map[string]interface{}{
 			"type": "snapshot",
 			"data": history,
@@ -134,14 +191,11 @@ func ServeWs(hub *Hub, w http.ResponseWriter, r *http.Request) {
 
 		data, err := json.Marshal(snapshotMsg)
 		if err == nil {
-			// 直接塞入 send channel，讓 writePump 依序送出
-			// 這樣做比直接 conn.WriteJSON 安全，避免併發寫入衝突
 			client.send <- data
 		} else {
-			log.Println("Failed to marshal snapshot:", err)
+			slog.Error("Failed to marshal snapshot", "component", "ws", "error", err)
 		}
 	}
 
-	// 啟動寫入迴圈 (這會一直跑，直到連線斷開)
 	go client.writePump()
 }

@@ -5,36 +5,51 @@ import { DnsRecord } from '../types';
 // 定義 WebSocket 傳來的訊息格式 (Discriminated Union)
 type WebSocketPayload =
     | { type: 'snapshot'; data: DnsRecord[] } // 歷史快照
-    | DnsRecord;                              // 單筆更新 (假設後端沒包 type，或與 DnsRecord 結構一致)
+    | DnsRecord;                              // 單筆更新
 
-const getWebSocketUrl = () => {
-  // 1. 優先讀取環境變數 (適合 K8s/Docker 部署時注入)
+const getWebSocketUrl = (token: string) => {
   if (import.meta.env.VITE_WS_URL) {
-    return import.meta.env.VITE_WS_URL;
+    return `${import.meta.env.VITE_WS_URL}?token=${token}`;
   }
 
-  // 2. 自動判斷 (適合直接跑在 Host Network 或前後端整合部署)
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const host = window.location.hostname;
-  return `${protocol}//${host}/ws`;
+  return `${protocol}//${host}/ws?token=${token}`;
+};
+
+const getTokenUrl = () => {
+  if (import.meta.env.VITE_API_URL) {
+    return `${import.meta.env.VITE_API_URL}/api/token`;
+  }
+  return `/api/token`;
+};
+
+const calculateBackoff = (attempt: number): number => {
+  const base = Math.min(1000 * Math.pow(2, attempt), 60000);
+  const jitter = base * (0.7 + Math.random() * 0.6); // ±30% jitter
+  return Math.round(jitter);
 };
 
 export const useDnsStream = (enabled: boolean = true) => {
   const { addRecord, loadSnapshot } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
+  const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
 
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<number | undefined>(undefined);
+  const attemptRef = useRef(0);
+  const tokenRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!enabled) {
       setIsConnected(false);
+      setReconnectDelay(null);
       return;
     }
 
-    const connect = () => {
-      const url = getWebSocketUrl();
+    const connectWithToken = (token: string) => {
+      const url = getWebSocketUrl(token);
       console.log(`Connecting to WebSocket: ${url}`);
 
       ws.current = new WebSocket(url);
@@ -42,8 +57,9 @@ export const useDnsStream = (enabled: boolean = true) => {
       ws.current.onopen = () => {
         console.log('SRRT WebSocket connected');
         setIsConnected(true);
+        setReconnectDelay(null);
+        attemptRef.current = 0;
 
-        // 連線成功，清除重連計時器
         if (reconnectTimeout.current) {
           clearTimeout(reconnectTimeout.current);
           reconnectTimeout.current = undefined;
@@ -53,13 +69,10 @@ export const useDnsStream = (enabled: boolean = true) => {
       ws.current.onmessage = (event) => {
         try {
           const rawData = JSON.parse(event.data) as WebSocketPayload;
-          // [Type Guard] 判斷是否為 Snapshot
-          // 檢查邏輯：有 'data' 欄位且是陣列 -> Snapshot
           if ('data' in rawData && Array.isArray(rawData.data)) {
             console.log(`[WS] Loaded snapshot: ${rawData.data.length} records`);
             loadSnapshot(rawData.data as DnsRecord[]);
           } else {
-            // 否則視為單筆 DnsRecord
             addRecord(rawData as DnsRecord);
           }
         } catch (error) {
@@ -67,29 +80,66 @@ export const useDnsStream = (enabled: boolean = true) => {
         }
       };
 
-      ws.current.onclose = () => {
-        console.warn('[WS] Disconnected. Reconnecting in 3s...');
+      ws.current.onclose = (event) => {
         setIsConnected(false);
 
-        // 重連機制：確保不會重複設定 Timer
+        // 4001 = token 無效，需要重新取得
+        if (event.code === 4001 || event.code === 1006) {
+          tokenRef.current = null;
+        }
+
+        const delay = calculateBackoff(attemptRef.current);
+        attemptRef.current++;
+
+        console.warn(`[WS] Disconnected. Reconnecting in ${(delay / 1000).toFixed(1)}s... (attempt ${attemptRef.current})`);
+        setReconnectDelay(delay);
+
         if (!reconnectTimeout.current) {
           reconnectTimeout.current = window.setTimeout(() => {
-            // 這裡遞迴呼叫 connect，但因為是在 useEffect 內部定義的，
-            // 若 dependencies 沒變，這個 closure 是安全的。
-            connect();
-          }, 3000);
+            reconnectTimeout.current = undefined;
+            fetchTokenAndConnect();
+          }, delay);
         }
       };
 
       ws.current.onerror = (error) => {
         console.error('[WS] Error:', error);
-        ws.current?.close(); // 觸發 onclose 進行重連
+        ws.current?.close();
       };
     };
 
-    connect();
+    const fetchTokenAndConnect = async () => {
+      // 如果已有 token，直接連線
+      if (tokenRef.current) {
+        connectWithToken(tokenRef.current);
+        return;
+      }
 
-    // Cleanup Function (元件卸載時執行)
+      try {
+        const resp = await fetch(getTokenUrl());
+        if (!resp.ok) {
+          throw new Error(`Token fetch failed: ${resp.status}`);
+        }
+        const data = await resp.json();
+        tokenRef.current = data.token;
+        console.log('[WS] Token acquired');
+        connectWithToken(data.token);
+      } catch (error) {
+        console.error('[WS] Failed to fetch token:', error);
+
+        const delay = calculateBackoff(attemptRef.current);
+        attemptRef.current++;
+        setReconnectDelay(delay);
+
+        reconnectTimeout.current = window.setTimeout(() => {
+          reconnectTimeout.current = undefined;
+          fetchTokenAndConnect();
+        }, delay);
+      }
+    };
+
+    fetchTokenAndConnect();
+
     return () => {
       if (ws.current) {
         ws.current.onclose = null;
@@ -101,5 +151,5 @@ export const useDnsStream = (enabled: boolean = true) => {
     };
   }, [addRecord, loadSnapshot, enabled]);
 
-  return isConnected;
+  return { isConnected, reconnectDelay };
 };

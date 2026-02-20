@@ -1,185 +1,65 @@
-import { useState, useEffect } from 'react';
-import pako from 'pako';
+import { useState, useCallback, useEffect } from 'react';
 import { useDnsStore } from './stores/useDnsStore';
-import { DnsRecord } from './types';
 import { useDnsStream } from './hooks/useDnsStream';
 import { useMockDnsStream } from './hooks/useMockDnsStream';
+import { useSharedReport } from './hooks/useSharedReport';
+import { useTour } from './hooks/useTour';
+import { useTracerouteStore } from './stores/useTracerouteStore';
 import { LiveTable } from './components/LiveTable';
 import { TrafficDashboard } from './components/TrafficDashboard';
 import { LiveTrafficChart } from './components/LiveTrafficChart';
 import { CyberMap } from './components/CyberMap';
+import { TracerouteDrawer } from './components/TracerouteDrawer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
-import { Shield, Search, Activity, LayoutPanelLeft } from 'lucide-react';
-import Joyride, { Step } from 'react-joyride';
+import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, Route } from 'lucide-react';
+import { Tooltip } from './components/Tooltip';
+import Joyride, { CallBackProps, STATUS } from 'react-joyride';
+
+type TabKey = 'table' | 'chart' | 'stats' | 'route';
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, loadSnapshot, isSharedReport, setSharedReport } = useDnsStore();
-  const isConnected = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
+  const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, maxRecords } = useDnsStore();
+  const { isLoading: traceLoading, hasResult: traceHasResult } = useTracerouteStore();
+  const { isConnected, reconnectDelay } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
+  const [activeTab, setActiveTab] = useState<TabKey>('table');
 
-  // 檢查 URL 是否含有分享資料
+  useSharedReport();
+
+  // Sync .dark class to <html> so that:
+  // 1. body dark: styles in index.css work
+  // 2. Portal components (Tooltip) inherit dark mode
+  // 3. .dark .foo CSS selectors work globally
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const zdata = params.get('zdata');
-
-    if (zdata) {
-      try {
-        // Base64 URL-safe 還原
-        const base64 = zdata.replace(/-/g, '+').replace(/_/g, '/');
-        const binaryString = atob(base64);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
-        }
-
-        // pako 解壓縮
-        const decompressed = pako.inflate(bytes, { to: 'string' });
-        const decoded = JSON.parse(decompressed);
-
-        loadRecords(decoded);
-      } catch (e) {
-        console.error('Failed to decode compressed share data:', e);
-      }
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
+  }, [theme]);
 
-    function loadRecords(decoded: any[]) {
-      const records: DnsRecord[] = decoded.map((r: any) => ({
-        timestamp: r.t,
-        domain: r.d,
-        resultIp: r.ip,
-        isForeign: r.f === 1,
-        latency: r.l,
-        sourceIp: r.s,
-        country: r.c,
-        appName: r.a,
-        appCategory: r.cat,
-        isp: r.isp,
-        asn: r.asn || 0,
-        type: 'A'
-      }));
-
-      // 設定一個虛擬的監控 IP 以便顯示資料
-      if (records.length > 0) {
-        setSharedReport(true);
-        setMonitoringIp(records[0].sourceIp);
-        loadSnapshot(records.reverse());
-      }
-    }
-  }, [setMonitoringIp, loadSnapshot, setSharedReport]);
-  const [runTour] = useState(true);
-
-  // 版面顯示狀態
+  const [runTour, setRunTour] = useState(() => !localStorage.getItem('srrt_tour_done'));
   const [showRightPanel, setShowRightPanel] = useState(true);
 
-  const { t, i18n } = useTranslation();
-
-  const formatTourContent = (text: string) => {
-    return (
-        <div style={{ whiteSpace: 'pre-line', textAlign: 'left' }}>
-          {text.split('\n').map((line, i) => {
-            const trimmedLine = line.trim();
-
-            // 1. 處理分隔線 (---)
-            if (trimmedLine === '---') {
-              return <hr key={i} style={{ border: '0', borderTop: '1px solid rgba(255,255,255,0.1)', margin: '12px 0' }} />;
-            }
-
-            // 2. 處理作業系統步驟 (支援 Windows, macOS, iOS, Android)
-            // 使用 Regex 確保中英文都能偵測到
-            if (/Windows|macOS|iOS|Android/.test(line) && line.includes(':')) {
-              const [platform, ...rest] = line.split(':');
-              return (
-                  <p key={i} style={{ margin: '6px 0', fontSize: '13px' }}>
-                    <strong style={{ color: '#f1f5f9' }}>{platform}:</strong>
-                    <span style={{ color: '#94a3b8' }}>{rest.join(':')}</span>
-                  </p>
-              );
-            }
-
-            // 3. 處理主要的 DNS IP 設定區塊 (偵測 Primary/Secondary 或 主要/備援)
-            if (/Primary|Secondary|主要|備援/.test(line) && line.includes('`')) {
-              return (
-                  <div key={i} style={{
-                    margin: '8px 0',
-                    padding: '10px 14px',
-                    backgroundColor: 'rgba(34, 211, 238, 0.08)',
-                    borderLeft: '4px solid #22d3ee',
-                    borderRadius: '4px'
-                  }}>
-                    {line.split('`').map((part, index) =>
-                        index % 2 === 1
-                            ? <code key={index} style={{ color: '#22d3ee', fontWeight: 'bold', fontSize: '15px', fontFamily: 'monospace' }}>{part}</code>
-                            : <span key={index} style={{ color: '#cbd5e1' }}>{part}</span>
-                    )}
-                  </div>
-              );
-            }
-
-            // 4. 警告語處理 (⚠️)
-            if (line.includes('⚠️')) {
-              return (
-                  <div key={i} style={{
-                    marginTop: '16px',
-                    padding: '10px',
-                    borderRadius: '8px',
-                    backgroundColor: 'rgba(251, 191, 36, 0.1)',
-                    color: '#fbbf24',
-                    fontSize: '12.5px',
-                    lineHeight: '1.5',
-                    border: '1px solid rgba(251, 191, 36, 0.2)'
-                  }}>
-                    {line}
-                  </div>
-              );
-            }
-
-            // 5. 一般文字
-            return <p key={i} style={{ margin: '4px 0', color: '#94a3b8' }}>{line}</p>;
-          })}
-        </div>
-    );
-  };
-
-  const tourSteps: Step[] = [
-    {
-      target: 'body',
-      placement: 'center',
-      title: t('tour_welcome_title'),
-      content: formatTourContent(t('tour_welcome_content')),
-    },
-    {
-      target: 'body',
-      placement: 'center',
-      title: t('tour_setup_title'),
-      content: formatTourContent(t('tour_setup_content')),
-    },
-    {
-      target: '.tour-monitoring',
-      title: t('tour_monitoring_title'),
-      content: t('tour_monitoring_content'),
-    },
-    {
-      target: '.tour-dashboard',
-      title: t('tour_dashboard_title'),
-      content: t('tour_dashboard_content'),
-    },
-    {
-      target: '.tour-map',
-      title: t('tour_map_title'),
-      content: t('tour_map_content'),
-    },
-    {
-      target: '.tour-table',
-      title: t('tour_table_title'),
-      content: t('tour_table_content'),
-    },
-    {
-      target: '.tour-traceroute',
-      title: t('tour_traceroute_title'),
-      content: t('tour_traceroute_content'),
+  const handleTourCallback = useCallback((data: CallBackProps) => {
+    if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
+      localStorage.setItem('srrt_tour_done', '1');
+      setRunTour(false);
     }
-  ];
+  }, []);
+
+  // Auto-switch to route tab when traceroute starts
+  useEffect(() => {
+    if (traceLoading) {
+      setActiveTab('route');
+    }
+  }, [traceLoading]);
+
+  const { t, i18n } = useTranslation();
+  const { tourSteps, joyrideStyles, joyrideLocale } = useTour(theme);
 
   const toggleLanguage = () => {
     i18n.changeLanguage(i18n.language === 'en' ? 'zh' : 'en');
@@ -196,202 +76,235 @@ function App() {
     setIpInput('');
   };
 
+  const tabs: { key: TabKey; label: string; icon: React.ReactNode; indicator?: boolean }[] = [
+    { key: 'table', label: t('tab_table'), icon: <TableProperties className="h-3.5 w-3.5" /> },
+    { key: 'chart', label: t('tab_chart'), icon: <BarChart3 className="h-3.5 w-3.5" /> },
+    { key: 'stats', label: t('tab_stats'), icon: <PieChart className="h-3.5 w-3.5" /> },
+    { key: 'route', label: t('tab_route'), icon: <Route className="h-3.5 w-3.5" />, indicator: traceLoading || traceHasResult },
+  ];
+
   return (
-      <div className="relative w-screen h-screen bg-gray-900 text-white overflow-hidden font-sans">
+      <div className={`relative w-screen h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-900'} overflow-hidden font-sans transition-colors duration-300`}>
         <Joyride
           steps={tourSteps}
           run={runTour}
           continuous
           showSkipButton
-          styles={{
-            options: {
-              primaryColor: '#22d3ee',
-              backgroundColor: '#0f172a',
-              textColor: '#f1f5f9',
-              arrowColor: '#0f172a',
-              width: 500,
-            },
-            tooltip: {
-              borderRadius: '16px',
-              padding: '24px',
-            },
-            tooltipContainer: {
-              textAlign: 'left',
-            },
-            tooltipTitle: {
-              fontSize: '20px',
-              fontWeight: '700',
-              marginBottom: '12px',
-              color: '#22d3ee',
-              textTransform: 'uppercase',
-              letterSpacing: '0.1em',
-            },
-            tooltipContent: {
-              fontSize: '14px',
-              lineHeight: '1.6',
-              color: '#94a3b8',
-            },
-            buttonNext: {
-              backgroundColor: 'rgba(6, 182, 212, 0.2)',
-              border: '1px solid rgba(34, 211, 238, 0.5)',
-              color: '#22d3ee',
-              borderRadius: '8px',
-              padding: '8px 16px',
-              fontSize: '12px',
-              fontWeight: 'bold',
-            },
-            buttonBack: {
-              color: '#64748b',
-              marginRight: '12px',
-              fontSize: '12px',
-            },
-            buttonSkip: {
-              color: '#64748b',
-              fontSize: '12px',
-            }
-          }}
-          locale={{
-            next: t('next'),
-            back: t('back'),
-            last: t('last'),
-            skip: t('skip')
-          }}
+          callback={handleTourCallback}
+          styles={joyrideStyles}
+          locale={joyrideLocale}
         />
 
-        {/* 版面配置：左側地圖，右側儀表板 */}
+        {/* 版面配置：左側地圖 60%，右側儀表板 40% */}
         <div className="flex w-full h-full">
           {/* 左側地圖區域 */}
-          <div className="flex-1 relative min-w-0">
-            <CyberMap />
+          <div className={`relative min-w-0 ${showRightPanel ? 'w-[60%]' : 'flex-1'}`}>
+            <ErrorBoundary>
+              <CyberMap />
+            </ErrorBoundary>
           </div>
 
-          {/* 右側資訊面板 (固定寬度) */}
+          {/* 右側資訊面板 (40%) */}
           {showRightPanel && (
-            <aside className="w-[550px] bg-slate-950 border-l border-white/10 flex flex-col z-10 pointer-events-auto">
+            <aside className="w-[40%] bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-white/10 flex flex-col z-10 pointer-events-auto transition-colors">
               {/* 頂部標題 */}
-              <div className="p-6 border-b border-white/5">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-3">
-                      <Shield className="h-6 w-6 text-cyan-400" />
-                      <h1 className="text-xl font-bold tracking-wider text-slate-100 uppercase font-sans">
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <Shield className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                    <div>
+                      <h1 className="text-base font-bold tracking-wider text-slate-800 dark:text-slate-100 uppercase font-sans">
                         {t('title')}
                       </h1>
-                    </div>
-                    <div className="text-[10px] font-mono text-slate-500 mt-1 tracking-[0.2em] uppercase">
-                      Live Monitoring System
+                      <div className="text-[9px] font-mono text-slate-400 dark:text-slate-500 tracking-[0.2em] uppercase">
+                        {t('subtitle')}
+                      </div>
                     </div>
                   </div>
-                  <button
-                    onClick={toggleLanguage}
-                    className="px-3 py-1.5 bg-slate-900/60 hover:bg-slate-800/80 rounded-lg text-xs transition-all font-mono border border-white/10 shadow-lg"
-                  >
-                    {i18n.language === 'en' ? '中文' : 'EN'}
-                  </button>
+                  <div className="flex items-center gap-2 relative" style={{ zIndex: 10001 }}>
+                    <button
+                      onClick={toggleTheme}
+                      className="p-2 bg-slate-100 dark:bg-slate-900/60 hover:bg-slate-200 dark:hover:bg-slate-800/80 rounded-lg text-slate-600 dark:text-slate-300 transition-all border border-slate-200 dark:border-white/10"
+                    >
+                      {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+                    </button>
+                    <button
+                      onClick={toggleLanguage}
+                      className="px-3 py-1.5 bg-slate-100 dark:bg-slate-900/60 hover:bg-slate-200 dark:hover:bg-slate-800/80 rounded-lg text-xs transition-all font-mono border border-slate-200 dark:border-white/10 shadow-lg text-slate-800 dark:text-slate-100"
+                    >
+                      {i18n.language === 'en' ? '中文' : 'EN'}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* 中間滾動區域：控制面板與統計圖 */}
-              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-6">
-                {/* IP Monitoring Controller */}
-                <div className="bg-slate-900/50 backdrop-blur-md p-5 rounded-xl border border-white/10 shadow-xl tour-monitoring">
-                  <h3 className="text-xs font-bold mb-4 text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
-                    <Search className="h-3.5 w-3.5 text-slate-500" />
+              {/* IP Monitoring Controller */}
+              <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
+                <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-white/10 shadow-xl tour-monitoring transition-colors">
+                  <h3 className="text-xs font-bold mb-3 text-slate-500 dark:text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
+                    <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     {t('monitoring_control')}
                   </h3>
                   {!monitoringIp ? (
-                    <div className="space-y-4">
+                    <div className="space-y-3">
                       <p className="text-[11px] text-slate-500 leading-relaxed">
-                        前端監控目前已關閉。請輸入 Source IP 以開始監控特定裝置的封包。
+                        {t('monitoring_disabled_desc')}
                       </p>
                       {!isSharedReport && (
-                        <div className="space-y-3">
+                        <div className="flex gap-2">
                           <input
                             type="text"
                             value={ipInput}
                             onChange={(e) => setIpInput(e.target.value)}
                             placeholder="e.g. 192.168.1.5"
-                            className="w-full bg-slate-950/80 border border-slate-800 rounded-lg px-3 py-2 text-sm font-mono focus:border-cyan-500/50 outline-none transition-colors text-slate-200"
+                            className="flex-1 bg-white dark:bg-slate-950/80 border border-slate-200 dark:border-slate-800 rounded-lg px-3 py-2 text-sm font-mono focus:border-cyan-500/50 outline-none transition-colors text-slate-800 dark:text-slate-200"
+                            onKeyDown={(e) => e.key === 'Enter' && handleStartMonitoring()}
                           />
                           <button
                             onClick={handleStartMonitoring}
-                            className="w-full bg-cyan-600/20 hover:bg-cyan-600/40 border border-cyan-500/50 text-cyan-400 py-2 rounded-lg text-sm font-bold transition-all flex items-center justify-center gap-2 shadow-lg shadow-cyan-900/20 group"
+                            className="bg-cyan-600/10 dark:bg-cyan-600/20 hover:bg-cyan-600/20 dark:hover:bg-cyan-600/40 border border-cyan-500/30 dark:border-cyan-500/50 text-cyan-600 dark:text-cyan-400 px-4 rounded-lg text-sm font-bold transition-all flex items-center gap-2 shadow-lg dark:shadow-cyan-900/20"
                           >
-                            <Activity className="h-4 w-4 group-hover:animate-pulse" />
-                            啟動監控
+                            <Activity className="h-4 w-4" />
+                            {t('start_monitor')}
                           </button>
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="space-y-4">
-                      <div className={`flex items-center justify-between ${isSharedReport ? 'bg-amber-900/30 border-amber-500/30' : 'bg-cyan-900/30 border-cyan-500/30'} border p-3 rounded-lg`}>
-                        <div>
-                          <span className={`text-[9px] ${isSharedReport ? 'text-amber-300' : 'text-cyan-300'} block uppercase font-bold tracking-widest mb-1`}>
-                            {isSharedReport ? t('shared_report_tag') : t('monitoring_active')}
-                          </span>
-                          <span className={`text-lg font-mono ${isSharedReport ? 'text-amber-400' : 'text-cyan-400'} font-bold`}>{monitoringIp}</span>
-                        </div>
-                        <button
-                          onClick={handleStopMonitoring}
-                          className="bg-slate-800 hover:bg-slate-700 p-2 rounded-lg text-slate-400 hover:text-white transition-colors"
-                        >
-                          {t('stop')}
-                        </button>
+                    <div className={`flex items-center justify-between ${isSharedReport ? 'bg-amber-100/50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-500/30' : 'bg-cyan-50 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-500/30'} border p-3 rounded-lg`}>
+                      <div>
+                        <span className={`text-[9px] ${isSharedReport ? 'text-amber-600 dark:text-amber-300' : 'text-cyan-600 dark:text-cyan-300'} block uppercase font-bold tracking-widest mb-1`}>
+                          {isSharedReport ? t('shared_report_tag') : t('monitoring_active')}
+                        </span>
+                        <span className={`text-lg font-mono ${isSharedReport ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-600 dark:text-cyan-400'} font-bold`}>{monitoringIp}</span>
                       </div>
+                      <button
+                        onClick={handleStopMonitoring}
+                        className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white border border-slate-200 dark:border-transparent transition-colors shadow-sm"
+                      >
+                        {t('stop')}
+                      </button>
                     </div>
                   )}
                 </div>
+              </div>
 
-                {/* Real-time Traffic Chart */}
-                <LiveTrafficChart className="bg-slate-900/50" />
+              {/* Tab bar */}
+              <div className="flex border-b border-slate-200 dark:border-white/10 px-5">
+                {tabs.map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setActiveTab(tab.key)}
+                    className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px ${
+                      activeTab === tab.key
+                        ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500'
+                        : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'
+                    }`}
+                  >
+                    {tab.icon}
+                    {tab.label}
+                    {tab.indicator && activeTab !== tab.key && (
+                      <span className={`w-1.5 h-1.5 rounded-full ${traceLoading ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400'}`} />
+                    )}
+                  </button>
+                ))}
+              </div>
 
-                {/* Traffic Stats Dashboard */}
-                <div className="bg-slate-900/50 backdrop-blur-md rounded-xl border border-white/10 shadow-xl p-5">
-                  <h3 className="text-xs font-bold mb-4 text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
-                    <Activity className="h-3.5 w-3.5 text-slate-500" />
-                    流量分析數據
-                  </h3>
-                  <TrafficDashboard className="p-0 bg-transparent border-none shadow-none" />
-                </div>
+              {/* Tab content — fills remaining height */}
+              <div className="flex-1 overflow-hidden flex flex-col">
+                {activeTab === 'table' && (
+                  <ErrorBoundary>
+                    <LiveTable />
+                  </ErrorBoundary>
+                )}
 
-                {/* System Status Panel */}
-                <div className="bg-slate-900/50 backdrop-blur-md p-5 rounded-xl border border-white/10 shadow-xl">
-                  <h3 className="text-xs font-bold mb-4 text-slate-400 uppercase tracking-wider font-sans">
-                    {t('system_status')}
-                  </h3>
-                  <div className="space-y-3 text-xs">
-                    <div className="flex justify-between items-center py-2 border-b border-white/5 font-mono">
-                      <span className="text-slate-500 uppercase">{t('local_country')}:</span>
-                      <span className="text-blue-400 font-bold bg-blue-400/10 px-2 py-0.5 rounded">TW</span>
-                    </div>
+                {activeTab === 'chart' && (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5 flex flex-col">
+                    <LiveTrafficChart className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-900/50 transition-colors" />
 
-                    <div className="flex justify-between items-center py-2 border-b border-white/5 font-mono">
-                      <span className="text-slate-500 uppercase">{t('websocket_status')}:</span>
-                      <span className={`font-bold flex items-center gap-2 ${
-                          isSharedReport ? 'text-amber-400' : (isConnected ? 'text-green-400' : 'text-red-500')
-                      }`}>
-                        <span className={`w-1.5 h-1.5 rounded-full ${
-                            isSharedReport ? 'bg-amber-400' : (isConnected ? 'bg-green-400 animate-pulse' : 'bg-red-500')
-                        }`}></span>
-                        {isSharedReport ? t('static_report') : (isConnected ? t('connected') : t('disconnected'))}
-                      </span>
-                    </div>
+                    {/* System Status Panel */}
+                    <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md p-5 rounded-xl border border-slate-200 dark:border-white/10 shadow-xl transition-colors">
+                      <h3 className="text-xs font-bold mb-4 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-sans">
+                        {t('system_status')}
+                      </h3>
+                      <div className="space-y-3 text-xs">
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('local_country')}:</span>
+                            <Tooltip text={t('tip_local_country')} />
+                          </div>
+                          <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-100 dark:bg-blue-400/10 px-2 py-0.5 rounded">TW</span>
+                        </div>
 
-                    <div className="flex justify-between items-center py-2 font-mono">
-                      <span className="text-slate-500 uppercase">{t('max_logs')}:</span>
-                      <span className="text-slate-300">1000</span>
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('websocket_status')}:</span>
+                            <Tooltip text={t('tip_websocket_status')} />
+                          </div>
+                          <span className={`font-bold flex items-center gap-2 ${
+                              isSharedReport ? 'text-amber-600 dark:text-amber-400' : (isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-500')
+                          }`}>
+                            <span className={`w-1.5 h-1.5 rounded-full ${
+                                isSharedReport ? 'bg-amber-600 dark:bg-amber-400' : (isConnected ? 'bg-green-600 dark:bg-green-400 animate-pulse' : 'bg-red-600 dark:bg-red-500 animate-pulse')
+                            }`}></span>
+                            {isSharedReport ? t('static_report') : (isConnected ? t('connected') : (
+                              <>
+                                {t('disconnected')}
+                                {reconnectDelay !== null && (
+                                  <span className="ml-1 text-[10px] opacity-70">
+                                    ({t('reconnecting_in', { seconds: Math.ceil(reconnectDelay / 1000) })})
+                                  </span>
+                                )}
+                              </>
+                            ))}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
+                          <div className="flex items-center gap-1">
+                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('max_logs')}:</span>
+                            <Tooltip text={t('tip_max_logs')} />
+                          </div>
+                          <span className="text-slate-600 dark:text-slate-300">{maxRecords}</span>
+                        </div>
+
+                        <div className="flex justify-between items-center py-2 font-mono">
+                          <span className="text-slate-400 dark:text-slate-500 uppercase">{t('guided_tour')}:</span>
+                          <button
+                            onClick={() => {
+                              localStorage.removeItem('srrt_tour_done');
+                              setRunTour(true);
+                            }}
+                            className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors uppercase tracking-wider"
+                          >
+                            {t('replay_tour')}
+                          </button>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
+
+                {activeTab === 'stats' && (
+                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
+                    <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-200 dark:border-white/10 shadow-xl p-5 transition-colors tour-dashboard">
+                      <h3 className="text-xs font-bold mb-4 text-slate-500 dark:text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
+                        <Activity className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
+                        {t('dashboard')}
+                      </h3>
+                      <TrafficDashboard expanded className="p-0 bg-transparent border-none shadow-none" />
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'route' && (
+                  <ErrorBoundary>
+                    <TracerouteDrawer />
+                  </ErrorBoundary>
+                )}
               </div>
 
-              {/* 底部日誌表格區域 (佔據固定高度) */}
-              <div className="h-[400px] flex flex-col border-t border-white/10 overflow-hidden tour-table">
-                <LiveTable />
-              </div>
-
-              <footer className="p-4 text-center text-slate-600 text-[9px] uppercase tracking-widest bg-slate-950 border-t border-white/5">
+              <footer className="px-4 py-3 text-center text-slate-400 dark:text-slate-600 text-[9px] uppercase tracking-widest bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/5">
                 &copy; {new Date().getFullYear()} ZEROFLARE TECH. ALL RIGHTS RESERVED.
               </footer>
             </aside>
@@ -403,15 +316,16 @@ function App() {
           <button
             onClick={() => setShowRightPanel(!showRightPanel)}
             className={`p-3 rounded-xl border transition-all shadow-2xl backdrop-blur-xl ${
-              showRightPanel 
-                ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' 
-                : 'bg-slate-900/80 border-white/10 text-slate-400 hover:text-white'
+              showRightPanel
+                ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-300 dark:border-cyan-500/40 text-cyan-600 dark:text-cyan-400'
+                : 'bg-white/80 dark:bg-slate-900/80 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-white'
             }`}
-            title={showRightPanel ? "隱藏資訊面板" : "顯示資訊面板"}
+            title={showRightPanel ? t('hide_panel') : t('show_panel')}
           >
             {showRightPanel ? <LayoutPanelLeft className="h-5 w-5 rotate-180" /> : <Activity className="h-5 w-5" />}
           </button>
         </div>
+
       </div>
   );
 }

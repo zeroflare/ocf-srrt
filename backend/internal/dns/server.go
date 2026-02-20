@@ -1,21 +1,22 @@
 package dns
 
 import (
-	"context"
 	"encoding/json"
-	"log"
+	"fmt"
+	"log/slog"
 	"math/rand"
 	"net"
+	"ocf-srrt/backend/internal/api"
+	"ocf-srrt/backend/internal/auth"
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/geoip"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/types"
 	"os"
-	"os/exec"
-	"strconv"
-	"strings"
+	"sync"
 	"time"
 
+	probing "github.com/go-ping/ping"
 	"github.com/miekg/dns"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/time/rate"
@@ -24,14 +25,16 @@ import (
 // Server 定義了 DNS 伺服器結構
 type Server struct {
 	*dns.Server
-	broadcast chan []byte
-	limiters  *cache.Cache
-	dnsClient *dns.Client
-	upstreams []string
+	broadcast  chan api.BroadcastMessage
+	tokenStore *auth.TokenStore
+	limiters   *cache.Cache
+	dnsClient  *dns.Client
+	upstreams  []string
+	wg         sync.WaitGroup
 }
 
 // NewServer 建立一個新的 DNS 伺服器實例
-func NewServer(broadcast chan []byte) *Server {
+func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore) *Server {
 	upstreams := []string{
 		"1.1.1.1:53",
 		"8.8.8.8:53",
@@ -40,8 +43,9 @@ func NewServer(broadcast chan []byte) *Server {
 	}
 
 	s := &Server{
-		Server:    &dns.Server{Addr: ":53", Net: "udp"},
-		broadcast: broadcast,
+		Server:     &dns.Server{Addr: ":53", Net: "udp"},
+		broadcast:  broadcast,
+		tokenStore: tokenStore,
 		// 參數 1 (DefaultExpiration): 10 分鐘。如果 IP 10 分鐘沒活動，Rate Limiter 就會被刪除。
 		// 參數 2 (CleanupInterval): 15 分鐘。每 15 分鐘背景掃描一次過期資料。
 		limiters: cache.New(10*time.Minute, 15*time.Minute),
@@ -62,7 +66,10 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	}
 
 	sourceIp, _, _ := net.SplitHostPort(w.RemoteAddr().String())
-	log.Printf("[DNS] Request from %s: %s", sourceIp, r.Question[0].Name)
+	slog.Debug("DNS request received", "component", "dns", "sourceIp", sourceIp, "domain", r.Question[0].Name)
+
+	// 自動為新 IP 建立 token
+	s.tokenStore.GetOrCreateToken(sourceIp)
 
 	// 2. Rate Limiting
 	limiter := s.getLimiter(sourceIp)
@@ -81,7 +88,7 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		backupTarget := s.upstreams[(rand.Intn(len(s.upstreams))+1)%len(s.upstreams)]
 		resp, _, err = s.dnsClient.Exchange(r, backupTarget)
 		if err != nil {
-			log.Printf("[Error] Upstream forward failed: %v", err)
+			slog.Error("Upstream forward failed", "component", "dns", "error", err)
 			m := new(dns.Msg)
 			m.SetRcode(r, dns.RcodeServerFailure)
 			w.WriteMsg(m)
@@ -96,13 +103,17 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	// 5. 先回應 Client (降低延遲)
 	// 將「寫入回應」移到「分析數據」之前
 	if err := w.WriteMsg(resp); err != nil {
-		log.Printf("[Error] Write response failed: %v", err)
+		slog.Error("Write response failed", "component", "dns", "error", err)
 		return // 若寫入失敗，後續分析也無意義
 	}
 
-	// 6. 異步/同步 處理記錄
+	// 6. 異步處理記錄
 	// 既然已經回應使用者了，這裡可以慢慢做分析
-	go s.processAndRecord(sourceIp, r.Copy(), resp.Copy())
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		s.processAndRecord(sourceIp, r.Copy(), resp.Copy())
+	}()
 }
 
 func (s *Server) getLimiter(ip string) *rate.Limiter {
@@ -151,35 +162,60 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		// 這些查詢可能涉及 File IO 或大量運算
 		resultCountry, _ := geoip.GetCountry(resultIP)
 		isForeign := localCountry != "" && resultCountry != localCountry
+		foreignConfidence := ""
 
-		// 國內外判斷機制：如果國家在國外，再用 ping 判斷 (Ping < 10ms 視為國內)
+		// 境外判斷機制：GeoIP 判定外國後，用延遲進一步驗證
 		latency := -1.0
 		if isForeign {
 			latency = pingIP(resultIP)
-			if latency > 0 && latency < 10 {
-				isForeign = false
+			if latency >= 0 {
+				// ICMP 成功
+				if latency < 10 {
+					isForeign = false // 國內 CDN
+				} else {
+					foreignConfidence = "high"
+				}
+			} else {
+				// ICMP 失敗，fallback TCP 探測
+				latency = tcpProbe(resultIP)
+				if latency >= 0 {
+					if latency < 10 {
+						isForeign = false
+					} else {
+						foreignConfidence = "high"
+					}
+				} else {
+					// 兩者都失敗，保持 isForeign=true 但標記低確信度
+					foreignConfidence = "low"
+				}
 			}
 		}
 
 		asn, isp, _ := geoip.GetASN(resultIP)
+		coords, _ := geoip.GetCoords(resultIP)
 		appName, appCat := recognition.IdentifyApp(question.Name)
 
 		record := types.DNSQueryRecord{
-			Timestamp:   time.Now(),
-			Domain:      question.Name,
-			Type:        recordType,
-			ResultIP:    resultIP,
-			IsForeign:   isForeign,
-			Latency:     latency,
-			SourceIP:    sourceIp,
-			Country:     resultCountry,
-			ASN:         asn,
-			ISP:         isp,
-			AppName:     appName,
-			AppCategory: appCat,
+			Timestamp:         time.Now(),
+			Domain:            question.Name,
+			Type:              recordType,
+			ResultIP:          resultIP,
+			IsForeign:         isForeign,
+			ForeignConfidence: foreignConfidence,
+			Latency:           latency,
+			SourceIP:          sourceIp,
+			Country:           resultCountry,
+			ASN:               asn,
+			ISP:               isp,
+			AppName:           appName,
+			AppCategory:       appCat,
+		}
+		if coords != nil && len(coords) == 2 {
+			record.Longitude = coords[0]
+			record.Latitude = coords[1]
 		}
 
-		log.Printf("[DNS] Processed: %s -> %s (%s) [%s] from %s", question.Name, resultIP, resultCountry, appName, sourceIp)
+		slog.Info("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appName, "sourceIp", sourceIp)
 
 		// 存入 Ring Buffer
 		buffer.Add(sourceIp, record)
@@ -188,44 +224,52 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		data, err := json.Marshal(record)
 		if err == nil {
 			select {
-			case s.broadcast <- data:
+			case s.broadcast <- api.BroadcastMessage{SourceIP: sourceIp, Data: data}:
 			default:
-				// 這裡丟棄是正確的，保護主程式
-				log.Println("Broadcast full")
+				slog.Warn("Broadcast channel full, dropping message", "component", "dns")
 			}
 		}
 	}
 }
 
-// pingIP 執行簡單的 ping 並傳回延遲 (ms)
+// pingIP 使用 go-ping 執行 ICMP ping 並傳回延遲 (ms)，失敗回 -1
 func pingIP(ip string) float64 {
-	// 建立 context 避免 ping 太久 (1秒)
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	// 使用系統 ping 指令
-	// -c 1: 只 ping 一次
-	// -t 1 (或 -W 1): 等待時間
-	// 注意: macOS 是 -t, Linux 是 -W，這裡為了通用性可能需要判斷或使用封裝庫
-	// 簡單起見先假設是 macOS (符合專案環境說明)
-	cmd := exec.CommandContext(ctx, "ping", "-c", "1", "-t", "1", ip)
-	output, err := cmd.CombinedOutput()
+	pinger, err := probing.NewPinger(ip)
 	if err != nil {
 		return -1
 	}
+	pinger.Count = 1
+	pinger.Timeout = 1 * time.Second
+	pinger.SetPrivileged(false) // unprivileged mode (UDP)，不需 root
 
-	// 解析輸出，尋找 "time=X.XXX ms"
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
-		if strings.Contains(line, "time=") {
-			parts := strings.Split(line, "time=")
-			if len(parts) > 1 {
-				msStr := strings.Split(parts[1], " ")[0]
-				ms, _ := strconv.ParseFloat(msStr, 64)
-				return ms
-			}
-		}
+	if err := pinger.Run(); err != nil {
+		return -1
 	}
 
+	stats := pinger.Statistics()
+	if stats.PacketsRecv == 0 {
+		return -1
+	}
+
+	return float64(stats.AvgRtt.Microseconds()) / 1000.0
+}
+
+// tcpProbe 嘗試 TCP 連線探測延遲 (ms)，失敗回 -1
+func tcpProbe(ip string) float64 {
+	ports := []string{"443", "80"}
+	for _, port := range ports {
+		start := time.Now()
+		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", ip, port), 1*time.Second)
+		if err != nil {
+			continue
+		}
+		conn.Close()
+		return float64(time.Since(start).Microseconds()) / 1000.0
+	}
 	return -1
+}
+
+// Wait 等待所有 enrichment goroutine 完成
+func (s *Server) Wait() {
+	s.wg.Wait()
 }

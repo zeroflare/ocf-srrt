@@ -11,6 +11,7 @@ interface DnsState {
   monitoringIp: string | null;
   maxRecords: number;
   isSharedReport: boolean;
+  theme: 'dark' | 'light';
 
   // Actions
   addRecord: (record: DnsRecord) => void;
@@ -18,10 +19,13 @@ interface DnsState {
   setPaused: (paused: boolean) => void;
   setMonitoringIp: (ip: string | null) => void;
   setSharedReport: (isShared: boolean) => void;
+  setTheme: (theme: 'dark' | 'light') => void;
+  toggleTheme: () => void;
   clearRecords: () => void;
   exportToUrl: () => string;
 }
 
+const MAX_RECORDS = 200;
 const MAX_RECORDS_FOR_SHARE = 50;
 
 // 實際執行 State 更新的邏輯 (Pure Function)
@@ -76,8 +80,9 @@ export const useDnsStore = create<DnsState>((set, get) => {
     foreignQueries: 0,
     isPaused: false,
     monitoringIp: null,
-    maxRecords: MAX_RECORDS_FOR_SHARE,
+    maxRecords: MAX_RECORDS,
     isSharedReport: false,
+    theme: 'dark',
 
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
@@ -127,6 +132,10 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     setSharedReport: (isShared: boolean) => set({ isSharedReport: isShared }),
 
+    setTheme: (theme: 'dark' | 'light') => set({ theme }),
+
+    toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+
     clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0, isSharedReport: false }),
 
     exportToUrl: () => {
@@ -134,8 +143,9 @@ export const useDnsStore = create<DnsState>((set, get) => {
       if (records.length === 0) return window.location.origin + window.location.pathname;
 
       try {
-        // 為了分享，我們將資料轉為縮寫格式
-        const minimalRecords = records.map(r => ({
+        // 分享時只取最新的 MAX_RECORDS_FOR_SHARE 筆
+        const shareRecords = records.slice(0, MAX_RECORDS_FOR_SHARE);
+        const minimalRecords = shareRecords.map(r => ({
           t: r.timestamp,
           d: r.domain,
           ip: r.resultIp,
@@ -157,6 +167,12 @@ export const useDnsStore = create<DnsState>((set, get) => {
             .replace(/\+/g, '-')
             .replace(/\//g, '_')
             .replace(/=+$/, '');
+
+        const MAX_ZDATA_LENGTH = 100 * 1024;
+        if (base64.length > MAX_ZDATA_LENGTH) {
+          console.error(`[Share] Compressed data exceeds size limit: ${base64.length} bytes`);
+          return window.location.origin + window.location.pathname;
+        }
 
         const url = new URL(window.location.href);
         url.searchParams.set('zdata', base64);

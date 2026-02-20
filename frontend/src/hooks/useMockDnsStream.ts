@@ -60,5 +60,5 @@ export const useMockDnsStream = (enabled: boolean = true) => {
     };
   }, [isConnected, monitoringIp, addRecord, enabled]);
 
-  return isConnected;
+  return { isConnected, reconnectDelay: null as number | null };
 };

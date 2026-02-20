@@ -14,6 +14,9 @@ export interface DnsRecord {
     // 對應 Go: IsForeign bool
     isForeign: boolean;
 
+    // 對應 Go: ForeignConfidence string
+    foreignConfidence?: 'high' | 'low' | '';
+
     // 對應 Go: Latency float64
     latency: number;
 
@@ -34,4 +37,24 @@ export interface DnsRecord {
 
     // 對應 Go: AppCategory string
     appCategory: string;
+
+    // 對應 Go: Longitude/Latitude float64
+    longitude?: number;
+    latitude?: number;
+}
+
+export interface Hop {
+  index: number;
+  ip: string;
+  host: string;
+  latency: number;
+  country: string;
+  coords: [number, number]; // [lon, lat]
+}
+
+export interface TraceResult {
+  target: string;
+  hops: Hop[];
+  status: 'completed' | 'timeout' | 'error';
+  time: string;
 }

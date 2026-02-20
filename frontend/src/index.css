@@ -1,10 +1,12 @@
 @import "tailwindcss";
 
-body {
-  @apply bg-gray-900 text-white overflow-hidden;
-  margin: 0;
-  width: 100vw;
-  height: 100vh;
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900 dark:bg-gray-900 dark:text-white overflow-hidden;
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+  }
 }
 
 .custom-scrollbar::-webkit-scrollbar {
@@ -16,12 +18,33 @@ body {
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.1);
   border-radius: 2px;
 }
 
+.dark .custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+}
+
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.2);
+}
+
+/* Row flash animation for new DNS records */
+@keyframes row-flash {
+  0% { background-color: rgba(6, 182, 212, 0.15); }
+  100% { background-color: transparent; }
+}
+.animate-row-flash { animation: row-flash 1.5s ease-out; }
+
+/* Tooltip fade-in */
+@keyframes fade-in {
+  from { opacity: 0; transform: translate(-50%, -100%) scale(0.95); }
+  to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 }
 
 /* MapLibre GL JS Popup 樣式自訂 */
@@ -33,5 +56,9 @@ body {
 }
 
 .maplibregl-popup-tip {
-  border-top-color: #1f2937 !important; /* gray-800 */
+  border-top-color: #ffffff !important;
+}
+
+.dark .maplibregl-popup-tip {
+  border-top-color: #0f172a !important;
 }

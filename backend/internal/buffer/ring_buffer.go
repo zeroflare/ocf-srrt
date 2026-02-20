@@ -1,7 +1,7 @@
 package buffer
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -31,6 +31,13 @@ var GlobalStore = struct {
 	sessions: make(map[string]*SessionBuffer),
 }
 
+var onSessionRemoved func(ip string)
+
+// SetOnSessionRemoved 設定 session 被 GC 移除時的回呼函式
+func SetOnSessionRemoved(fn func(ip string)) {
+	onSessionRemoved = fn
+}
+
 func init() {
 	go func() {
 		ticker := time.NewTicker(CleanupInterval)
@@ -49,10 +56,20 @@ func cleanupIdleSessions() {
 		lastActive := atomic.LoadInt64(&session.lastActive)
 
 		if time.Duration(now-lastActive) > IdleTimeout {
-			log.Printf("[GC] Removing idle session: %s", ip)
+			slog.Info("Removing idle session", "component", "buffer", "ip", ip)
 			delete(GlobalStore.sessions, ip)
+			if onSessionRemoved != nil {
+				onSessionRemoved(ip)
+			}
 		}
 	}
+}
+
+// SessionCount 回傳目前活躍的 Session 數量
+func SessionCount() int {
+	GlobalStore.mu.RLock()
+	defer GlobalStore.mu.RUnlock()
+	return len(GlobalStore.sessions)
 }
 
 // Add 加入紀錄 (O(1) 效能，GC 友善)
@@ -68,7 +85,7 @@ func Add(sourceIp string, record interface{}) {
 		session, exists = GlobalStore.sessions[sourceIp]
 		if !exists {
 			if len(GlobalStore.sessions) >= MaxSessions {
-				log.Printf("[Warn] Max sessions reached (%d). Dropping data for %s", MaxSessions, sourceIp)
+				slog.Warn("Max sessions reached, dropping data", "component", "buffer", "maxSessions", MaxSessions, "sourceIp", sourceIp)
 				GlobalStore.mu.Unlock()
 				return
 			}

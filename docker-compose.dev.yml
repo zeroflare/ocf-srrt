@@ -8,10 +8,15 @@ services:
       target: builder # 只構建到第一階段 (含有 Go 環境)，不跑 Runner 階段
     container_name: srrt-backend
 
-    # 權限設定 (Packet Sniffer 需要)
+    # 權限設定 (DNS port 53 + Packet Sniffer 需要)
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - NET_BIND_SERVICE
+
+    # 記憶體限制：防止 OOM 吃光宿主機
+    mem_limit: 1g
+    memswap_limit: 1g
 
     # 將本地程式碼掛載進去，這樣修改存檔時容器才看得到
     volumes:
@@ -46,6 +51,10 @@ services:
       target: builder # 只使用 Node 環境，不使用 Nginx
     container_name: srrt-frontend
 
+    # 記憶體限制
+    mem_limit: 512m
+    memswap_limit: 512m
+
     # [關鍵] 掛載程式碼
     volumes:
       - ./frontend:/app
@@ -63,7 +72,7 @@ services:
 
     environment:
       - CHOKIDAR_USEPOLLING=true # 強制 Webpack/Vite 輪詢檔案變更
-
+      - VITE_USE_MOCK=false
     restart: unless-stopped
 
 volumes:

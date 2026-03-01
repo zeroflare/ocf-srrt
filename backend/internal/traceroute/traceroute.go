@@ -30,12 +30,6 @@ type TraceResult struct {
 	Time   time.Time `json:"time"`
 }
 
-var (
-	// 解析範例: " 1  192.168.1.1 (192.168.1.1)  1.234 ms"
-	hopRegex = regexp.MustCompile(`^\s*(\d+)\s+([^\s\(]+)\s+\(([^\)]+)\)\s+([\d\.]+)\s+ms`)
-	// 簡化解析範例 (某些系統): " 1  192.168.1.1  1.234 ms"
-	simpleHopRegex = regexp.MustCompile(`^\s*(\d+)\s+([\d\.]+)\s+ms`)
-)
 
 // Run 執行系統 traceroute 指令並解析結果
 func Run(ctx context.Context, target string) (*TraceResult, error) {
@@ -93,7 +87,7 @@ func Run(ctx context.Context, target string) (*TraceResult, error) {
 func parseLine(line string) *Hop {
 	// macOS/Linux 範例: " 1  192.168.1.1  0.582 ms"
 	fields := strings.Fields(line)
-	if len(fields) < 4 {
+	if len(fields) < 2 {
 		return nil
 	}
 

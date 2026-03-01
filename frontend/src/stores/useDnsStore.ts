@@ -1,7 +1,8 @@
 import { create } from 'zustand';
 import { throttle } from 'lodash-es';
 import pako from 'pako';
-import { DnsRecord } from '../types'; // 引入剛剛定義好的 Type
+import { DnsRecord } from '../types';
+import { useTracerouteStore } from './useTracerouteStore';
 
 interface DnsState {
   records: DnsRecord[];
@@ -150,6 +151,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
           d: r.domain,
           ip: r.resultIp,
           f: r.isForeign ? 1 : 0,
+          fc: r.foreignConfidence || '',
           l: r.latency,
           s: r.sourceIp,
           c: r.country,
@@ -159,7 +161,24 @@ export const useDnsStore = create<DnsState>((set, get) => {
           asn: r.asn
         }));
 
-        const json = JSON.stringify(minimalRecords);
+        // 一併序列化 Traceroute 資料
+        const traceResult = useTracerouteStore.getState().activeResult;
+        const payload: Record<string, unknown> = { r: minimalRecords };
+        if (traceResult) {
+          payload.trace = {
+            target: traceResult.target,
+            status: traceResult.status,
+            hops: traceResult.hops.map(h => ({
+              i: h.index,
+              ip: h.ip,
+              l: h.latency,
+              c: h.country,
+              co: h.coords,
+            })),
+          };
+        }
+
+        const json = JSON.stringify(payload);
         // 使用 pako 進行壓縮
         const compressed = pako.deflate(json);
         // 將 Uint8Array 轉為 base64 (使用可選的 URL 安全字元處理更好，這裡先用基礎 btoa)

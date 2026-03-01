@@ -5,6 +5,7 @@ import { useMockDnsStream } from './hooks/useMockDnsStream';
 import { useSharedReport } from './hooks/useSharedReport';
 import { useTour } from './hooks/useTour';
 import { useTracerouteStore } from './stores/useTracerouteStore';
+import { useCableStore } from './stores/useCableStore';
 import { LiveTable } from './components/LiveTable';
 import { TrafficDashboard } from './components/TrafficDashboard';
 import { LiveTrafficChart } from './components/LiveTrafficChart';
@@ -21,7 +22,7 @@ type TabKey = 'table' | 'chart' | 'stats' | 'route';
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
   const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, maxRecords } = useDnsStore();
-  const { isLoading: traceLoading, hasResult: traceHasResult } = useTracerouteStore();
+  const { isLoading: traceLoading, hasResult: traceHasResult, activeResult: traceActiveResult } = useTracerouteStore();
   const { isConnected, reconnectDelay } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('table');
@@ -57,6 +58,11 @@ function App() {
       setActiveTab('route');
     }
   }, [traceLoading]);
+
+  // Traceroute → Cable store 連動
+  useEffect(() => {
+    useCableStore.getState().selectCableByTraceResult(traceActiveResult);
+  }, [traceActiveResult]);
 
   const { t, i18n } = useTranslation();
   const { tourSteps, joyrideStyles, joyrideLocale } = useTour(theme);

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
-import { DnsRecord } from '../types';
+import { DnsRecord, TraceResult } from '../types';
 
 export type CableSegment = {
   id: string;
@@ -27,6 +27,15 @@ export type CableFeatureProps = {
   isAvailablePath: boolean;
 };
 
+const APP_TO_CABLE: Record<string, string> = {
+  'Google': 'apricot',
+  'YouTube': 'apricot',
+  'Facebook': 'apcn2',
+  'Instagram': 'apcn2',
+  'Netflix': 'tpe',
+  'Cloudflare': 'faister',
+};
+
 interface CableState {
   cables: CableData[];
   geoJSON: FeatureCollection<LineString, CableFeatureProps> | null;
@@ -39,6 +48,7 @@ interface CableState {
   toggleCableSelection: (id: string) => void;
   setActiveApp: (appName: string | null) => void;
   selectCableByRecord: (record: DnsRecord | null) => void;
+  selectCableByTraceResult: (traceResult: TraceResult | null) => void;
 }
 
 /**
@@ -141,17 +151,7 @@ export const useCableStore = create<CableState>((set) => ({
       return;
     }
 
-    // 簡單的映射邏輯：根據 App 映射到可能的海纜
-    const appToCable: Record<string, string> = {
-      'Google': 'apricot',
-      'YouTube': 'apricot',
-      'Facebook': 'apcn2',
-      'Instagram': 'apcn2',
-      'Netflix': 'tpe',
-      'Cloudflare': 'faister',
-    };
-
-    const cableId = appToCable[appName];
+    const cableId = APP_TO_CABLE[appName];
     if (cableId) {
       set({ activeAppId: appName, selectedCableId: cableId });
     } else {
@@ -159,10 +159,6 @@ export const useCableStore = create<CableState>((set) => ({
     }
   },
 
-  /**
-   * 根據 DNS 紀錄（例如延遲）來決定顯示哪條海纜
-   * 這裡實作一個簡單的 placeholder 計算
-   */
   selectCableByRecord: (record: DnsRecord | null) => {
     if (!record) {
       set({ selectedCableId: null, activeAppId: null });
@@ -170,23 +166,9 @@ export const useCableStore = create<CableState>((set) => ({
     }
 
     const { latency, appName } = record;
-    
-    // 優先使用 App 映射
-    const appToCable: Record<string, string> = {
-      'Google': 'apricot',
-      'YouTube': 'apricot',
-      'Facebook': 'apcn2',
-      'Instagram': 'apcn2',
-      'Netflix': 'tpe',
-      'Cloudflare': 'faister',
-    };
+    let cableId = APP_TO_CABLE[appName];
 
-    let cableId = appToCable[appName];
-
-    // 如果沒有特定 App 映射，則根據延遲模擬
     if (!cableId && record.isForeign) {
-      // 模擬邏輯：延遲低的走一條，延遲高的走另一條
-      // 這裡僅供展示，實際會需要查詢 GeoIP 或 Traceroute 資料
       if (latency < 50) {
         cableId = 'apricot';
       } else if (latency < 150) {
@@ -197,5 +179,21 @@ export const useCableStore = create<CableState>((set) => ({
     }
 
     set({ activeAppId: appName, selectedCableId: cableId || null });
+  },
+
+  selectCableByTraceResult: (traceResult: TraceResult | null) => {
+    if (!traceResult) {
+      set({ selectedCableId: null });
+      return;
+    }
+    // TODO: 根據 hop 座標序列分析可能經過的海纜
+    // Placeholder：取第一個非 TW 跳點的國家作為線索
+    const firstForeignHop = traceResult.hops.find(
+      h => h.ip !== '*' && h.country && h.country !== 'TW'
+    );
+    if (firstForeignHop) {
+      // 預留接口：後續實作 coords → cable 空間查詢
+      set({ selectedCableId: null });
+    }
   },
 }));

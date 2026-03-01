@@ -1,7 +1,8 @@
 import { useEffect } from 'react';
 import pako from 'pako';
 import { useDnsStore } from '../stores/useDnsStore';
-import { DnsRecord } from '../types';
+import { useTracerouteStore } from '../stores/useTracerouteStore';
+import { DnsRecord, TraceResult } from '../types';
 
 const MAX_ZDATA_LENGTH = 100 * 1024;
 
@@ -29,18 +30,23 @@ export const useSharedReport = () => {
         const decompressed = pako.inflate(bytes, { to: 'string' });
         const decoded = JSON.parse(decompressed);
 
-        loadRecords(decoded);
+        // 新格式: { r: [...], trace?: {...} } / 舊格式: [...]
+        const rawRecords = Array.isArray(decoded) ? decoded : decoded.r;
+        const traceData = Array.isArray(decoded) ? null : decoded.trace;
+
+        loadRecords(rawRecords, traceData);
       } catch (e) {
         console.error('Failed to decode compressed share data:', e);
       }
     }
 
-    function loadRecords(decoded: any[]) {
+    function loadRecords(decoded: any[], traceData: any | null) {
       const records: DnsRecord[] = decoded.map((r: any) => ({
         timestamp: r.t,
         domain: r.d,
         resultIp: r.ip,
         isForeign: r.f === 1,
+        foreignConfidence: r.fc || '',
         latency: r.l,
         sourceIp: r.s,
         country: r.c,
@@ -55,6 +61,24 @@ export const useSharedReport = () => {
         setSharedReport(true);
         setMonitoringIp(records[0].sourceIp);
         loadSnapshot(records.reverse());
+      }
+
+      // 還原 Traceroute 狀態
+      if (traceData) {
+        const traceResult: TraceResult = {
+          target: traceData.target,
+          status: traceData.status,
+          time: records[0]?.timestamp ?? new Date().toISOString(),
+          hops: traceData.hops.map((h: any) => ({
+            index: h.i,
+            ip: h.ip,
+            host: '',
+            latency: h.l,
+            country: h.c,
+            coords: h.co,
+          })),
+        };
+        useTracerouteStore.getState().loadSharedResult(traceResult);
       }
     }
   }, [setMonitoringIp, loadSnapshot, setSharedReport]);

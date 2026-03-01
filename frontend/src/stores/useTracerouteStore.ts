@@ -12,6 +12,7 @@ interface TracerouteState {
   runTraceroute: (ip: string) => Promise<void>;
   closeDrawer: () => void;
   setResult: (result: TraceResult | null) => void;
+  loadSharedResult: (result: TraceResult) => void;
 }
 
 export const useTracerouteStore = create<TracerouteState>((set) => ({
@@ -61,4 +62,11 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
 
   closeDrawer: () => set({ isOpen: false }),
   setResult: (result) => set({ activeResult: result }),
+  loadSharedResult: (result: TraceResult) => set({
+    activeResult: result,
+    isLoading: false,
+    isOpen: true,
+    hasResult: true,
+    error: null,
+  }),
 }));

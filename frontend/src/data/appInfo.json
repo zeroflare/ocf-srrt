@@ -1,0 +1,89 @@
+{
+  "version": "1.0",
+  "apps": [
+    {
+      "name": "Google",
+      "description": "Google 搜尋引擎與雲端服務平台，提供搜尋、Gmail、雲端硬碟等服務。",
+      "domains": ["google.com", ".google.com", "gstatic.com", ".gstatic.com", "googleapis.com", ".googleapis.com"],
+      "appStoreUrl": "https://apps.apple.com/app/google/id284815942",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.google.android.googlequicksearchbox",
+      "websiteUrl": "https://www.google.com",
+      "appIconUrl": "https://www.google.com/favicon.ico"
+    },
+    {
+      "name": "YouTube",
+      "description": "全球最大的影音分享平台，提供影片觀看、上傳與直播服務。",
+      "domains": ["youtube.com", ".youtube.com", "ytimg.com", ".ytimg.com", "googlevideo.com", ".googlevideo.com"],
+      "appStoreUrl": "https://apps.apple.com/app/youtube/id544007664",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.google.android.youtube",
+      "websiteUrl": "https://www.youtube.com",
+      "appIconUrl": "https://www.youtube.com/favicon.ico"
+    },
+    {
+      "name": "Facebook",
+      "description": "全球最大的社群網路平台，提供社交、通訊與內容分享服務。",
+      "domains": ["facebook.com", ".facebook.com", "fbcdn.net", ".fbcdn.net", "fb.com"],
+      "appStoreUrl": "https://apps.apple.com/app/facebook/id284882215",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.facebook.katana",
+      "websiteUrl": "https://www.facebook.com",
+      "appIconUrl": "https://www.facebook.com/favicon.ico"
+    },
+    {
+      "name": "Instagram",
+      "description": "以圖片與短影音為主的社群媒體平台，由 Meta 營運。",
+      "domains": ["instagram.com", ".instagram.com", "cdninstagram.com", ".cdninstagram.com"],
+      "appStoreUrl": "https://apps.apple.com/app/instagram/id389801252",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.instagram.android",
+      "websiteUrl": "https://www.instagram.com",
+      "appIconUrl": "https://www.instagram.com/favicon.ico"
+    },
+    {
+      "name": "Apple",
+      "description": "Apple 裝置系統服務，包含 iCloud、App Store、系統更新等。",
+      "domains": ["apple.com", ".apple.com", "icloud.com", ".icloud.com", "mzstatic.com", ".mzstatic.com"],
+      "websiteUrl": "https://www.apple.com",
+      "appIconUrl": "https://www.apple.com/favicon.ico"
+    },
+    {
+      "name": "Microsoft",
+      "description": "Microsoft 雲端與生產力服務，包含 Office 365、Azure、Teams 等。",
+      "domains": ["microsoft.com", ".microsoft.com", "azure.com", ".azure.com", "office.com", ".office.com", "windows.com", ".windows.com", "bing.com", ".bing.com"],
+      "appStoreUrl": "https://apps.apple.com/app/microsoft-365/id541164041",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.microsoft.office.officehubrow",
+      "websiteUrl": "https://www.microsoft.com",
+      "appIconUrl": "https://www.microsoft.com/favicon.ico"
+    },
+    {
+      "name": "Netflix",
+      "description": "全球最大的串流影音平台，提供電影、影集與原創內容。",
+      "domains": ["netflix.com", ".netflix.com", "nflxvideo.net", ".nflxvideo.net"],
+      "appStoreUrl": "https://apps.apple.com/app/netflix/id363590051",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.netflix.mediaclient",
+      "websiteUrl": "https://www.netflix.com",
+      "appIconUrl": "https://www.netflix.com/favicon.ico"
+    },
+    {
+      "name": "Cloudflare",
+      "description": "全球 CDN 與網路安全服務商，提供 DNS、DDoS 防護與邊緣運算。",
+      "domains": ["cloudflare.com", ".cloudflare.com", "cloudflare-dns.com", ".cloudflare-dns.com"],
+      "websiteUrl": "https://www.cloudflare.com",
+      "appIconUrl": "https://www.cloudflare.com/favicon.ico"
+    },
+    {
+      "name": "GitHub",
+      "description": "全球最大的程式碼託管平台，提供版本控制、CI/CD 與協作開發。",
+      "domains": ["github.com", ".github.com", "github.io", ".github.io", "githubusercontent.com", ".githubusercontent.com"],
+      "appStoreUrl": "https://apps.apple.com/app/github/id1477376905",
+      "googlePlayUrl": "https://play.google.com/store/apps/details?id=com.github.android",
+      "websiteUrl": "https://github.com",
+      "appIconUrl": "https://github.com/favicon.ico"
+    },
+    {
+      "name": "JetBrains",
+      "description": "專業開發工具廠商，提供 IntelliJ IDEA、WebStorm、PyCharm 等 IDE。",
+      "domains": ["jetbrains.com", ".jetbrains.com"],
+      "websiteUrl": "https://www.jetbrains.com",
+      "appIconUrl": "https://www.jetbrains.com/favicon.ico"
+    }
+  ]
+}

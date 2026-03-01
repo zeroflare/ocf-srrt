@@ -4,6 +4,8 @@ import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
 import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, Zap, SlidersHorizontal, Radio, Tag } from 'lucide-react';
+import { AppInfoTooltip } from './AppInfoTooltip';
+import { getAppInfoByName } from '../utils/appInfo';
 import {
   createColumnHelper,
   flexRender,
@@ -73,11 +75,26 @@ export const LiveTable: React.FC = () => {
     columnHelper.accessor('appName', {
       id: 'appName',
       header: t('app'),
-      cell: info => (
-        <span className="text-slate-600 dark:text-slate-300">
-          {info.row.original.appName}
-        </span>
-      ),
+      cell: info => {
+        const appName = info.row.original.appName;
+        const appInfo = getAppInfoByName(appName);
+        if (appInfo) {
+          return (
+            <AppInfoTooltip appInfo={appInfo}>
+              {appInfo.appIconUrl && (
+                <img
+                  src={appInfo.appIconUrl}
+                  alt={appName}
+                  className="w-3.5 h-3.5 rounded"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                />
+              )}
+              <span className="text-slate-600 dark:text-slate-300">{appName}</span>
+            </AppInfoTooltip>
+          );
+        }
+        return <span className="text-slate-600 dark:text-slate-300">{appName}</span>;
+      },
       size: 150,
     }),
     columnHelper.accessor('type', {

@@ -13,6 +13,7 @@ import (
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/types"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -24,37 +25,58 @@ import (
 
 // Server 定義了 DNS 伺服器結構
 type Server struct {
-	*dns.Server
+	udpServer  *dns.Server
+	tcpServer  *dns.Server
 	broadcast  chan api.BroadcastMessage
 	tokenStore *auth.TokenStore
 	limiters   *cache.Cache
 	dnsClient  *dns.Client
 	upstreams  []string
+	dnsCache   *cache.Cache // DNS 回應快取
 	wg         sync.WaitGroup
 }
 
-// NewServer 建立一個新的 DNS 伺服器實例
-func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore) *Server {
-	upstreams := []string{
+// buildUpstreams 從環境變數或預設值建立 upstream 列表
+func buildUpstreams() []string {
+	if env := os.Getenv("DNS_UPSTREAMS"); env != "" {
+		parts := strings.Split(env, ",")
+		var result []string
+		for _, p := range parts {
+			if addr := strings.TrimSpace(p); addr != "" {
+				result = append(result, addr)
+			}
+		}
+		if len(result) > 0 {
+			slog.Info("Using custom DNS upstreams from env", "upstreams", result)
+			return result
+		}
+	}
+	return []string{
 		"1.1.1.1:53",
 		"8.8.8.8:53",
 		"1.0.0.1:53",
 		"8.8.4.4:53",
 	}
+}
 
+// NewServer 建立一個新的 DNS 伺服器實例
+func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore) *Server {
 	s := &Server{
-		Server:     &dns.Server{Addr: ":53", Net: "udp"},
+		udpServer:  &dns.Server{Addr: "0.0.0.0:53", Net: "udp"},
+		tcpServer:  &dns.Server{Addr: "0.0.0.0:53", Net: "tcp"},
 		broadcast:  broadcast,
 		tokenStore: tokenStore,
 		// 參數 1 (DefaultExpiration): 10 分鐘。如果 IP 10 分鐘沒活動，Rate Limiter 就會被刪除。
 		// 參數 2 (CleanupInterval): 15 分鐘。每 15 分鐘背景掃描一次過期資料。
 		limiters: cache.New(10*time.Minute, 15*time.Minute),
 		dnsClient: &dns.Client{
-			Timeout: 2 * time.Second,
+			Timeout: 3 * time.Second, // 給 Go runtime 排程額外緩衝
 		},
-		upstreams: upstreams,
+		upstreams: buildUpstreams(),
+		dnsCache:  cache.New(30*time.Second, 60*time.Second),
 	}
-	s.Handler = s
+	s.udpServer.Handler = s
+	s.tcpServer.Handler = s
 	return s
 }
 
@@ -79,41 +101,102 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
-	// 3. 隨機挑選上游 (簡單負載平衡)
-	target := s.upstreams[rand.Intn(len(s.upstreams))]
-
-	resp, _, err := s.dnsClient.Exchange(r, target)
-	if err != nil {
-		// 簡單的 Failover 機制
-		backupTarget := s.upstreams[(rand.Intn(len(s.upstreams))+1)%len(s.upstreams)]
-		resp, _, err = s.dnsClient.Exchange(r, backupTarget)
-		if err != nil {
-			slog.Error("Upstream forward failed", "component", "dns", "error", err)
-			m := new(dns.Msg)
-			m.SetRcode(r, dns.RcodeServerFailure)
-			w.WriteMsg(m)
-			return
-		}
+	// 3. 查詢 DNS 快取
+	cacheKey := fmt.Sprintf("%s:%d", r.Question[0].Name, r.Question[0].Qtype)
+	if cached, found := s.dnsCache.Get(cacheKey); found {
+		resp := cached.(*dns.Msg).Copy()
+		resp.Id = r.Id
+		w.WriteMsg(resp)
+		s.wg.Add(1)
+		go func() {
+			defer s.wg.Done()
+			s.processAndRecord(sourceIp, r.Copy(), resp.Copy())
+		}()
+		return
 	}
 
-	// 4. 強制覆寫 ID
-	// 確保回應的 Transaction ID 與請求一致，否則 Client 會丟棄封包
+	// 4. 快取未命中，依序嘗試所有 upstream
+	resp, err := s.forwardWithFallback(r)
+	if err != nil {
+		slog.Error("All upstreams failed", "component", "dns", "error", err)
+		m := new(dns.Msg)
+		m.SetRcode(r, dns.RcodeServerFailure)
+		w.WriteMsg(m)
+		return
+	}
+
+	// 寫入快取
+	s.dnsCache.Set(cacheKey, resp, cache.DefaultExpiration)
+
+	// 5. 強制覆寫 ID
 	resp.Id = r.Id
 
-	// 5. 先回應 Client (降低延遲)
-	// 將「寫入回應」移到「分析數據」之前
+	// 6. 先回應 Client (降低延遲)
 	if err := w.WriteMsg(resp); err != nil {
 		slog.Error("Write response failed", "component", "dns", "error", err)
-		return // 若寫入失敗，後續分析也無意義
+		return
 	}
 
-	// 6. 異步處理記錄
-	// 既然已經回應使用者了，這裡可以慢慢做分析
+	// 7. 異步處理記錄
 	s.wg.Add(1)
 	go func() {
 		defer s.wg.Done()
 		s.processAndRecord(sourceIp, r.Copy(), resp.Copy())
 	}()
+}
+
+// forwardWithFallback 從隨機起始位置，依序嘗試所有 upstream，任一成功即回傳
+func (s *Server) forwardWithFallback(r *dns.Msg) (*dns.Msg, error) {
+	startIdx := rand.Intn(len(s.upstreams))
+	var lastErr error
+
+	for i := 0; i < len(s.upstreams); i++ {
+		idx := (startIdx + i) % len(s.upstreams)
+		upstream := s.upstreams[idx]
+
+		resp, _, err := s.dnsClient.Exchange(r, upstream)
+		if err == nil {
+			return resp, nil
+		}
+		slog.Warn("Upstream attempt failed, trying next",
+			"component", "dns",
+			"upstream", upstream,
+			"error", err,
+			"attempt", i+1,
+			"total", len(s.upstreams),
+		)
+		lastErr = err
+	}
+	return nil, fmt.Errorf("all %d upstreams failed, last error: %w", len(s.upstreams), lastErr)
+}
+
+// ListenAndServe 同時啟動 UDP 與 TCP 伺服器
+func (s *Server) ListenAndServe() error {
+	errChan := make(chan error, 2)
+
+	go func() {
+		slog.Info("Starting DNS UDP server", "addr", s.udpServer.Addr)
+		errChan <- s.udpServer.ListenAndServe()
+	}()
+
+	go func() {
+		slog.Info("Starting DNS TCP server", "addr", s.tcpServer.Addr)
+		errChan <- s.tcpServer.ListenAndServe()
+	}()
+
+	// 回傳第一個發生的錯誤
+	return <-errChan
+}
+
+// Shutdown 同時停止兩個伺服器
+func (s *Server) Shutdown() error {
+	slog.Info("Stopping DNS servers...")
+	errU := s.udpServer.Shutdown()
+	errT := s.tcpServer.Shutdown()
+	if errU != nil {
+		return errU
+	}
+	return errT
 }
 
 func (s *Server) getLimiter(ip string) *rate.Limiter {

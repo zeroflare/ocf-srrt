@@ -5,6 +5,8 @@ FROM node:24-alpine AS builder
 
 WORKDIR /app
 
+RUN apk add --no-cache libc6-compat
+
 # 啟用 pnpm (Corepack)
 RUN corepack enable && corepack prepare pnpm@latest --activate
 

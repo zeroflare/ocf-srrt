@@ -40,9 +40,6 @@ RUN apk --no-cache add ca-certificates libpcap tzdata
 # 設定時區為台北 (方便除錯 Log)
 ENV TZ=Asia/Taipei
 
-# 建立非 root 使用者
-RUN addgroup -S dns-proxy && adduser -S dns-proxy -G dns-proxy
-
 WORKDIR /home/dns-proxy
 
 # 建立資料夾並設定權限
@@ -53,12 +50,6 @@ COPY --from=builder /app/dns-analyzer .
 
 # 複製靜態資源 (app.json, GeoIP DB 等)
 COPY --from=builder /app/data ./data
-
-# 設定檔案擁有者
-RUN chown -R dns-proxy:dns-proxy /home/dns-proxy
-
-# 切換到非 root 使用者
-USER dns-proxy
 
 # 53: DNS 服務
 # 8080: WebSocket 儀表板

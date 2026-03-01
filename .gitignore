@@ -6,6 +6,11 @@
 .vscode/
 *.swp
 *.log
+.ai
+.aiassistant
+.pnpm-store
+.env
+.env.development
 
 # ========================
 # Backend (Go)

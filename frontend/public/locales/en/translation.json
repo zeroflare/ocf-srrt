@@ -35,7 +35,7 @@
   "tour_welcome_title": "Welcome to SRRT DNS Analyzer",
   "tour_welcome_content": "A real-time war room for network traffic analysis.\n\nThis tool helps you monitor connection paths, undersea cable flows, and potential risks. Let's see how to set it up!",
   "tour_setup_title": "How to Setup DNS?",
-  "tour_setup_content": "To ensure stable connection and precise analysis, please configure your DNS:\n\nPrimary DNS (This System): `103.136.x.x` \nSecondary DNS: `1.1.1.1` or `8.8.8.8` \n\n--- \n• Windows: Settings -> Network & Internet -> Ethernet/Wi-Fi -> Edit IP settings -> Manual.\n• macOS: System Settings -> Network -> Wi-Fi/Ethernet -> Details -> DNS tab.\n• iOS: Settings -> Wi-Fi -> tap (i) icon -> Configure DNS -> Manual.\n• Android: Settings -> Network & Internet -> Private DNS or DNS settings in Wi-Fi details.\n\n⚠️ Important: Always set a secondary DNS to prevent disconnection during system maintenance.",
+  "tour_setup_content": "To ensure stable connection and precise analysis, please configure your DNS:\n\nPrimary DNS (This System): `35.221.247.16` \nSecondary DNS: `1.1.1.1` or `8.8.8.8` \n\n--- \n• Windows: Settings -> Network & Internet -> Ethernet/Wi-Fi -> Edit IP settings -> Manual.\n• macOS: System Settings -> Network -> Wi-Fi/Ethernet -> Details -> DNS tab.\n• iOS: Settings -> Wi-Fi -> tap (i) icon -> Configure DNS -> Manual.\n• Android: Settings -> Network & Internet -> Private DNS or DNS settings in Wi-Fi details.\n\n⚠️ Important: Always set a secondary DNS to prevent disconnection during system maintenance.",
   "tour_monitoring_title": "Sniffing Control",
   "tour_monitoring_content": "Enter your device's IP here to start receiving live packet data.",
   "tour_dashboard_title": "Traffic Dashboard",

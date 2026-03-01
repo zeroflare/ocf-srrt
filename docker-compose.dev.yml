@@ -52,17 +52,22 @@ services:
     container_name: srrt-frontend
 
     # 記憶體限制
-    mem_limit: 512m
-    memswap_limit: 512m
+    mem_limit: 1g
+    memswap_limit: 1g
 
     # [關鍵] 掛載程式碼
     volumes:
       - ./frontend:/app
-      # 避免容器內的 node_modules 被本機的空資料夾覆蓋
-      - /app/node_modules
-
+      # 1. 確保 node_modules 獨立
+      - frontend_node_modules:/app/node_modules
+      # 2. 避免 Vite 快取污染
+      - /app/node_modules/.vite
+      # 3. 避免 pnpm 虛擬儲存路徑衝突
+      - /app/node_modules/.pnpm
     # 啟動 Vite Dev Server
-    command: pnpm dev
+    command: >
+      sh -c "pnpm install && 
+             pnpm dev --host 0.0.0.0 --force"
 
     ports:
       - "80:5173" # 將本機的 80 對應到容器的 5173 (Vite 預設 Port)
@@ -77,3 +82,4 @@ services:
 
 volumes:
   go_cache: # 讓 Go 下載的依賴可以持久化，不用每次重開都下載
+  frontend_node_modules:

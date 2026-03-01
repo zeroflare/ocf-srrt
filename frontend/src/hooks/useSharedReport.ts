@@ -54,6 +54,7 @@ export const useSharedReport = () => {
         appCategory: r.cat,
         isp: r.isp,
         asn: r.asn || 0,
+        os: r.os || '',
         type: 'A'
       }));
 

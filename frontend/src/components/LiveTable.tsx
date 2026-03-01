@@ -3,7 +3,7 @@ import { useDnsStore } from '../stores/useDnsStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
-import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, Zap, SlidersHorizontal, Radio, Tag } from 'lucide-react';
+import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, Zap, SlidersHorizontal, Radio, Tag, Monitor } from 'lucide-react';
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import {
@@ -23,6 +23,7 @@ export const LiveTable: React.FC = () => {
   const { runTraceroute } = useTracerouteStore();
   const [globalFilter, setGlobalFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
+  const [osFilter, setOsFilter] = useState<string | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     sourceIp: false,
@@ -192,11 +193,26 @@ export const LiveTable: React.FC = () => {
     return Array.from(cats).sort();
   }, [records]);
 
-  // Filter records by category
+  // Derive available OS types from records
+  const availableOsTypes = useMemo(() => {
+    const osSet = new Set<string>();
+    for (const r of records) {
+      if (r.os) osSet.add(r.os);
+    }
+    return Array.from(osSet).sort();
+  }, [records]);
+
+  // Filter records by category and OS
   const filteredRecords = useMemo(() => {
-    if (!categoryFilter) return records;
-    return records.filter(r => r.appCategory === categoryFilter);
-  }, [records, categoryFilter]);
+    let result = records;
+    if (categoryFilter) {
+      result = result.filter(r => r.appCategory === categoryFilter);
+    }
+    if (osFilter) {
+      result = result.filter(r => r.os === osFilter);
+    }
+    return result;
+  }, [records, categoryFilter, osFilter]);
 
   const table = useReactTable({
     data: filteredRecords,
@@ -351,6 +367,36 @@ export const LiveTable: React.FC = () => {
               }`}
             >
               {cat}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* OS filter chips */}
+      {availableOsTypes.length > 0 && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-100 dark:border-white/5 overflow-x-auto">
+          <Monitor className="h-3 w-3 text-slate-400 dark:text-slate-600 shrink-0" />
+          <button
+            onClick={() => setOsFilter(null)}
+            className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
+              !osFilter
+                ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-500/40'
+                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
+            }`}
+          >
+            {t('all') || 'All'}
+          </button>
+          {availableOsTypes.map(os => (
+            <button
+              key={os}
+              onClick={() => setOsFilter(osFilter === os ? null : os)}
+              className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
+                osFilter === os
+                  ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-500/40'
+                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
+              }`}
+            >
+              {os}
             </button>
           ))}
         </div>

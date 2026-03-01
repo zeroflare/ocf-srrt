@@ -10,6 +10,7 @@ import (
 	"ocf-srrt/backend/internal/auth"
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/geoip"
+	"ocf-srrt/backend/internal/osfingerprint"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/types"
 	"os"
@@ -33,6 +34,7 @@ type Server struct {
 	dnsClient  *dns.Client
 	upstreams  []string
 	dnsCache   *cache.Cache // DNS 回應快取
+	osCache    *cache.Cache // Per-IP OS fingerprint 快取
 	wg         sync.WaitGroup
 }
 
@@ -74,6 +76,7 @@ func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore)
 		},
 		upstreams: buildUpstreams(),
 		dnsCache:  cache.New(30*time.Second, 60*time.Second),
+		osCache:   cache.New(30*time.Minute, 60*time.Minute),
 	}
 	s.udpServer.Handler = s
 	s.tcpServer.Handler = s
@@ -278,6 +281,16 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		coords, _ := geoip.GetCoords(resultIP)
 		appName, appCat := recognition.IdentifyApp(question.Name)
 
+		// OS Fingerprinting: 嘗試從域名推斷 OS，結果快取在 Per-IP osCache 中
+		detectedOS := ""
+		if cached, found := s.osCache.Get(sourceIp); found {
+			detectedOS = cached.(string)
+		}
+		if os := osfingerprint.Detect(question.Name); os != "" {
+			detectedOS = os
+			s.osCache.Set(sourceIp, os, cache.DefaultExpiration)
+		}
+
 		record := types.DNSQueryRecord{
 			Timestamp:         time.Now(),
 			Domain:            question.Name,
@@ -292,6 +305,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			ISP:               isp,
 			AppName:           appName,
 			AppCategory:       appCat,
+			OS:                detectedOS,
 		}
 		if coords != nil && len(coords) == 2 {
 			record.Longitude = coords[0]

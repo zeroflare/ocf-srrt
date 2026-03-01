@@ -17,6 +17,7 @@ type DNSQueryRecord struct {
 	ISP               string    `json:"isp"`
 	AppName           string    `json:"appName"`
 	AppCategory       string    `json:"appCategory"`
+	OS                string    `json:"os,omitempty"`
 	Longitude         float64   `json:"longitude,omitempty"`
 	Latitude          float64   `json:"latitude,omitempty"`
 }

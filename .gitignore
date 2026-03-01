@@ -8,6 +8,8 @@
 *.log
 .ai
 .aiassistant
+.claude
+.playwright-mcp
 .pnpm-store
 .env
 .env.development

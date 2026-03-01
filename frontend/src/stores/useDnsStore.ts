@@ -158,7 +158,8 @@ export const useDnsStore = create<DnsState>((set, get) => {
           a: r.appName,
           cat: r.appCategory,
           isp: r.isp,
-          asn: r.asn
+          asn: r.asn,
+          os: r.os || ''
         }));
 
         // 一併序列化 Traceroute 資料

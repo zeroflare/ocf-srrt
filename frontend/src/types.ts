@@ -38,6 +38,9 @@ export interface DnsRecord {
     // 對應 Go: AppCategory string
     appCategory: string;
 
+    // 對應 Go: OS string `json:"os,omitempty"`
+    os?: string;
+
     // 對應 Go: Longitude/Latitude float64
     longitude?: number;
     latitude?: number;

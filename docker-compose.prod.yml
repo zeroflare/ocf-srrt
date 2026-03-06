@@ -36,7 +36,7 @@ services:
     volumes:
       - ./backend/data/GeoLite2-ASN.mmdb:/home/dns-proxy/data/GeoLite2-ASN.mmdb:ro
       - ./backend/data/GeoLite2-City.mmdb:/home/dns-proxy/data/GeoLite2-City.mmdb:ro
-      - ./backend/data/app.json:/app/data/app.json:ro
+      - ./backend/data/app.json:/home/dns-proxy/data/app.json:ro
 
     environment:
       - LOCAL_COUNTRY=TW
@@ -44,6 +44,7 @@ services:
       - ASN_DB_PATH=data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=data/GeoLite2-City.mmdb
       - RULES_PATH=data/app.json
+      - TRUSTED_PROXIES=127.0.0.1 # Nginx 與後端同機，只信任 localhost
     restart: unless-stopped
 
   # =========================================

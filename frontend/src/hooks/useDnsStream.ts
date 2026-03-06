@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDnsStore } from '../stores/useDnsStore';
 import { DnsRecord } from '../types';
+import { logger } from '../utils/logger';
 
 // 定義 WebSocket 傳來的訊息格式 (Discriminated Union)
 type WebSocketPayload =
@@ -35,6 +36,7 @@ export const useDnsStream = (enabled: boolean = true) => {
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
+  const [myIp, setMyIp] = useState<string | null>(null);
 
   const ws = useRef<WebSocket | null>(null);
   const reconnectTimeout = useRef<number | undefined>(undefined);
@@ -50,12 +52,10 @@ export const useDnsStream = (enabled: boolean = true) => {
 
     const connectWithToken = (token: string) => {
       const url = getWebSocketUrl(token);
-      console.log(`Connecting to WebSocket: ${url}`);
 
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
-        console.log('SRRT WebSocket connected');
         setIsConnected(true);
         setReconnectDelay(null);
         attemptRef.current = 0;
@@ -70,13 +70,12 @@ export const useDnsStream = (enabled: boolean = true) => {
         try {
           const rawData = JSON.parse(event.data) as WebSocketPayload;
           if ('data' in rawData && Array.isArray(rawData.data)) {
-            console.log(`[WS] Loaded snapshot: ${rawData.data.length} records`);
             loadSnapshot(rawData.data as DnsRecord[]);
           } else {
             addRecord(rawData as DnsRecord);
           }
         } catch (error) {
-          console.error('[WS] Failed to parse message:', error);
+          logger.error('[WS] Failed to parse message');
         }
       };
 
@@ -91,7 +90,6 @@ export const useDnsStream = (enabled: boolean = true) => {
         const delay = calculateBackoff(attemptRef.current);
         attemptRef.current++;
 
-        console.warn(`[WS] Disconnected. Reconnecting in ${(delay / 1000).toFixed(1)}s... (attempt ${attemptRef.current})`);
         setReconnectDelay(delay);
 
         if (!reconnectTimeout.current) {
@@ -102,8 +100,8 @@ export const useDnsStream = (enabled: boolean = true) => {
         }
       };
 
-      ws.current.onerror = (error) => {
-        console.error('[WS] Error:', error);
+      ws.current.onerror = () => {
+        logger.error('[WS] Connection error');
         ws.current?.close();
       };
     };
@@ -122,10 +120,11 @@ export const useDnsStream = (enabled: boolean = true) => {
         }
         const data = await resp.json();
         tokenRef.current = data.token;
-        console.log('[WS] Token acquired');
+        // 後端同時回傳 ip，供前端 IP 欄位預填
+        if (data.ip) { setMyIp(data.ip); }
         connectWithToken(data.token);
       } catch (error) {
-        console.error('[WS] Failed to fetch token:', error);
+        logger.error('[WS] Failed to fetch token');
 
         const delay = calculateBackoff(attemptRef.current);
         attemptRef.current++;
@@ -151,5 +150,5 @@ export const useDnsStream = (enabled: boolean = true) => {
     };
   }, [addRecord, loadSnapshot, enabled]);
 
-  return { isConnected, reconnectDelay };
+  return { isConnected, reconnectDelay, myIp };
 };

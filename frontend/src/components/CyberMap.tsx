@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import maplibregl from 'maplibre-gl';
+import maplibregl, { ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Feature } from 'geojson';
 import { useCableStore } from '../stores/useCableStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
@@ -212,7 +213,7 @@ export const CyberMap: React.FC = () => {
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
 
-    const filter: any =
+    const filter: ExpressionSpecification =
         selectedCableId
             ? ['all', ['==', ['get', 'hidden'], false], ['==', ['get', 'cableId'], selectedCableId]]
             : ['all', ['==', ['get', 'hidden'], false], ['==', ['get', 'cableId'], '___none___']];
@@ -235,7 +236,7 @@ export const CyberMap: React.FC = () => {
       return;
     }
 
-    const features: any[] = [];
+    const features: Feature[] = [];
     const hops = activeResult.hops.filter(h => h.coords && h.coords.length === 2);
 
     // 1. Add Hop Nodes
@@ -251,7 +252,7 @@ export const CyberMap: React.FC = () => {
     for (let i = 0; i < hops.length - 1; i++) {
       const start = hops[i];
       const end = hops[i+1];
-      
+
       // Calculate distance for visual logic
       const dist = calculateDistance(start.coords, end.coords);
       const isSubmarine = dist > 1000;

@@ -1,7 +1,7 @@
 # ==========================================
-# Stage 1: Builder
+# Stage 1: Base (依賴階段)
 # ==========================================
-FROM node:24-alpine AS builder
+FROM node:24-alpine AS base
 
 WORKDIR /app
 
@@ -17,6 +17,11 @@ COPY package.json pnpm-lock.yaml ./
 # 保證安裝的版本與 pnpm-lock.yaml 完全鎖死，不會偷升級
 RUN pnpm install --frozen-lockfile
 
+# ==========================================
+# Stage 2: Builder (編譯階段)
+# ==========================================
+FROM base AS builder
+
 # 複製程式碼 (包含 .env, tsconfig 等)
 COPY . .
 
@@ -24,9 +29,9 @@ COPY . .
 RUN pnpm run build
 
 # ==========================================
-# Stage 2: Serve
+# Stage 3: Serve (正式環境服務階段)
 # ==========================================
-FROM nginx:stable-alpine
+FROM nginx:stable-alpine AS runner
 
 # 移除 Nginx 預設頁面
 RUN rm -rf /usr/share/nginx/html/*
@@ -41,6 +46,8 @@ COPY nginx.conf /etc/nginx/templates/default.conf.template
 # 預設環境變數
 ENV NGINX_PORT=80
 ENV BACKEND_ADDR=127.0.0.1:8080
+# 限定 envsubst 只替換這兩個變數，避免 Nginx 原生變數 ($host, $uri 等) 被清空
+ENV NGINX_ENVSUBST_FILTER=NGINX_PORT|BACKEND_ADDR
 
 EXPOSE 80
 

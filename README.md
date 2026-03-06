@@ -66,6 +66,7 @@ docker-compose -f docker-compose.dev.yml up --build
 ```
 - **Frontend**: http://localhost (Vite Dev Server)
 - **Backend**: http://localhost:8080 (Air Runner)
+- **DNS**: `localhost:1053` (UDP/TCP)
 
 #### 🏭 模式 B：生產環境 (Production)
 最佳化效能與安全性。使用編譯後的 Go Binary 與 Nginx 靜態服務，並啟用 host 網路模式以獲取真實來源 IP。

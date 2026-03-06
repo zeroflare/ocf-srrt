@@ -1,9 +1,33 @@
 import { DnsRecord } from '../types';
 
-const DOMAINS = [
-  'google.com', 'facebook.com', 'youtube.com', 'amazon.com', 'wikipedia.org',
-  'twitter.com', 'instagram.com', 'netflix.com', 'apple.com', 'microsoft.com',
-  'github.com', 'openai.com', 'cloudflare.com', 'twitch.tv', 'reddit.com'
+// Domain、AppName、AppCategory 必須與 appInfo.json 中的 name 對應，
+// 這樣 LiveTable 的 AppInfoTooltip 才能正確顯示。
+const MOCK_APPS: { domain: string; appName: string; appCategory: string }[] = [
+  { domain: 'www.google.com', appName: 'Google', appCategory: 'Search Engine' },
+  { domain: 'mail.google.com', appName: 'Google', appCategory: 'Search Engine' },
+  { domain: 'apis.google.com', appName: 'Google', appCategory: 'Search Engine' },
+  { domain: 'www.youtube.com', appName: 'YouTube', appCategory: 'Streaming' },
+  { domain: 'i.ytimg.com', appName: 'YouTube', appCategory: 'Streaming' },
+  { domain: 'rr3---sn-a5mlrnek.googlevideo.com', appName: 'YouTube', appCategory: 'Streaming' },
+  { domain: 'www.facebook.com', appName: 'Facebook', appCategory: 'Social' },
+  { domain: 'static.xx.fbcdn.net', appName: 'Facebook', appCategory: 'Social' },
+  { domain: 'www.instagram.com', appName: 'Instagram', appCategory: 'Social' },
+  { domain: 'scontent.cdninstagram.com', appName: 'Instagram', appCategory: 'Social' },
+  { domain: 'www.apple.com', appName: 'Apple', appCategory: 'System Service' },
+  { domain: 'icloud.com', appName: 'Apple', appCategory: 'System Service' },
+  { domain: 'updates.cdn-apple.com', appName: 'Apple', appCategory: 'System Service' },
+  { domain: 'outlook.office.com', appName: 'Microsoft', appCategory: 'Productivity' },
+  { domain: 'login.microsoftonline.com', appName: 'Microsoft', appCategory: 'Productivity' },
+  { domain: 'www.bing.com', appName: 'Microsoft', appCategory: 'Productivity' },
+  { domain: 'www.netflix.com', appName: 'Netflix', appCategory: 'Streaming' },
+  { domain: 'api.netflix.com', appName: 'Netflix', appCategory: 'Streaming' },
+  { domain: 'cdn.cloudflare.com', appName: 'Cloudflare', appCategory: 'CDN' },
+  { domain: 'cloudflare-dns.com', appName: 'Cloudflare', appCategory: 'CDN' },
+  { domain: 'github.com', appName: 'GitHub', appCategory: 'Developer' },
+  { domain: 'api.github.com', appName: 'GitHub', appCategory: 'Developer' },
+  { domain: 'raw.githubusercontent.com', appName: 'GitHub', appCategory: 'Developer' },
+  { domain: 'plugins.jetbrains.com', appName: 'JetBrains', appCategory: 'Developer' },
+  { domain: 'download.jetbrains.com', appName: 'JetBrains', appCategory: 'Developer' },
 ];
 
 const IPS = [
@@ -17,8 +41,6 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
   FR: [2.35, 48.9], AU: [151.2, -33.9],
 };
 const ISPS = ['Chunghwa Telecom', 'Google Cloud', 'Amazon Data Services', 'Cloudflare', 'Microsoft Azure'];
-const APP_NAMES = ['Chrome', 'Firefox', 'Safari', 'Curl', 'Slack', 'Discord', 'Docker'];
-const APP_CATEGORIES = ['Browser', 'Network Tool', 'Chat', 'DevOps'];
 
 export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
   const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
@@ -27,9 +49,10 @@ export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
   // Add small random offset to avoid exact overlaps
   const lon = coords[0] + (Math.random() - 0.5) * 4;
   const lat = coords[1] + (Math.random() - 0.5) * 4;
+  const app = MOCK_APPS[Math.floor(Math.random() * MOCK_APPS.length)];
   return {
     timestamp: new Date().toISOString(),
-    domain: DOMAINS[Math.floor(Math.random() * DOMAINS.length)],
+    domain: app.domain,
     type: Math.random() > 0.8 ? 'AAAA' : 'A',
     resultIp: `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
     isForeign,
@@ -39,8 +62,9 @@ export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
     country,
     asn: Math.floor(Math.random() * 60000) + 1000,
     isp: ISPS[Math.floor(Math.random() * ISPS.length)],
-    appName: APP_NAMES[Math.floor(Math.random() * APP_NAMES.length)],
-    appCategory: APP_CATEGORIES[Math.floor(Math.random() * APP_CATEGORIES.length)],
+    appName: app.appName,
+    appCategory: app.appCategory,
+    os: Math.random() > 0.5 ? 'Windows' : (Math.random() > 0.5 ? 'macOS' : 'iOS'),
     longitude: lon,
     latitude: lat,
   };

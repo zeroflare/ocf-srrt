@@ -100,6 +100,8 @@ func (h *Hub) Run() {
 			}
 			h.mu.Unlock()
 		case msg := <-h.broadcast:
+			// 第一階段：RLock 只做 send，收集需要踢除的 client
+			var toRemove []*Client
 			h.mu.RLock()
 			for client := range h.clients {
 				if client.clientIP != msg.SourceIP {
@@ -108,11 +110,23 @@ func (h *Hub) Run() {
 				select {
 				case client.send <- msg.Data:
 				default:
-					close(client.send)
-					delete(h.clients, client)
+					// channel 滿，標記為待移除，不在 RLock 下做 map 寫入
+					toRemove = append(toRemove, client)
 				}
 			}
 			h.mu.RUnlock()
+
+			// 第二階段：Lock 批次清理滿 channel 的 client
+			if len(toRemove) > 0 {
+				h.mu.Lock()
+				for _, client := range toRemove {
+					if _, ok := h.clients[client]; ok {
+						close(client.send)
+						delete(h.clients, client)
+					}
+				}
+				h.mu.Unlock()
+			}
 		}
 	}
 }

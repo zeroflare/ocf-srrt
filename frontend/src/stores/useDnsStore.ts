@@ -3,6 +3,7 @@ import { throttle } from 'lodash-es';
 import pako from 'pako';
 import { DnsRecord } from '../types';
 import { useTracerouteStore } from './useTracerouteStore';
+import { logger } from '../utils/logger';
 
 interface DnsState {
   records: DnsRecord[];
@@ -183,14 +184,15 @@ export const useDnsStore = create<DnsState>((set, get) => {
         // 使用 pako 進行壓縮
         const compressed = pako.deflate(json);
         // 將 Uint8Array 轉為 base64 (使用可選的 URL 安全字元處理更好，這裡先用基礎 btoa)
-        const base64 = btoa(String.fromCharCode.apply(null, Array.from(compressed)))
+        const binaryStr = Array.from(compressed).map(b => String.fromCharCode(b)).join('');
+        const base64 = btoa(binaryStr)
             .replace(/\+/g, '-')
             .replace(/\//g, '_')
             .replace(/=+$/, '');
 
         const MAX_ZDATA_LENGTH = 100 * 1024;
         if (base64.length > MAX_ZDATA_LENGTH) {
-          console.error(`[Share] Compressed data exceeds size limit: ${base64.length} bytes`);
+          logger.error('[Share] Compressed data exceeds size limit');
           return window.location.origin + window.location.pathname;
         }
 
@@ -198,7 +200,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
         url.searchParams.set('zdata', base64);
         return url.toString();
       } catch (e) {
-        console.error('Failed to export data:', e);
+        logger.error('Failed to export data');
         return window.location.origin + window.location.pathname;
       }
     }

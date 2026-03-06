@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useDnsStore } from '../stores/useDnsStore';
 import { generateRandomDnsRecord, generateSnapshot } from '../mocks/mockDataGenerator';
+import { logger } from '../utils/logger';
 
 export const useMockDnsStream = (enabled: boolean = true) => {
   const { addRecord, monitoringIp } = useDnsStore();
@@ -14,15 +15,15 @@ export const useMockDnsStream = (enabled: boolean = true) => {
     }
     // 模擬連線延遲
     const connectTimer = window.setTimeout(() => {
-      console.log('[MockWS] Connected to mock DNS stream');
+      logger.info('[MockWS] Connected to mock DNS stream');
       setIsConnected(true);
-      
+
       // 如果有設定監控 IP，則載入快照
       // 模擬快照也是「一筆一筆」快速進入的感覺
       if (monitoringIp) {
         const count = 20;
         const snapshot = generateSnapshot(count, monitoringIp);
-        
+
         let i = 0;
         const snapshotInterval = window.setInterval(() => {
           if (i < snapshot.length) {

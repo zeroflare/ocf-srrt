@@ -3,6 +3,8 @@ package dns
 import (
 	"encoding/json"
 	"net"
+	"ocf-srrt/backend/internal/api"
+	"ocf-srrt/backend/internal/auth"
 	"ocf-srrt/backend/internal/types"
 	"testing"
 	"time"
@@ -11,8 +13,9 @@ import (
 )
 
 func TestServer_ProcessAndRecord(t *testing.T) {
-	broadcast := make(chan []byte, 10)
-	s := NewServer(broadcast)
+	broadcast := make(chan api.BroadcastMessage, 10)
+	ts := auth.NewTokenStore()
+	s := NewServer(broadcast, ts)
 
 	req := new(dns.Msg)
 	req.SetQuestion("google.com.", dns.TypeA)
@@ -24,15 +27,12 @@ func TestServer_ProcessAndRecord(t *testing.T) {
 		A:   net.ParseIP("8.8.8.8"),
 	})
 
-	// Use a mock response writer
-	w := &mockResponseWriter{remoteAddr: &net.UDPAddr{IP: net.ParseIP("127.0.0.1"), Port: 12345}}
-
-	s.processAndRecord(w, req, resp)
+	s.processAndRecord("127.0.0.1", req, resp)
 
 	select {
 	case msg := <-broadcast:
 		var record types.DNSQueryRecord
-		if err := json.Unmarshal(msg, &record); err != nil {
+		if err := json.Unmarshal(msg.Data, &record); err != nil {
 			t.Fatalf("Failed to unmarshal record: %v", err)
 		}
 		if record.Domain != "google.com." {

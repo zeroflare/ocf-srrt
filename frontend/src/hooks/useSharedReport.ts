@@ -3,6 +3,7 @@ import pako from 'pako';
 import { useDnsStore } from '../stores/useDnsStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { DnsRecord, TraceResult } from '../types';
+import { logger } from '../utils/logger';
 
 const MAX_ZDATA_LENGTH = 100 * 1024;
 
@@ -16,7 +17,7 @@ export const useSharedReport = () => {
     if (zdata) {
       try {
         if (zdata.length > MAX_ZDATA_LENGTH) {
-          console.error(`[Share] zdata exceeds size limit: ${zdata.length} bytes`);
+          logger.error('[Share] zdata exceeds size limit');
           return;
         }
 
@@ -36,7 +37,7 @@ export const useSharedReport = () => {
 
         loadRecords(rawRecords, traceData);
       } catch (e) {
-        console.error('Failed to decode compressed share data:', e);
+        logger.error('Failed to decode compressed share data');
       }
     }
 

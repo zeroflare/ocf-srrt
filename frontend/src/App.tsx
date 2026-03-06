@@ -12,8 +12,10 @@ import { LiveTrafficChart } from './components/LiveTrafficChart';
 import { CyberMap } from './components/CyberMap';
 import { TracerouteDrawer } from './components/TracerouteDrawer';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { DnsSetupBanner } from './components/DnsSetupBanner';
 import { useTranslation } from 'react-i18next';
 import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, Route } from 'lucide-react';
+import { logger } from './utils/logger';
 import { Tooltip } from './components/Tooltip';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 
@@ -44,6 +46,52 @@ function App() {
 
   const [runTour, setRunTour] = useState(() => !localStorage.getItem('srrt_tour_done'));
   const [showRightPanel, setShowRightPanel] = useState(true);
+  const [rightPanelWidth, setRightPanelWidth] = useState(50); // 預設 50%
+  const [isResizing, setIsResizing] = useState(false);
+
+  const startResizing = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+  }, []);
+
+  const stopResizing = useCallback(() => {
+    setIsResizing(false);
+  }, []);
+
+  const resize = useCallback((e: MouseEvent) => {
+    if (isResizing) {
+      const newWidth = ((window.innerWidth - e.clientX) / window.innerWidth) * 100;
+      if (newWidth > 20 && newWidth < 80) {
+        setRightPanelWidth(newWidth);
+      }
+    }
+  }, [isResizing]);
+
+  useEffect(() => {
+    if (isResizing) {
+      window.addEventListener('mousemove', resize);
+      window.addEventListener('mouseup', stopResizing);
+    } else {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    }
+    return () => {
+      window.removeEventListener('mousemove', resize);
+      window.removeEventListener('mouseup', stopResizing);
+    };
+  }, [isResizing, resize, stopResizing]);
+
+  // Fetch Public IP
+  useEffect(() => {
+    if (!monitoringIp && !isSharedReport) {
+      fetch('https://api.ipify.org?format=json')
+        .then(res => res.json())
+        .then(data => {
+          if (data.ip) setIpInput(data.ip);
+        })
+        .catch(err => logger.error('Failed to fetch public IP', err));
+    }
+  }, [monitoringIp, isSharedReport]);
 
   const handleTourCallback = useCallback((data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
@@ -101,18 +149,33 @@ function App() {
           locale={joyrideLocale}
         />
 
-        {/* 版面配置：左側地圖 60%，右側儀表板 40% */}
-        <div className="flex w-full h-full">
+        {/* 版面配置：動態分割 */}
+        <div className="flex w-full h-full relative">
           {/* 左側地圖區域 */}
-          <div className={`relative min-w-0 ${showRightPanel ? 'w-[60%]' : 'flex-1'}`}>
+          <div 
+            className="relative min-w-0 flex-1"
+            style={{ width: showRightPanel ? `${100 - rightPanelWidth}%` : '100%' }}
+          >
             <ErrorBoundary>
               <CyberMap />
             </ErrorBoundary>
+
           </div>
 
-          {/* 右側資訊面板 (40%) */}
+          {/* Resize Handle */}
           {showRightPanel && (
-            <aside className="w-[40%] bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-white/10 flex flex-col z-10 pointer-events-auto transition-colors">
+            <div
+              className={`w-1 h-full cursor-col-resize z-20 hover:bg-cyan-500/50 transition-colors ${isResizing ? 'bg-cyan-500' : 'bg-transparent'}`}
+              onMouseDown={startResizing}
+            />
+          )}
+
+          {/* 右側資訊面板 */}
+          {showRightPanel && (
+            <aside 
+              className="bg-white dark:bg-slate-950 border-l border-slate-200 dark:border-white/10 flex flex-col z-10 pointer-events-auto transition-colors"
+              style={{ width: `${rightPanelWidth}%` }}
+            >
               {/* 頂部標題 */}
               <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
                 <div className="flex items-center justify-between">
@@ -143,6 +206,9 @@ function App() {
                   </div>
                 </div>
               </div>
+
+              {/* DNS Setup Banner */}
+              <DnsSetupBanner />
 
               {/* IP Monitoring Controller */}
               <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">

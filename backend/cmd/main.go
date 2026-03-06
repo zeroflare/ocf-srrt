@@ -19,6 +19,42 @@ import (
 	"time"
 )
 
+// extractClientIP 從請求中取得真實 client IP。
+// 只有當請求來自信任代理（TRUSTED_PROXIES 環境變數）時，才採用 X-Forwarded-For，
+// 避免惡意客戶端偽造 header 取得他人的 token。
+func extractClientIP(r *http.Request, trustedProxies map[string]bool) (string, error) {
+	remoteIP, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		return "", err
+	}
+
+	if len(trustedProxies) > 0 && trustedProxies[remoteIP] {
+		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+			// X-Forwarded-For 可能包含多個 IP，取第一個（最原始的 client）
+			if i := strings.Index(xff, ","); i != -1 {
+				xff = strings.TrimSpace(xff[:i])
+			}
+			return strings.TrimSpace(xff), nil
+		}
+	}
+	return remoteIP, nil
+}
+
+// parseTrustedProxies 解析 TRUSTED_PROXIES 環境變數（逗號分隔的 IP 清單）
+func parseTrustedProxies() map[string]bool {
+	proxies := make(map[string]bool)
+	env := os.Getenv("TRUSTED_PROXIES")
+	if env == "" {
+		return proxies
+	}
+	for _, p := range strings.Split(env, ",") {
+		if ip := strings.TrimSpace(p); ip != "" {
+			proxies[ip] = true
+		}
+	}
+	return proxies
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -31,6 +67,9 @@ func main() {
 	recognition.LoadRules(rulesPath)
 
 	startTime := time.Now()
+
+	trustedProxies := parseTrustedProxies()
+	slog.Info("Trusted proxies loaded", "component", "main", "count", len(trustedProxies))
 
 	// 初始化 Token Store
 	tokenStore := auth.NewTokenStore()
@@ -57,29 +96,33 @@ func main() {
 		api.ServeWs(hub, tokenStore, w, r)
 	})
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
-		clientIP := r.Header.Get("X-Forwarded-For")
-		if clientIP == "" {
-			var err error
-			clientIP, _, err = net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				http.Error(w, "cannot determine client IP", http.StatusInternalServerError)
-				return
-			}
-		} else {
-			// X-Forwarded-For 可能包含多個 IP，取第一個（最原始的 client）
-			if i := strings.Index(clientIP, ","); i != -1 {
-				clientIP = strings.TrimSpace(clientIP[:i])
-			}
+		clientIP, err := extractClientIP(r, trustedProxies)
+		if err != nil {
+			http.Error(w, "cannot determine client IP", http.StatusInternalServerError)
+			return
 		}
 
 		token := tokenStore.GetOrCreateToken(clientIP)
 
 		w.Header().Set("Content-Type", "application/json")
+		// 同時回傳 ip，讓前端可以預填監控 IP 欄位，省去額外 API 呼叫
 		json.NewEncoder(w).Encode(map[string]string{
 			"token": token,
+			"ip":    clientIP,
 		})
 	})
 	mux.HandleFunc("/api/traceroute", func(w http.ResponseWriter, r *http.Request) {
+		// 驗證 token，防止未授權的 traceroute 探測
+		token := r.URL.Query().Get("token")
+		if token == "" {
+			http.Error(w, "missing token", http.StatusUnauthorized)
+			return
+		}
+		if _, ok := tokenStore.ValidateToken(token); !ok {
+			http.Error(w, "invalid token", http.StatusUnauthorized)
+			return
+		}
+
 		target := r.URL.Query().Get("target")
 		if target == "" {
 			http.Error(w, "target is required", http.StatusBadRequest)

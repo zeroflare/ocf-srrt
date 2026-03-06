@@ -3,9 +3,10 @@ import { useDnsStore } from '../stores/useDnsStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
-import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, Zap, SlidersHorizontal, Radio, Tag, Monitor } from 'lucide-react';
+import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, SlidersHorizontal, Radio, Tag, Monitor, Route } from 'lucide-react';
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
+import { detectCloudProvider } from '../utils/cloudProvider';
 import {
   createColumnHelper,
   flexRender,
@@ -27,7 +28,6 @@ export const LiveTable: React.FC = () => {
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     sourceIp: false,
-    isp: false,
     type: false,
   });
 
@@ -114,23 +114,30 @@ export const LiveTable: React.FC = () => {
     columnHelper.accessor('domain', {
       id: 'domain',
       header: t('domain'),
-      cell: info => <span className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer">{info.getValue()}</span>,
+      cell: info => (
+        <span
+          className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer group/domain"
+          onClick={() => runTraceroute(info.getValue())}
+          title={t('start_traceroute')}
+        >
+          {info.getValue()}
+          <Route className="h-2.5 w-2.5 opacity-0 group-hover/domain:opacity-50 transition-opacity shrink-0" />
+        </span>
+      ),
       size: 250,
     }),
     columnHelper.accessor('resultIp', {
       id: 'resultIp',
       header: 'RESULT IP',
       cell: info => (
-        <div className="flex items-center gap-2 group/ip">
-          <span className="text-slate-600 dark:text-slate-300 font-mono">{info.getValue()}</span>
-          <button
-            onClick={() => runTraceroute(info.getValue())}
-            className="opacity-0 group-hover/ip:opacity-100 p-1 hover:bg-cyan-500/20 rounded transition-all text-cyan-600 dark:text-cyan-400"
-            title={t('start_traceroute')}
-          >
-            <Zap className="h-3 w-3 fill-cyan-400/20" />
-          </button>
-        </div>
+        <span
+          className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300 font-mono hover:text-cyan-600 dark:hover:text-cyan-400 hover:underline cursor-pointer group/ip"
+          onClick={() => runTraceroute(info.getValue())}
+          title={t('start_traceroute')}
+        >
+          {info.getValue()}
+          <Route className="h-2.5 w-2.5 opacity-0 group-hover/ip:opacity-50 transition-opacity shrink-0" />
+        </span>
       ),
       size: 160,
     }),
@@ -163,12 +170,25 @@ export const LiveTable: React.FC = () => {
     columnHelper.accessor('isp', {
       id: 'isp',
       header: 'ASN/ISP',
-      cell: info => (
-        <div className="text-xs max-w-[150px] truncate text-slate-500 dark:text-gray-500 group relative cursor-help">
-          <span className="text-slate-400 dark:text-gray-600 mr-1 block text-[10px]">AS{info.row.original.asn}</span>
-          {info.getValue()}
-        </div>
-      ),
+      cell: info => {
+        const isp = info.getValue();
+        const provider = detectCloudProvider(isp);
+        return (
+          <div className="flex flex-col gap-1 max-w-[150px]">
+            <div className="text-xs truncate text-slate-500 dark:text-gray-500 group relative cursor-help">
+              <span className="text-slate-400 dark:text-gray-600 mr-1 block text-[10px]">AS{info.row.original.asn}</span>
+              {isp}
+            </div>
+            {provider && (
+              <div className="flex">
+                <span className={`text-[9px] font-bold px-1 rounded uppercase tracking-tighter ${provider.colorClass}`}>
+                  {provider.name}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      },
     }),
   ], [t, runTraceroute]);
 
@@ -421,15 +441,7 @@ export const LiveTable: React.FC = () => {
             table.getRowModel().rows.map((row, index) => (
               <tr
                 key={row.id}
-                className={`hover:bg-cyan-500/5 transition-colors group ${
-                  row.original.isForeign
-                    ? row.original.foreignConfidence === 'high'
-                      ? 'shadow-[inset_3px_0_0_0_#ef4444]'
-                      : row.original.foreignConfidence === 'low'
-                        ? 'shadow-[inset_3px_0_0_0_#fb923c99]'
-                        : 'shadow-[inset_3px_0_0_0_#ef444499]'
-                    : ''
-                } ${index < newRowCountRef.current ? 'animate-row-flash' : ''}`}
+                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''}`}
               >
                 {row.getVisibleCells().map(cell => (
                   <td key={cell.id} className="px-4 py-2 whitespace-nowrap">

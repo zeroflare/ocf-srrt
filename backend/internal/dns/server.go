@@ -1,6 +1,7 @@
 package dns
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -26,16 +27,20 @@ import (
 
 // Server 定義了 DNS 伺服器結構
 type Server struct {
-	udpServer  *dns.Server
-	tcpServer  *dns.Server
-	broadcast  chan api.BroadcastMessage
-	tokenStore *auth.TokenStore
-	limiters   *cache.Cache
-	dnsClient  *dns.Client
-	upstreams  []string
-	dnsCache   *cache.Cache // DNS 回應快取
-	osCache    *cache.Cache // Per-IP OS fingerprint 快取
-	wg         sync.WaitGroup
+	udpServer    *dns.Server
+	tcpServer    *dns.Server
+	broadcast    chan api.BroadcastMessage
+	tokenStore   *auth.TokenStore
+	limiters     *cache.Cache
+	dnsClient    *dns.Client
+	upstreams    []string
+	dnsCache     *cache.Cache // DNS 回應快取
+	osCache      *cache.Cache // Per-IP OS fingerprint 快取
+	probeCache   *cache.Cache // 境外 IP 探測結果快取 (避免重複探測)
+	probeWorkers chan struct{}
+	wg           sync.WaitGroup
+	ctx          context.Context
+	cancel       context.CancelFunc
 }
 
 // buildUpstreams 從環境變數或預設值建立 upstream 列表
@@ -63,6 +68,7 @@ func buildUpstreams() []string {
 
 // NewServer 建立一個新的 DNS 伺服器實例
 func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore) *Server {
+	ctx, cancel := context.WithCancel(context.Background())
 	s := &Server{
 		udpServer:  &dns.Server{Addr: "0.0.0.0:53", Net: "udp"},
 		tcpServer:  &dns.Server{Addr: "0.0.0.0:53", Net: "tcp"},
@@ -74,9 +80,13 @@ func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore)
 		dnsClient: &dns.Client{
 			Timeout: 3 * time.Second, // 給 Go runtime 排程額外緩衝
 		},
-		upstreams: buildUpstreams(),
-		dnsCache:  cache.New(30*time.Second, 60*time.Second),
-		osCache:   cache.New(30*time.Minute, 60*time.Minute),
+		upstreams:    buildUpstreams(),
+		dnsCache:     cache.New(30*time.Second, 60*time.Second),
+		osCache:      cache.New(30*time.Minute, 60*time.Minute),
+		probeCache:   cache.New(10*time.Minute, 20*time.Minute),
+		probeWorkers: make(chan struct{}, 100), // 限制最多 100 個並發探測任務
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 	s.udpServer.Handler = s
 	s.tcpServer.Handler = s
@@ -194,6 +204,7 @@ func (s *Server) ListenAndServe() error {
 // Shutdown 同時停止兩個伺服器
 func (s *Server) Shutdown() error {
 	slog.Info("Stopping DNS servers...")
+	s.cancel() // 通知所有探測任務取消
 	errU := s.udpServer.Shutdown()
 	errT := s.tcpServer.Shutdown()
 	if errU != nil {
@@ -222,13 +233,19 @@ func (s *Server) getLimiter(ip string) *rate.Limiter {
 	return newLimiter
 }
 
+// probeResult 儲存探測後的暫存資料
+type probeResult struct {
+	isForeign         bool
+	foreignConfidence string
+	latency           float64
+}
+
 func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 	if len(req.Question) == 0 {
 		return
 	}
 
 	question := req.Question[0]
-	// sourceIp 已經從參數傳入
 	localCountry := os.Getenv("LOCAL_COUNTRY")
 
 	for _, answer := range resp.Answer {
@@ -249,30 +266,62 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		resultCountry, _ := geoip.GetCountry(resultIP)
 		isForeign := localCountry != "" && resultCountry != localCountry
 		foreignConfidence := ""
+		latency := -1.0
 
 		// 境外判斷機制：GeoIP 判定外國後，用延遲進一步驗證
-		latency := -1.0
 		if isForeign {
-			latency = pingIP(resultIP)
-			if latency >= 0 {
-				// ICMP 成功
-				if latency < 10 {
-					isForeign = false // 國內 CDN
-				} else {
-					foreignConfidence = "high"
-				}
+			// 檢查快取
+			if cached, found := s.probeCache.Get(resultIP); found {
+				res := cached.(probeResult)
+				isForeign = res.isForeign
+				foreignConfidence = res.foreignConfidence
+				latency = res.latency
 			} else {
-				// ICMP 失敗，fallback TCP 探測
-				latency = tcpProbe(resultIP)
-				if latency >= 0 {
-					if latency < 10 {
-						isForeign = false
-					} else {
-						foreignConfidence = "high"
-					}
-				} else {
-					// 兩者都失敗，保持 isForeign=true 但標記低確信度
-					foreignConfidence = "low"
+				// 嘗試獲取 Worker 令牌，若滿了則跳過探測 (降低壓力，確保 shutdown 不超時)
+				select {
+				case s.probeWorkers <- struct{}{}:
+					// 使用獨立 goroutine 執行探測，以免阻塞當前 processAndRecord
+					// 雖然 processAndRecord 本身已在 goroutine，但在處理多個 Answer 時仍會同步阻塞
+					func() {
+						defer func() { <-s.probeWorkers }()
+
+						// 建立帶超時的 Context
+						ctx, cancel := context.WithTimeout(s.ctx, 3*time.Second)
+						defer cancel()
+
+						resLatency := pingIP(ctx, resultIP)
+						resForeign := true
+						resConfidence := ""
+
+						if resLatency >= 0 {
+							if resLatency < 10 {
+								resForeign = false
+							} else {
+								resConfidence = "high"
+							}
+						} else {
+							resLatency = tcpProbe(ctx, resultIP)
+							if resLatency >= 0 {
+								if resLatency < 10 {
+									resForeign = false
+								} else {
+									resConfidence = "high"
+								}
+							} else {
+								resConfidence = "low"
+							}
+						}
+
+						// 更新區域變數與快取
+						isForeign = resForeign
+						foreignConfidence = resConfidence
+						latency = resLatency
+						s.probeCache.Set(resultIP, probeResult{resForeign, resConfidence, resLatency}, cache.DefaultExpiration)
+					}()
+				default:
+					// Worker 滿，跳過探測，標記為低確信度
+					slog.Warn("Probe workers full, skipping detailed probe", "ip", resultIP)
+					foreignConfidence = "low (busy)"
 				}
 			}
 		}
@@ -330,7 +379,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 }
 
 // pingIP 使用 go-ping 執行 ICMP ping 並傳回延遲 (ms)，失敗回 -1
-func pingIP(ip string) float64 {
+func pingIP(ctx context.Context, ip string) float64 {
 	pinger, err := probing.NewPinger(ip)
 	if err != nil {
 		return -1
@@ -339,8 +388,20 @@ func pingIP(ip string) float64 {
 	pinger.Timeout = 1 * time.Second
 	pinger.SetPrivileged(false) // unprivileged mode (UDP)，不需 root
 
-	if err := pinger.Run(); err != nil {
+	// 建立一個 channel 接收 Run 結果
+	done := make(chan error, 1)
+	go func() {
+		done <- pinger.Run()
+	}()
+
+	select {
+	case <-ctx.Done():
+		pinger.Stop()
 		return -1
+	case err := <-done:
+		if err != nil {
+			return -1
+		}
 	}
 
 	stats := pinger.Statistics()
@@ -352,11 +413,17 @@ func pingIP(ip string) float64 {
 }
 
 // tcpProbe 嘗試 TCP 連線探測延遲 (ms)，失敗回 -1
-func tcpProbe(ip string) float64 {
+func tcpProbe(ctx context.Context, ip string) float64 {
 	ports := []string{"443", "80"}
 	for _, port := range ports {
+		select {
+		case <-ctx.Done():
+			return -1
+		default:
+		}
 		start := time.Now()
-		conn, err := net.DialTimeout("tcp", fmt.Sprintf("%s:%s", ip, port), 1*time.Second)
+		d := net.Dialer{Timeout: 1 * time.Second}
+		conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, port))
 		if err != nil {
 			continue
 		}

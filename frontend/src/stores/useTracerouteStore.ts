@@ -9,7 +9,7 @@ interface TracerouteState {
   error: string | null;
 
   // Actions
-  runTraceroute: (ip: string) => Promise<void>;
+  runTraceroute: (ip: string, token?: string) => Promise<void>;
   closeDrawer: () => void;
   setResult: (result: TraceResult | null) => void;
   loadSharedResult: (result: TraceResult) => void;
@@ -22,7 +22,7 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
   hasResult: false,
   error: null,
 
-  runTraceroute: async (ip: string) => {
+  runTraceroute: async (ip: string, token?: string) => {
     set({ isLoading: true, isOpen: true, error: null, activeResult: null, hasResult: false });
 
     const useMock = import.meta.env.VITE_USE_MOCK === 'true';
@@ -49,7 +49,8 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
     }
 
     try {
-      const response = await fetch(`/api/traceroute?target=${ip}`);
+      const tokenParam = token ? `&token=${token}` : '';
+      const response = await fetch(`/api/traceroute?target=${ip}${tokenParam}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch traceroute: ${response.statusText}`);
       }

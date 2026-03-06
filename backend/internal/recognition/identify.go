@@ -59,11 +59,14 @@ func LoadRules(path string) {
 				// 簡單判斷：如果包含 * 或是特殊字元，才當作 Regex 編譯
 				// 這樣可以保留單純字串比對的彈性
 				if strings.Contains(pattern, "*") {
-					// 將 wildcard 轉為 regex
+					// 使用字串邊界錨點，避免 google.com 匹配到 notgoogle.com
+					// 或是 www.google.com.tw 這種非預期的情況。
+					// 我們採用 (?:^|\.)PATTERN$ 的邏輯：
+					// 以該 pattern 為開頭，或者前綴是一個點（子網域），並且必須以該 pattern 結尾。
 					regexPattern := strings.ReplaceAll(pattern, ".", "\\.")
 					regexPattern = strings.ReplaceAll(regexPattern, "*", ".*")
+					regexPattern = "(?:^|\\.)" + regexPattern + "$"
 
-					// 不強制加 ^ 和 $，改為 "包含" 邏輯，增加命中率
 					re, err := regexp.Compile(regexPattern)
 					if err == nil {
 						compiledRules = append(compiledRules, struct {
@@ -86,10 +89,11 @@ func IdentifyApp(domain string) (string, string) {
 	// 2. Level 1: 優先比對 Rules
 	for _, rule := range rules {
 		for _, pattern := range rule.Patterns {
-			// A. 簡單關鍵字包含 (最快)
-			// 如果 pattern 不含 wildcard，直接檢查字串包含
+			// A. 規則比對 (最快)
+			// 如果 pattern 不含 wildcard，直接檢查後綴匹配 (Suffix Match)
+			// 避免 google.com 匹配到 notgoogle.com，但允許 www.google.com
 			if !strings.Contains(pattern, "*") {
-				if strings.Contains(cleanDomain, pattern) {
+				if cleanDomain == pattern || strings.HasSuffix(cleanDomain, "."+pattern) {
 					return rule.Name, rule.Category
 				}
 			}

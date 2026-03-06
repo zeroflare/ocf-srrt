@@ -106,5 +106,16 @@
   "start_traceroute": "Start Traceroute",
   "cable_source": "Cable data:",
   "cable_available_path": "Taiwan Available Route",
-  "cable_click_to_select": "Click to select cable"
+  "cable_click_to_select": "Click to select cable",
+  "dns_setup_title": "DNS Target",
+  "dns_setup_copy": "Copy",
+  "dns_setup_copied": "Copied!",
+  "dns_setup_how": "How to configure",
+  "dns_setup_windows": "Network Settings > Ethernet/Wi-Fi > Change adapter options > TCP/IPv4 > Preferred DNS",
+  "dns_setup_macos": "System Settings > Wi-Fi/Network > DNS > Add the IP above",
+  "dns_setup_linux": "Edit /etc/resolv.conf, add nameserver <IP>, or configure via NetworkManager",
+  "dns_setup_mobile": "Wi-Fi settings > Long press network > Modify > Static IP > DNS: enter IP above",
+  "provider_column": "Provider",
+  "start_traceroute_domain": "Traceroute (domain)",
+  "start_traceroute_ip": "Traceroute (IP)"
 }

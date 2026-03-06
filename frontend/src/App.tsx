@@ -1,5 +1,8 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
 import { useDnsStore } from './stores/useDnsStore';
+
+// 獨立 Traceroute 頁面（懶載入）
+const TraceroutePage = lazy(() => import('./pages/TraceroutePage'));
 import { useDnsStream } from './hooks/useDnsStream';
 import { useMockDnsStream } from './hooks/useMockDnsStream';
 import { useSharedReport } from './hooks/useSharedReport';
@@ -402,4 +405,23 @@ function App() {
   );
 }
 
-export default App;
+/**
+ * AppRouter — 頂層路由器，根據 pathname 決定渲染哪個頁面
+ * 不含任何 hook，避免違反 React Rules of Hooks
+ */
+function AppRouter() {
+  if (window.location.pathname === '/traceroute') {
+    return (
+      <Suspense fallback={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono text-xs uppercase tracking-widest animate-pulse">
+          Loading...
+        </div>
+      }>
+        <TraceroutePage />
+      </Suspense>
+    );
+  }
+  return <App />;
+}
+
+export default AppRouter;

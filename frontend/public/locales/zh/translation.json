@@ -117,5 +117,11 @@
   "dns_setup_mobile": "Wi-Fi 設定 > 長按網路名稱 > 修改 > 靜態 IP > DNS 填入上方 IP",
   "provider_column": "服務商",
   "start_traceroute_domain": "追蹤路由（從域名）",
-  "start_traceroute_ip": "追蹤路由（從 IP）"
+  "start_traceroute_ip": "追蹤路由（從 IP）",
+  "traceroute_open_new_tab": "在新頁面開啟",
+  "traceroute_copy_share": "複製分享連結",
+  "traceroute_copied": "已複製！",
+  "traceroute_page_back_main": "返回主頁",
+  "traceroute_share_decode_error": "無法解析分享資料",
+  "traceroute_page_no_params": "未提供追蹤目標或分享資料"
 }

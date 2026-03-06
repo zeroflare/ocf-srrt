@@ -32,7 +32,8 @@ type Server struct {
 	broadcast    chan api.BroadcastMessage
 	tokenStore   *auth.TokenStore
 	limiters     *cache.Cache
-	dnsClient    *dns.Client
+	udpClient    *dns.Client
+	tcpClient    *dns.Client
 	upstreams    []string
 	dnsCache     *cache.Cache // DNS 回應快取
 	osCache      *cache.Cache // Per-IP OS fingerprint 快取
@@ -77,8 +78,13 @@ func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore)
 		// 參數 1 (DefaultExpiration): 10 分鐘。如果 IP 10 分鐘沒活動，Rate Limiter 就會被刪除。
 		// 參數 2 (CleanupInterval): 15 分鐘。每 15 分鐘背景掃描一次過期資料。
 		limiters: cache.New(10*time.Minute, 15*time.Minute),
-		dnsClient: &dns.Client{
-			Timeout: 3 * time.Second, // 給 Go runtime 排程額外緩衝
+		udpClient: &dns.Client{
+			Net:     "", // 預設 UDP
+			Timeout: 3 * time.Second,
+		},
+		tcpClient: &dns.Client{
+			Net:     "tcp",
+			Timeout: 3 * time.Second,
 		},
 		upstreams:    buildUpstreams(),
 		dnsCache:     cache.New(30*time.Second, 60*time.Second),
@@ -158,20 +164,21 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 	}()
 }
 
-// forwardWithFallback 從隨機起始位置，依序嘗試所有 upstream，任一成功即回傳
+// forwardWithFallback 從隨機起始位置，依序嘗試所有 upstream (UDP → TCP fallback)
 func (s *Server) forwardWithFallback(r *dns.Msg) (*dns.Msg, error) {
 	startIdx := rand.Intn(len(s.upstreams))
 	var lastErr error
 
+	// 第一輪：UDP
 	for i := 0; i < len(s.upstreams); i++ {
 		idx := (startIdx + i) % len(s.upstreams)
 		upstream := s.upstreams[idx]
 
-		resp, _, err := s.dnsClient.Exchange(r, upstream)
+		resp, _, err := s.udpClient.Exchange(r, upstream)
 		if err == nil {
 			return resp, nil
 		}
-		slog.Warn("Upstream attempt failed, trying next",
+		slog.Warn("UDP upstream failed, trying next",
 			"component", "dns",
 			"upstream", upstream,
 			"error", err,
@@ -180,7 +187,28 @@ func (s *Server) forwardWithFallback(r *dns.Msg) (*dns.Msg, error) {
 		)
 		lastErr = err
 	}
-	return nil, fmt.Errorf("all %d upstreams failed, last error: %w", len(s.upstreams), lastErr)
+
+	// 第二輪：TCP fallback（GCE 等環境可能阻擋出站 UDP 53）
+	for i := 0; i < len(s.upstreams); i++ {
+		idx := (startIdx + i) % len(s.upstreams)
+		upstream := s.upstreams[idx]
+
+		resp, _, err := s.tcpClient.Exchange(r, upstream)
+		if err == nil {
+			slog.Info("TCP fallback succeeded", "component", "dns", "upstream", upstream)
+			return resp, nil
+		}
+		slog.Warn("TCP upstream failed, trying next",
+			"component", "dns",
+			"upstream", upstream,
+			"error", err,
+			"attempt", i+1,
+			"total", len(s.upstreams),
+		)
+		lastErr = err
+	}
+
+	return nil, fmt.Errorf("all upstreams failed (UDP+TCP), last error: %w", lastErr)
 }
 
 // ListenAndServe 同時啟動 UDP 與 TCP 伺服器

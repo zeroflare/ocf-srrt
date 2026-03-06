@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { TraceResult } from '../types';
+import { useDnsStore } from './useDnsStore';
 
 interface TracerouteState {
   activeResult: TraceResult | null;
@@ -49,8 +50,11 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
     }
 
     try {
-      const tokenParam = token ? `&token=${token}` : '';
-      const response = await fetch(`/api/traceroute?target=${ip}${tokenParam}`);
+      const effectiveToken = token || useDnsStore.getState().token;
+      if (!effectiveToken) {
+        throw new Error('No authentication token available');
+      }
+      const response = await fetch(`/api/traceroute?target=${encodeURIComponent(ip)}&token=${effectiveToken}`);
       if (!response.ok) {
         throw new Error(`Failed to fetch traceroute: ${response.statusText}`);
       }

@@ -66,6 +66,19 @@ func main() {
 	}
 	recognition.LoadRules(rulesPath)
 
+	// 初始化 Traceroute 日誌記錄器
+	// TRACEROUTE_LOG_ENABLED: "true"（預設）或 "false" 關閉
+	// TRACEROUTE_LOG_PATH: 日誌檔路徑（預設 "traceroute.log"）
+	traceLogEnabled := os.Getenv("TRACEROUTE_LOG_ENABLED") != "false"
+	traceLogPath := os.Getenv("TRACEROUTE_LOG_PATH")
+	if traceLogPath == "" {
+		traceLogPath = "traceroute.log"
+	}
+	if err := traceroute.InitLogger(traceLogEnabled, traceLogPath); err != nil {
+		slog.Warn("Failed to init traceroute logger", "component", "main", "error", err)
+	}
+	defer traceroute.CloseLogger()
+
 	startTime := time.Now()
 
 	trustedProxies := parseTrustedProxies()
@@ -137,6 +150,9 @@ func main() {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// 寫入日誌（若已啟用）
+		traceroute.LogResult(result)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(result)

@@ -32,7 +32,7 @@ const calculateBackoff = (attempt: number): number => {
 };
 
 export const useDnsStream = (enabled: boolean = true) => {
-  const { addRecord, loadSnapshot } = useDnsStore();
+  const { addRecord, loadSnapshot, setToken } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
@@ -120,6 +120,7 @@ export const useDnsStream = (enabled: boolean = true) => {
         }
         const data = await resp.json();
         tokenRef.current = data.token;
+        setToken(data.token);
         // 後端同時回傳 ip，供前端 IP 欄位預填
         if (data.ip) { setMyIp(data.ip); }
         connectWithToken(data.token);

@@ -1,28 +1,73 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
-import { Activity, MapPin, Globe, Zap } from 'lucide-react';
+import { Activity, MapPin, Globe, Zap, ExternalLink, Share2, Check } from 'lucide-react';
 import { isLikelySubmarine } from '../utils/geo';
 import { useTranslation } from 'react-i18next';
+import { buildTracerouteShareUrl, buildTracerouteRunUrl } from '../utils/tracerouteShare';
 
 export const TracerouteDrawer: React.FC = () => {
   const { t } = useTranslation();
   const { activeResult, isLoading, error } = useTracerouteStore();
-  const { theme } = useDnsStore();
+  const { theme, token } = useDnsStore();
+  const [copied, setCopied] = useState(false);
+
+  const handleOpenNewPage = () => {
+    if (!activeResult) return;
+    const url = activeResult
+      ? buildTracerouteRunUrl(activeResult.target, token || '')
+      : '';
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const handleCopyShare = () => {
+    if (!activeResult) return;
+    const url = buildTracerouteShareUrl(activeResult);
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Header */}
-      <div className={`px-5 py-4 border-b ${theme === 'dark' ? 'border-white/5' : 'border-slate-100'} flex items-center gap-3`}>
-        <div className={`p-1.5 ${theme === 'dark' ? 'bg-cyan-500/20' : 'bg-cyan-100'} rounded-lg`}>
-          <Activity className={`h-4 w-4 ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`} />
+      <div className={`px-5 py-3 border-b ${theme === 'dark' ? 'border-white/5' : 'border-slate-100'} flex items-center justify-between gap-2`}>
+        <div className="flex items-center gap-3 min-w-0">
+          <div className={`p-1.5 flex-shrink-0 ${theme === 'dark' ? 'bg-cyan-500/20' : 'bg-cyan-100'} rounded-lg`}>
+            <Activity className={`h-4 w-4 ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'}`} />
+          </div>
+          <div className="min-w-0">
+            <h2 className={`text-sm font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-800'} uppercase tracking-tight`}>{t('traceroute_title')}</h2>
+            <p className={`text-[10px] font-mono ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'} uppercase tracking-widest truncate`}>
+              {activeResult ? t('traceroute_target', { ip: activeResult.target }) : (isLoading ? t('traceroute_probing') : t('traceroute_na'))}
+            </p>
+          </div>
         </div>
-        <div>
-          <h2 className={`text-sm font-bold ${theme === 'dark' ? 'text-slate-100' : 'text-slate-800'} uppercase tracking-tight`}>{t('traceroute_title')}</h2>
-          <p className={`text-[10px] font-mono ${theme === 'dark' ? 'text-cyan-400' : 'text-cyan-600'} uppercase tracking-widest`}>
-            {activeResult ? t('traceroute_target', { ip: activeResult.target }) : (isLoading ? t('traceroute_probing') : t('traceroute_na'))}
-          </p>
-        </div>
+
+        {/* 操作按鈕（有結果時才顯示） */}
+        {activeResult && (
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              onClick={handleCopyShare}
+              title={t('traceroute_copy_share')}
+              className={`p-1.5 rounded-lg border text-xs transition-all ${
+                copied
+                  ? theme === 'dark' ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                  : theme === 'dark' ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'
+              }`}
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={handleOpenNewPage}
+              title={t('traceroute_open_new_tab')}
+              className={`p-1.5 rounded-lg border text-xs transition-all ${theme === 'dark' ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'}`}
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Content */}

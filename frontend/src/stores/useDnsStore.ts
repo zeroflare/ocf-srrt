@@ -14,6 +14,7 @@ interface DnsState {
   maxRecords: number;
   isSharedReport: boolean;
   theme: 'dark' | 'light';
+  token: string | null;
 
   // Actions
   addRecord: (record: DnsRecord) => void;
@@ -25,6 +26,7 @@ interface DnsState {
   toggleTheme: () => void;
   clearRecords: () => void;
   exportToUrl: () => string;
+  setToken: (token: string | null) => void;
 }
 
 const MAX_RECORDS = 200;
@@ -85,6 +87,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     maxRecords: MAX_RECORDS,
     isSharedReport: false,
     theme: 'dark',
+    token: null,
 
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
@@ -139,6 +142,8 @@ export const useDnsStore = create<DnsState>((set, get) => {
     toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
 
     clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0, isSharedReport: false }),
+
+    setToken: (token: string | null) => set({ token }),
 
     exportToUrl: () => {
       const { records } = get();

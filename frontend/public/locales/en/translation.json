@@ -117,5 +117,11 @@
   "dns_setup_mobile": "Wi-Fi settings > Long press network > Modify > Static IP > DNS: enter IP above",
   "provider_column": "Provider",
   "start_traceroute_domain": "Traceroute (domain)",
-  "start_traceroute_ip": "Traceroute (IP)"
+  "start_traceroute_ip": "Traceroute (IP)",
+  "traceroute_open_new_tab": "Open in new page",
+  "traceroute_copy_share": "Copy share link",
+  "traceroute_copied": "Copied!",
+  "traceroute_page_back_main": "Back to main",
+  "traceroute_share_decode_error": "Failed to decode shared data",
+  "traceroute_page_no_params": "No target or shared data provided"
 }

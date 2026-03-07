@@ -123,5 +123,22 @@
   "traceroute_copied": "已複製！",
   "traceroute_page_back_main": "返回主頁",
   "traceroute_share_decode_error": "無法解析分享資料",
-  "traceroute_page_no_params": "未提供追蹤目標或分享資料"
+  "traceroute_page_no_params": "未提供追蹤目標或分享資料",
+  "about": "關於",
+  "about_title": "關於 SRRT DNS Analyzer",
+  "about_what_title": "這是什麼？",
+  "about_what_desc": "SRRT 是一套即時 DNS 流量監控系統，專為資安分析設計。它能攔截並分析經過本節點的所有 DNS 查詢，自動識別應用程式、標記境外流量、並在地圖上視覺化全球連線路徑。",
+  "about_how_title": "運作原理",
+  "about_how_desc": "當您將裝置的 DNS 伺服器指向本系統後，所有網域名稱解析請求都會經過這裡。系統會即時：",
+  "about_how_1": "轉發查詢至上游 DNS（如 1.1.1.1、8.8.8.8）取得解析結果",
+  "about_how_2": "透過 GeoIP 資料庫標記目標 IP 的國家、城市與 ISP",
+  "about_how_3": "利用三層識別引擎判斷流量所屬的應用程式",
+  "about_how_4": "透過延遲探測驗證境外流量的可信度",
+  "about_how_5": "即時推送至瀏覽器儀表板進行視覺化呈現",
+  "about_privacy_title": "隱私設計",
+  "about_privacy_desc": "所有數據僅存放於伺服器記憶體中（Ring Buffer），不寫入任何資料庫或磁碟。服務重啟後所有資料即銷毀，無留存風險。",
+  "about_tech_title": "技術架構",
+  "about_tech_backend": "後端：Go + miekg/dns + GeoIP + WebSocket",
+  "about_tech_frontend": "前端：React 19 + TypeScript + Zustand + MapLibre GL",
+  "about_footer": "由 Zeroflare Tech 開發與維護"
 }

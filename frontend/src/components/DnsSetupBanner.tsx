@@ -1,14 +1,16 @@
 import React, { useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Server, ChevronDown, ChevronUp, Copy, Check } from 'lucide-react';
+import { useDnsStore } from '../stores/useDnsStore';
 
 export const DnsSetupBanner: React.FC = () => {
   const { t } = useTranslation();
+  const { dnsIp } = useDnsStore();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  // DNS 伺服器就是目前這台主機
-  const dnsTarget = window.location.hostname;
+  // 優先使用後端回傳的 DNS 伺服器 IP，否則 fallback 到 hostname
+  const dnsTarget = dnsIp || window.location.hostname;
 
   const handleCopy = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();

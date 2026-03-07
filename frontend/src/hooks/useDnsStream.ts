@@ -32,7 +32,7 @@ const calculateBackoff = (attempt: number): number => {
 };
 
 export const useDnsStream = (enabled: boolean = true) => {
-  const { addRecord, loadSnapshot, setToken } = useDnsStore();
+  const { addRecord, loadSnapshot, setToken, setDnsIp } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
@@ -123,6 +123,8 @@ export const useDnsStream = (enabled: boolean = true) => {
         setToken(data.token);
         // 後端同時回傳 ip，供前端 IP 欄位預填
         if (data.ip) { setMyIp(data.ip); }
+        // 後端回傳 DNS 伺服器公網 IP，供 DnsSetupBanner 顯示
+        if (data.dnsIp) { setDnsIp(data.dnsIp); }
         connectWithToken(data.token);
       } catch (error) {
         logger.error('[WS] Failed to fetch token');

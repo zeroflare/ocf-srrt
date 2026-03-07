@@ -45,6 +45,7 @@ services:
       - GEOIP_DB_PATH=data/GeoLite2-City.mmdb
       - RULES_PATH=data/app.json
       - TRUSTED_PROXIES=127.0.0.1 # Nginx 與後端同機，只信任 localhost
+      - DNS_PUBLIC_IP=${DNS_PUBLIC_IP:-} # VM 公網 IP，供前端顯示 DNS 設定指引
     restart: unless-stopped
 
   # =========================================

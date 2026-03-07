@@ -12,7 +12,10 @@ i18n
     .use(initReactI18next)
     .init({
       fallbackLng: 'en',
-      debug: true, // 開發階段建議開啟，方便看有沒有載入失敗
+      supportedLngs: ['en', 'zh'],
+      // 將 zh-TW、zh-CN 等變體自動對應到 zh
+      load: 'languageOnly',
+      debug: false,
 
       interpolation: {
         escapeValue: false,

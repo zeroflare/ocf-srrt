@@ -108,6 +108,8 @@ func main() {
 	mux.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		api.ServeWs(hub, tokenStore, w, r)
 	})
+	dnsPublicIP := os.Getenv("DNS_PUBLIC_IP")
+
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
 		clientIP, err := extractClientIP(r, trustedProxies)
 		if err != nil {
@@ -118,11 +120,14 @@ func main() {
 		token := tokenStore.GetOrCreateToken(clientIP)
 
 		w.Header().Set("Content-Type", "application/json")
-		// 同時回傳 ip，讓前端可以預填監控 IP 欄位，省去額外 API 呼叫
-		json.NewEncoder(w).Encode(map[string]string{
+		resp := map[string]string{
 			"token": token,
 			"ip":    clientIP,
-		})
+		}
+		if dnsPublicIP != "" {
+			resp["dnsIp"] = dnsPublicIP
+		}
+		json.NewEncoder(w).Encode(resp)
 	})
 	mux.HandleFunc("/api/traceroute", func(w http.ResponseWriter, r *http.Request) {
 		// 驗證 token，防止未授權的 traceroute 探測

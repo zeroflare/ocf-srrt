@@ -18,6 +18,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { DnsSetupBanner } from './components/DnsSetupBanner';
 import { useTranslation } from 'react-i18next';
 import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, Route } from 'lucide-react';
+import { AboutModal } from './components/AboutModal';
 import { logger } from './utils/logger';
 import { Tooltip } from './components/Tooltip';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
@@ -194,6 +195,7 @@ function App() {
                     </div>
                   </div>
                   <div className="flex items-center gap-2 relative" style={{ zIndex: 10001 }}>
+                    <AboutModal />
                     <button
                       onClick={toggleTheme}
                       className="p-2 bg-slate-100 dark:bg-slate-900/60 hover:bg-slate-200 dark:hover:bg-slate-800/80 rounded-lg text-slate-600 dark:text-slate-300 transition-all border border-slate-200 dark:border-white/10"

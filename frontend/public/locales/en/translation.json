@@ -123,5 +123,22 @@
   "traceroute_copied": "Copied!",
   "traceroute_page_back_main": "Back to main",
   "traceroute_share_decode_error": "Failed to decode shared data",
-  "traceroute_page_no_params": "No target or shared data provided"
+  "traceroute_page_no_params": "No target or shared data provided",
+  "about": "About",
+  "about_title": "About SRRT DNS Analyzer",
+  "about_what_title": "What is this?",
+  "about_what_desc": "SRRT is a real-time DNS traffic monitoring system designed for security analysis. It intercepts and analyzes all DNS queries passing through this node, automatically identifying applications, flagging foreign traffic, and visualizing global connection paths on a map.",
+  "about_how_title": "How it works",
+  "about_how_desc": "Once you point your device's DNS server to this system, all domain name resolution requests are routed through here. The system will:",
+  "about_how_1": "Forward queries to upstream DNS resolvers (e.g., 1.1.1.1, 8.8.8.8)",
+  "about_how_2": "Tag destination IPs with country, city, and ISP via GeoIP database",
+  "about_how_3": "Identify applications using a three-tier recognition engine",
+  "about_how_4": "Verify foreign traffic confidence through latency probing",
+  "about_how_5": "Push results to the browser dashboard in real-time via WebSocket",
+  "about_privacy_title": "Privacy by design",
+  "about_privacy_desc": "All data is stored exclusively in server memory (Ring Buffer) with no database or disk writes. All data is destroyed upon service restart, ensuring zero data retention risk.",
+  "about_tech_title": "Tech stack",
+  "about_tech_backend": "Backend: Go + miekg/dns + GeoIP + WebSocket",
+  "about_tech_frontend": "Frontend: React 19 + TypeScript + Zustand + MapLibre GL",
+  "about_footer": "Built and maintained by Zeroflare Tech"
 }

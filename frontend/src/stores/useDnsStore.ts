@@ -15,6 +15,7 @@ interface DnsState {
   isSharedReport: boolean;
   theme: 'dark' | 'light';
   token: string | null;
+  dnsIp: string | null;
 
   // Actions
   addRecord: (record: DnsRecord) => void;
@@ -27,6 +28,7 @@ interface DnsState {
   clearRecords: () => void;
   exportToUrl: () => string;
   setToken: (token: string | null) => void;
+  setDnsIp: (ip: string | null) => void;
 }
 
 const MAX_RECORDS = 200;
@@ -88,6 +90,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     isSharedReport: false,
     theme: 'dark',
     token: null,
+    dnsIp: null,
 
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
@@ -144,6 +147,8 @@ export const useDnsStore = create<DnsState>((set, get) => {
     clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0, isSharedReport: false }),
 
     setToken: (token: string | null) => set({ token }),
+
+    setDnsIp: (ip: string | null) => set({ dnsIp: ip }),
 
     exportToUrl: () => {
       const { records } = get();

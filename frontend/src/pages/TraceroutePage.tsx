@@ -1,10 +1,35 @@
-import React, { useEffect, useState } from 'react';
-import { Activity, MapPin, Globe, Zap, Share2, Check, ExternalLink } from 'lucide-react';
+import React, { useEffect, useState, useMemo } from 'react';
+import { Activity, Zap, Share2, Check, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { TraceResult } from '../types';
+import { TraceResult, Hop } from '../types';
 import { decodeTraceResult, buildTracerouteShareUrl } from '../utils/tracerouteShare';
 import { isLikelySubmarine } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
+
+const LatencyBar: React.FC<{ hop: Hop; maxLatency: number }> = ({ hop, maxLatency }) => {
+  const avg = hop.latency;
+  if (hop.ip === '*' || avg === 0) return <span className="text-slate-500 dark:text-slate-600">—</span>;
+
+  const pct = maxLatency > 0 ? Math.min((avg / maxLatency) * 100, 100) : 0;
+  const color = avg < 50 ? 'bg-emerald-500' : avg < 150 ? 'bg-amber-500' : 'bg-rose-500';
+
+  return (
+    <div className="flex items-center gap-2 min-w-[100px]">
+      <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${Math.max(pct, 4)}%` }} />
+      </div>
+      <span className={`font-mono text-xs font-bold min-w-[50px] text-right ${
+        avg < 50 ? 'text-emerald-600 dark:text-emerald-400' : avg < 150 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-500'
+      }`}>{avg.toFixed(1)} ms</span>
+    </div>
+  );
+};
+
+const RttCell: React.FC<{ value?: number }> = ({ value }) => {
+  if (value === undefined) return <span className="text-slate-400 dark:text-slate-600">*</span>;
+  const color = value < 50 ? 'text-emerald-600 dark:text-emerald-400' : value < 150 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-500';
+  return <span className={`font-mono ${color}`}>{value.toFixed(1)}</span>;
+};
 
 /**
  * TraceroutePage — 獨立全頁 Traceroute 檢視器
@@ -22,7 +47,11 @@ const TraceroutePage: React.FC = () => {
   const [copied, setCopied] = useState(false);
   const [isShared, setIsShared] = useState(false);
 
-  // 同步 dark class 到 <html>
+  const maxLatency = useMemo(() => {
+    if (!result) return 0;
+    return Math.max(...result.hops.filter(h => h.ip !== '*').map(h => h.latency), 1);
+  }, [result]);
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') root.classList.add('dark');
@@ -36,7 +65,6 @@ const TraceroutePage: React.FC = () => {
     const token = params.get('token');
 
     if (zdata) {
-      // 分享模式：直接解碼顯示
       const decoded = decodeTraceResult(zdata);
       if (decoded) {
         setResult(decoded);
@@ -45,7 +73,6 @@ const TraceroutePage: React.FC = () => {
         setError(t('traceroute_share_decode_error'));
       }
     } else if (target) {
-      // 執行模式：若缺少 token，先向後端取得
       const runTrace = async () => {
         setIsLoading(true);
         try {
@@ -85,7 +112,7 @@ const TraceroutePage: React.FC = () => {
 
   return (
     <div className={`min-h-screen ${isDark ? 'bg-slate-950 text-white' : 'bg-slate-50 text-slate-900'} transition-colors`}>
-      {/* 頂部 Header */}
+      {/* Header */}
       <div className={`sticky top-0 z-10 ${isDark ? 'bg-slate-900/95 border-white/10' : 'bg-white/95 border-slate-200'} border-b backdrop-blur-sm px-6 py-4 flex items-center justify-between`}>
         <div className="flex items-center gap-3">
           <div className={`p-2 ${isDark ? 'bg-cyan-500/20' : 'bg-cyan-100'} rounded-xl`}>
@@ -110,7 +137,6 @@ const TraceroutePage: React.FC = () => {
           </div>
         </div>
 
-        {/* 操作按鈕 */}
         <div className="flex items-center gap-2">
           {result && (
             <button
@@ -135,8 +161,8 @@ const TraceroutePage: React.FC = () => {
         </div>
       </div>
 
-      {/* 內容區域 */}
-      <div className="max-w-2xl mx-auto px-6 py-8">
+      {/* Content */}
+      <div className="max-w-4xl mx-auto px-6 py-8">
         {isLoading ? (
           <div className="flex flex-col items-center justify-center py-24 space-y-4">
             <div className="relative">
@@ -165,96 +191,88 @@ const TraceroutePage: React.FC = () => {
               <span>{new Date(result.time).toLocaleString()}</span>
             </div>
 
-            {/* Hop 列表 */}
-            <div className="relative">
-              {/* 垂直連線 */}
-              <div className={`absolute left-[15px] top-2 bottom-2 w-0.5 ${isDark ? 'bg-gradient-to-b from-cyan-500/50 via-purple-500/50 to-emerald-500/50' : 'bg-slate-200'}`}></div>
+            {/* Hop 表格 */}
+            <div className={`rounded-xl border overflow-hidden ${isDark ? 'border-white/5' : 'border-slate-200'}`}>
+              <table className="w-full text-[11px]">
+                <thead className={isDark ? 'bg-slate-900' : 'bg-slate-50'}>
+                  <tr>
+                    <th className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 w-10">#</th>
+                    <th className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">IP</th>
+                    <th className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">ASN/ISP</th>
+                    <th className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 w-14"></th>
+                    <th className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">{t('traceroute_latency')}</th>
+                    <th className="px-4 py-3 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">RTT 1</th>
+                    <th className="px-4 py-3 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">RTT 2</th>
+                    <th className="px-4 py-3 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">RTT 3</th>
+                  </tr>
+                </thead>
+                <tbody className={`divide-y ${isDark ? 'divide-white/5' : 'divide-slate-100'}`}>
+                  {result.hops.map((hop, index) => {
+                    const nextHop = result.hops[index + 1];
+                    const hasSubmarineJump = nextHop && isLikelySubmarine(hop, nextHop);
+                    const isStar = hop.ip === '*';
+                    const rtts = hop.rtts || [];
 
-              <div className="space-y-8">
-                {result.hops.map((hop, index) => {
-                  const nextHop = result.hops[index + 1];
-                  const hasSubmarineJump = nextHop && isLikelySubmarine(hop, nextHop);
-
-                  return (
-                    <React.Fragment key={index}>
-                      <div className="relative pl-10 group">
-                        {/* 節點圓圈 */}
-                        <div className={`absolute left-0 top-1.5 w-8 h-8 -ml-[1px] rounded-full border-2 ${isDark ? 'bg-slate-900' : 'bg-white'} flex items-center justify-center z-10 transition-all duration-300 group-hover:scale-110 ${
-                          hop.ip === '*'
-                            ? (isDark ? 'border-slate-600' : 'border-slate-300')
-                            : hop.latency < 50
-                            ? 'border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]'
-                            : hop.latency < 150
-                            ? 'border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]'
-                            : 'border-rose-500 shadow-[0_0_15px_rgba(244,63,94,0.5)] animate-pulse'
-                        }`}>
-                          <span className={`text-[10px] font-bold ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>{hop.index}</span>
-                        </div>
-
-                        {/* Hop 卡片 */}
-                        <div className={`${isDark ? 'bg-slate-800/40 border-white/5 hover:bg-slate-800/60 hover:border-cyan-500/30' : 'bg-white border-slate-200 hover:border-cyan-300 shadow-sm hover:shadow-md'} border rounded-xl p-4 transition-all`}>
-                          <div className="flex items-start justify-between">
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className={`${isDark ? 'text-cyan-400' : 'text-cyan-600'} font-mono font-bold text-sm`}>
-                                  {hop.ip}
-                                </span>
-                                {hop.country && (
-                                  <span className={`${isDark ? 'bg-slate-700 text-slate-300' : 'bg-slate-100 text-slate-600'} text-[10px] px-1.5 py-0.5 rounded flex items-center gap-1`}>
-                                    <Globe className="h-3 w-3" />
-                                    {hop.country}
-                                  </span>
+                    return (
+                      <React.Fragment key={index}>
+                        <tr className={`group transition-colors ${isStar ? 'opacity-40' : 'hover:bg-cyan-500/5'}`}>
+                          <td className="px-4 py-2.5 font-mono font-bold text-slate-400 dark:text-slate-500">{hop.index}</td>
+                          <td className="px-4 py-2.5">
+                            {isStar ? (
+                              <span className="text-slate-500 dark:text-slate-600 font-mono">*</span>
+                            ) : (
+                              <div>
+                                <span className="text-cyan-600 dark:text-cyan-400 font-mono font-bold">{hop.ip}</span>
+                                {hop.host && hop.host !== hop.ip && (
+                                  <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[220px]">{hop.host}</div>
                                 )}
                               </div>
-                              <p className={`text-xs ${isDark ? 'text-slate-400' : 'text-slate-500'}`}>
-                                {hop.host || t('traceroute_unknown_host')}
-                              </p>
-                            </div>
-                            {hop.ip !== '*' && (
-                              <div className="text-right">
-                                <div className={`text-sm font-mono font-bold ${
-                                  hop.latency < 50
-                                    ? isDark ? 'text-emerald-400' : 'text-emerald-600'
-                                    : hop.latency < 150
-                                    ? isDark ? 'text-amber-400' : 'text-amber-600'
-                                    : isDark ? 'text-rose-500' : 'text-rose-600'
-                                }`}>
-                                  {hop.latency.toFixed(2)} ms
-                                </div>
-                                <div className="text-[9px] text-slate-500 uppercase tracking-tighter">{t('traceroute_latency')}</div>
-                              </div>
                             )}
-                          </div>
-
-                          {hop.coords && hop.coords.length >= 2 && (
-                            <div className={`mt-2 pt-2 border-t ${isDark ? 'border-white/5' : 'border-slate-100'} flex items-center gap-2 text-[10px] text-slate-500 font-mono`}>
-                              <MapPin className="h-3 w-3" />
-                              <span>{hop.coords[1].toFixed(4)}, {hop.coords[0].toFixed(4)}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* 海底電纜提示 */}
-                      {hasSubmarineJump && (
-                        <div className="relative py-2 pl-10">
-                          <div className={`inline-flex items-center gap-2 px-3 py-1 ${isDark ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' : 'bg-purple-50 border-purple-200 text-purple-600'} border rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse`}>
-                            <Activity className="h-3 w-3" />
-                            {t('traceroute_submarine')}
-                          </div>
-                          <div className={`absolute left-[15px] top-0 bottom-0 w-0.5 ${isDark ? 'bg-purple-500/30 border-l border-dashed border-purple-400/50' : 'bg-purple-200 border-l border-dashed border-purple-300'}`}></div>
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
-              </div>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {!isStar && hop.asn ? (
+                              <div className="max-w-[160px]">
+                                <span className="text-[10px] text-slate-400 dark:text-slate-600 block">AS{hop.asn}</span>
+                                <span className="text-slate-500 dark:text-slate-400 truncate block text-[10px]">{hop.isp}</span>
+                              </div>
+                            ) : (
+                              <span className="text-slate-400 dark:text-slate-600">—</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            {!isStar && hop.country && (
+                              <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
+                                {hop.country}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <LatencyBar hop={hop} maxLatency={maxLatency} />
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-[10px]"><RttCell value={rtts[0]} /></td>
+                          <td className="px-4 py-2.5 text-right text-[10px]"><RttCell value={rtts[1]} /></td>
+                          <td className="px-4 py-2.5 text-right text-[10px]"><RttCell value={rtts[2]} /></td>
+                        </tr>
+                        {hasSubmarineJump && (
+                          <tr>
+                            <td colSpan={8} className="px-4 py-1.5">
+                              <div className={`inline-flex items-center gap-2 px-3 py-1 ${isDark ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' : 'bg-purple-50 border-purple-200 text-purple-600'} border rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse`}>
+                                <Activity className="h-3 w-3" />
+                                {t('traceroute_submarine')}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </>
         )}
       </div>
 
-      {/* Footer */}
       <footer className={`px-4 py-3 text-center text-[9px] uppercase tracking-widest border-t mt-8 ${isDark ? 'text-slate-600 bg-slate-950 border-white/5' : 'text-slate-400 bg-white border-slate-100'}`}>
         &copy; {new Date().getFullYear()} ZEROFLARE TECH. ALL RIGHTS RESERVED.
       </footer>

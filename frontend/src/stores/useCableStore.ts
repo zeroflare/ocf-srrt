@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { Feature, FeatureCollection, LineString } from 'geojson';
 import { DnsRecord, TraceResult } from '../types';
+import { useDnsStore } from './useDnsStore';
 
 export type CableSegment = {
   id: string;
@@ -187,9 +188,10 @@ export const useCableStore = create<CableState>((set) => ({
       return;
     }
     // TODO: 根據 hop 座標序列分析可能經過的海纜
-    // Placeholder：取第一個非 TW 跳點的國家作為線索
+    // Placeholder：取第一個非本地跳點的國家作為線索
+    const localCountry = useDnsStore.getState().localCountry || 'TW';
     const firstForeignHop = traceResult.hops.find(
-      h => h.ip !== '*' && h.country && h.country !== 'TW'
+      h => h.ip !== '*' && h.country && h.country !== localCountry
     );
     if (firstForeignHop) {
       // 預留接口：後續實作 coords → cable 空間查詢

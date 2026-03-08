@@ -16,6 +16,8 @@ interface DnsState {
   theme: 'dark' | 'light';
   token: string | null;
   dnsIp: string | null;
+  localCountry: string | null;
+  selectedRowIds: Set<string>;
 
   // Actions
   addRecord: (record: DnsRecord) => void;
@@ -29,6 +31,11 @@ interface DnsState {
   exportToUrl: () => string;
   setToken: (token: string | null) => void;
   setDnsIp: (ip: string | null) => void;
+  setLocalCountry: (country: string | null) => void;
+  toggleRowSelection: (id: string) => void;
+  toggleAllSelection: (ids: string[]) => void;
+  clearSelection: () => void;
+  getSelectedRecords: () => DnsRecord[];
 }
 
 const MAX_RECORDS = 200;
@@ -70,6 +77,8 @@ const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boole
 export const useDnsStore = create<DnsState>((set, get) => {
   // 內部緩衝區 (閉包變數)
   let batchBuffer: DnsRecord[] = [];
+  // 儲存最近一次原始快照，供 setMonitoringIp 時重播
+  let pendingSnapshot: DnsRecord[] | null = null;
 
   // 節流更新：每 500ms 至少執行一次，將緩衝區的資料寫入 State
   const flushBuffer = throttle(() => {
@@ -78,7 +87,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     // 呼叫更新邏輯
     updateStateWithBatch(currentBatch, set, get().isPaused, get().monitoringIp, get().maxRecords);
-  }, 500, { leading: false, trailing: true });
+  }, 500, { leading: true, trailing: true });
 
   return {
     records: [],
@@ -91,6 +100,8 @@ export const useDnsStore = create<DnsState>((set, get) => {
     theme: 'dark',
     token: null,
     dnsIp: null,
+    localCountry: null,
+    selectedRowIds: new Set<string>(),
 
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
@@ -101,41 +112,54 @@ export const useDnsStore = create<DnsState>((set, get) => {
     },
 
     // 這是給 WebSocket 一連線時用的，直接替換當前列表
+    // 如果 monitoringIp 尚未設定，先暫存快照，等 setMonitoringIp 後自動重播
     loadSnapshot: (historyRecords: DnsRecord[]) => {
+      // 無論如何都儲存原始快照
+      pendingSnapshot = historyRecords;
+
       const { monitoringIp, maxRecords } = get();
       if (!monitoringIp) return;
 
-      set(() => {
-        // 過濾歷史資料
-        const filtered = historyRecords.filter(r => r.sourceIp === monitoringIp);
-        // 歷史資料通常是 舊->新，但 UI 顯示習慣 新->舊，所以反轉
-        const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
+      const filtered = historyRecords.filter(r => r.sourceIp === monitoringIp);
+      const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
+      const historyForeignCount = sortedRecords.reduce(
+          (acc, r) => acc + (r.isForeign ? 1 : 0), 0
+      );
 
-        // 重新計算歷史數據的統計
-        const historyForeignCount = sortedRecords.reduce(
-            (acc, r) => acc + (r.isForeign ? 1 : 0), 0
-        );
-
-        return {
-          records: sortedRecords,
-          totalQueries: sortedRecords.length,
-          foreignQueries: historyForeignCount,
-        };
+      set({
+        records: sortedRecords,
+        totalQueries: sortedRecords.length,
+        foreignQueries: historyForeignCount,
       });
     },
 
     setPaused: (paused: boolean) => set({ isPaused: paused }),
 
     setMonitoringIp: (ip: string | null) => {
-      // 如果 ip 為 null 或與當前不同，則重置 (除了 isSharedReport)
-      set((state) => ({
-        monitoringIp: ip,
-        records: [],
-        totalQueries: 0,
-        foreignQueries: 0,
-        // 如果是主動設定新 IP (非分享模式下)，則取消分享模式
-        isSharedReport: state.isSharedReport && ip === state.monitoringIp
-      }));
+      const { maxRecords } = get();
+      // 如果有暫存快照且設定了新 IP，立即重播快照
+      if (ip && pendingSnapshot && pendingSnapshot.length > 0) {
+        const filtered = pendingSnapshot.filter(r => r.sourceIp === ip);
+        const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
+        const historyForeignCount = sortedRecords.reduce(
+            (acc, r) => acc + (r.isForeign ? 1 : 0), 0
+        );
+        set((state) => ({
+          monitoringIp: ip,
+          records: sortedRecords,
+          totalQueries: sortedRecords.length,
+          foreignQueries: historyForeignCount,
+          isSharedReport: state.isSharedReport && ip === state.monitoringIp,
+        }));
+      } else {
+        set((state) => ({
+          monitoringIp: ip,
+          records: [],
+          totalQueries: 0,
+          foreignQueries: 0,
+          isSharedReport: state.isSharedReport && ip === state.monitoringIp,
+        }));
+      }
     },
 
     setSharedReport: (isShared: boolean) => set({ isSharedReport: isShared }),
@@ -149,6 +173,26 @@ export const useDnsStore = create<DnsState>((set, get) => {
     setToken: (token: string | null) => set({ token }),
 
     setDnsIp: (ip: string | null) => set({ dnsIp: ip }),
+
+    setLocalCountry: (country: string | null) => set({ localCountry: country }),
+
+    toggleRowSelection: (id: string) => set((state) => {
+      const next = new Set(state.selectedRowIds);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return { selectedRowIds: next };
+    }),
+
+    toggleAllSelection: (ids: string[]) => set((state) => {
+      const allSelected = ids.every(id => state.selectedRowIds.has(id));
+      return { selectedRowIds: allSelected ? new Set<string>() : new Set(ids) };
+    }),
+
+    clearSelection: () => set({ selectedRowIds: new Set<string>() }),
+
+    getSelectedRecords: () => {
+      const { records, selectedRowIds } = get();
+      return records.filter(r => selectedRowIds.has(r.timestamp));
+    },
 
     exportToUrl: () => {
       const { records } = get();
@@ -184,8 +228,11 @@ export const useDnsStore = create<DnsState>((set, get) => {
               i: h.index,
               ip: h.ip,
               l: h.latency,
+              r: h.rtts,
               c: h.country,
               co: h.coords,
+              a: h.asn,
+              isp: h.isp,
             })),
           };
         }

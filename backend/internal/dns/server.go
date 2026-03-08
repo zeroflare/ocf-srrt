@@ -274,7 +274,13 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 	}
 
 	question := req.Question[0]
-	localCountry := os.Getenv("LOCAL_COUNTRY")
+	// per-user localCountry：優先從 token store 查詢，fallback 到環境變數
+	localCountry := ""
+	if lc, ok := s.tokenStore.GetLocalCountry(sourceIp); ok {
+		localCountry = lc
+	} else {
+		localCountry = os.Getenv("LOCAL_COUNTRY")
+	}
 
 	for _, answer := range resp.Answer {
 		var resultIP string

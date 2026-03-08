@@ -36,6 +36,7 @@ export const CyberMap: React.FC = () => {
       container: mapContainer.current,
       style: {
         version: 8,
+        glyphs: 'https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf',
         sources: {
           map: {
             type: "vector",
@@ -231,6 +232,7 @@ export const CyberMap: React.FC = () => {
 
     if (!activeResult || activeResult.hops.length === 0) {
       source.setData({ type: 'FeatureCollection', features: [] });
+      if (map.current.getLayer('trace-labels')) map.current.removeLayer('trace-labels');
       if (map.current.getLayer('trace-nodes')) map.current.removeLayer('trace-nodes');
       if (map.current.getLayer('trace-lines')) map.current.removeLayer('trace-lines');
       return;
@@ -322,6 +324,27 @@ export const CyberMap: React.FC = () => {
           'circle-stroke-color': '#0f172a'
         },
         filter: ['==', ['geometry-type'], 'Point']
+      });
+    }
+
+    if (!map.current.getLayer('trace-labels')) {
+      map.current.addLayer({
+        id: 'trace-labels',
+        type: 'symbol',
+        source: 'traceroute',
+        filter: ['==', ['geometry-type'], 'Point'],
+        layout: {
+          'text-field': ['to-string', ['get', 'index']],
+          'text-size': 10,
+          'text-font': ['Open Sans Bold'],
+          'text-offset': [0, -1.5],
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#22d3ee',
+          'text-halo-color': '#0f172a',
+          'text-halo-width': 1.5,
+        },
       });
     }
 

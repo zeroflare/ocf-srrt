@@ -76,8 +76,11 @@ export const useSharedReport = () => {
             ip: h.ip,
             host: '',
             latency: h.l,
+            rtts: h.r,
             country: h.c,
             coords: h.co,
+            asn: h.a,
+            isp: h.isp,
           })),
         };
         useTracerouteStore.getState().loadSharedResult(traceResult);

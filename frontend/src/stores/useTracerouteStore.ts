@@ -37,11 +37,11 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
         time: new Date().toISOString(),
         status: 'completed',
         hops: [
-          { index: 1, ip: '192.168.1.1', host: 'gateway', latency: 2.5, country: 'TW', coords: [121.5, 25.0] },
-          { index: 2, ip: '168.95.1.1', host: 'hinet.net', latency: 8.2, country: 'TW', coords: [121.3, 24.8] },
-          { index: 3, ip: '203.75.1.1', host: 'tp-core.hinet.net', latency: 12.5, country: 'TW', coords: [121.0, 24.5] },
-          { index: 4, ip: '72.14.232.1', host: 'google-gw.net', latency: 45.1, country: 'US', coords: [-122.08, 37.38] }, // 跨太平洋跳躍
-          { index: 5, ip: '142.250.1.1', host: 'google.com', latency: 155.8, country: 'US', coords: [-74.00, 40.71] },   // 美國東岸跳躍
+          { index: 1, ip: '192.168.1.1', host: 'gateway', latency: 2.5, rtts: [2.3, 2.5, 2.7], country: 'TW', coords: [121.5, 25.0], asn: 0, isp: 'Private' },
+          { index: 2, ip: '168.95.1.1', host: 'hinet.net', latency: 8.2, rtts: [7.8, 8.2, 8.6], country: 'TW', coords: [121.3, 24.8], asn: 3462, isp: 'Chunghwa Telecom' },
+          { index: 3, ip: '203.75.1.1', host: 'tp-core.hinet.net', latency: 12.5, rtts: [11.9, 12.5, 13.1], country: 'TW', coords: [121.0, 24.5], asn: 3462, isp: 'Chunghwa Telecom' },
+          { index: 4, ip: '72.14.232.1', host: 'google-gw.net', latency: 45.1, rtts: [43.2, 45.1, 47.0], country: 'US', coords: [-122.08, 37.38], asn: 15169, isp: 'Google LLC' },
+          { index: 5, ip: '142.250.1.1', host: 'google.com', latency: 155.8, rtts: [152.1, 155.8, 159.5], country: 'US', coords: [-74.00, 40.71], asn: 15169, isp: 'Google LLC' },
         ]
       };
 

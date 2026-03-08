@@ -31,8 +31,27 @@ const calculateBackoff = (attempt: number): number => {
   return Math.round(jitter);
 };
 
+const LOCAL_COUNTRY_KEY = 'localCountry';
+const LOCAL_COUNTRY_UPDATED_KEY = 'localCountryUpdatedAt';
+const LOCAL_COUNTRY_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
+
+const getCachedLocalCountry = (): string | null => {
+  const country = localStorage.getItem(LOCAL_COUNTRY_KEY);
+  const updatedAt = localStorage.getItem(LOCAL_COUNTRY_UPDATED_KEY);
+  if (country && updatedAt) {
+    const elapsed = Date.now() - new Date(updatedAt).getTime();
+    if (elapsed < LOCAL_COUNTRY_TTL) return country;
+  }
+  return null;
+};
+
+const setCachedLocalCountry = (country: string) => {
+  localStorage.setItem(LOCAL_COUNTRY_KEY, country);
+  localStorage.setItem(LOCAL_COUNTRY_UPDATED_KEY, new Date().toISOString());
+};
+
 export const useDnsStream = (enabled: boolean = true) => {
-  const { addRecord, loadSnapshot, setToken, setDnsIp } = useDnsStore();
+  const { addRecord, loadSnapshot, setToken, setDnsIp, setLocalCountry } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
@@ -114,6 +133,12 @@ export const useDnsStream = (enabled: boolean = true) => {
       }
 
       try {
+        // 先從快取讀取 localCountry
+        const cachedCountry = getCachedLocalCountry();
+        if (cachedCountry) {
+          setLocalCountry(cachedCountry);
+        }
+
         const resp = await fetch(getTokenUrl());
         if (!resp.ok) {
           throw new Error(`Token fetch failed: ${resp.status}`);
@@ -125,6 +150,11 @@ export const useDnsStream = (enabled: boolean = true) => {
         if (data.ip) { setMyIp(data.ip); }
         // 後端回傳 DNS 伺服器公網 IP，供 DnsSetupBanner 顯示
         if (data.dnsIp) { setDnsIp(data.dnsIp); }
+        // 更新 localCountry 並快取
+        if (data.localCountry) {
+          setLocalCountry(data.localCountry);
+          setCachedLocalCountry(data.localCountry);
+        }
         connectWithToken(data.token);
       } catch (error) {
         logger.error('[WS] Failed to fetch token');

@@ -13,8 +13,11 @@ export function encodeTraceResult(result: TraceResult): string {
       i: h.index,
       ip: h.ip,
       l: h.latency,
+      r: h.rtts,
       c: h.country,
       co: h.coords,
+      a: h.asn,
+      isp: h.isp,
     })),
   };
 
@@ -60,13 +63,16 @@ export function decodeTraceResult(zdata: string): TraceResult | null {
       target: data.target,
       status: data.status,
       time: new Date().toISOString(),
-      hops: data.hops.map((h: { i: number; ip: string; l: number; c: string; co: [number, number] }) => ({
+      hops: data.hops.map((h: { i: number; ip: string; l: number; r?: number[]; c: string; co: [number, number]; a?: number; isp?: string }) => ({
         index: h.i,
         ip: h.ip,
         host: '',
         latency: h.l,
+        rtts: h.r,
         country: h.c,
         coords: h.co as [number, number],
+        asn: h.a,
+        isp: h.isp,
       })),
     };
   } catch {

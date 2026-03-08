@@ -1,4 +1,5 @@
 import { DnsRecord } from '../types';
+import { useDnsStore } from '../stores/useDnsStore';
 
 // Domain、AppName、AppCategory 必須與 appInfo.json 中的 name 對應，
 // 這樣 LiveTable 的 AppInfoTooltip 才能正確顯示。
@@ -44,7 +45,8 @@ const ISPS = ['Chunghwa Telecom', 'Google Cloud', 'Amazon Data Services', 'Cloud
 
 export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
   const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
-  const isForeign = country !== 'TW';
+  const localCountry = useDnsStore.getState().localCountry || 'TW';
+  const isForeign = country !== localCountry;
   const coords = COUNTRY_COORDS[country] || [121.5, 25.0];
   // Add small random offset to avoid exact overlaps
   const lon = coords[0] + (Math.random() - 0.5) * 4;

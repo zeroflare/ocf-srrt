@@ -10,6 +10,7 @@ import (
 	"ocf-srrt/backend/internal/auth"
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/dns"
+	"ocf-srrt/backend/internal/geoip"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/traceroute"
 	"os"
@@ -109,6 +110,7 @@ func main() {
 		api.ServeWs(hub, tokenStore, w, r)
 	})
 	dnsPublicIP := os.Getenv("DNS_PUBLIC_IP")
+	localCountryOverride := os.Getenv("LOCAL_COUNTRY")
 
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
 		clientIP, err := extractClientIP(r, trustedProxies)
@@ -119,10 +121,22 @@ func main() {
 
 		token := tokenStore.GetOrCreateToken(clientIP)
 
+		// 決定此用戶的 localCountry：env var 優先，否則 GeoIP 查 clientIP
+		localCountry, ok := tokenStore.GetLocalCountry(clientIP)
+		if !ok {
+			if localCountryOverride != "" {
+				localCountry = localCountryOverride
+			} else {
+				localCountry, _ = geoip.GetCountry(clientIP)
+			}
+			tokenStore.SetLocalCountry(clientIP, localCountry)
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		resp := map[string]string{
-			"token": token,
-			"ip":    clientIP,
+			"token":        token,
+			"ip":           clientIP,
+			"localCountry": localCountry,
 		}
 		if dnsPublicIP != "" {
 			resp["dnsIp"] = dnsPublicIP

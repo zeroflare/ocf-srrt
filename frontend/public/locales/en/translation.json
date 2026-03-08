@@ -140,5 +140,22 @@
   "about_tech_title": "Tech stack",
   "about_tech_backend": "Backend: Go + miekg/dns + GeoIP + WebSocket",
   "about_tech_frontend": "Frontend: React 19 + TypeScript + Zustand + MapLibre GL",
-  "about_footer": "Built and maintained by Zeroflare Tech"
+  "about_footer": "Built and maintained by Zeroflare Tech",
+  "back_to_table": "Back to Table",
+  "refresh": "Refresh",
+  "report_export": "Export Report",
+  "report_title": "DNS Analysis Report",
+  "report_total": "Total",
+  "report_domestic": "Domestic",
+  "report_foreign": "Foreign",
+  "report_domestic_pct": "Domestic %",
+  "report_app_name": "App Name",
+  "report_app_logo": "App Logo URL",
+  "report_website": "Website",
+  "report_generate": "Generate Report",
+  "report_edit": "Edit Info",
+  "report_cloud": "Cloud",
+  "report_status": "Status",
+  "report_generated_at": "Generated at {{time}}",
+  "cancel": "Cancel"
 }

@@ -51,8 +51,11 @@ export interface Hop {
   ip: string;
   host: string;
   latency: number;
+  rtts?: number[];
   country: string;
   coords: [number, number]; // [lon, lat]
+  asn?: number;
+  isp?: string;
 }
 
 export interface TraceResult {

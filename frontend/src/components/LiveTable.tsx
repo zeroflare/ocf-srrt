@@ -1,9 +1,8 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useDnsStore } from '../stores/useDnsStore';
-import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
-import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, SlidersHorizontal, Radio, Tag, Monitor, Route } from 'lucide-react';
+import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, SlidersHorizontal, Radio, Tag, Monitor, FileText } from 'lucide-react';
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import { detectCloudProvider } from '../utils/cloudProvider';
@@ -18,10 +17,13 @@ import {
 
 const columnHelper = createColumnHelper<DnsRecord>();
 
-export const LiveTable: React.FC = () => {
+interface LiveTableProps {
+  onOpenReport?: () => void;
+}
+
+export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
   const { t } = useTranslation();
-  const { records, isPaused, setPaused, clearRecords, exportToUrl, maxRecords, monitoringIp } = useDnsStore();
-  const { runTraceroute } = useTracerouteStore();
+  const { records, isPaused, setPaused, clearRecords, exportToUrl, maxRecords, monitoringIp, selectedRowIds, toggleRowSelection, toggleAllSelection } = useDnsStore();
   const [globalFilter, setGlobalFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
   const [osFilter, setOsFilter] = useState<string | null>(null);
@@ -60,7 +62,43 @@ export const LiveTable: React.FC = () => {
     showToast(t('share_copied', { count: maxRecords }));
   };
 
+  // Filter records by category and OS (moved before columns for checkbox dep)
+  const filteredRecords = useMemo(() => {
+    let result = records;
+    if (categoryFilter) {
+      result = result.filter(r => r.appCategory === categoryFilter);
+    }
+    if (osFilter) {
+      result = result.filter(r => r.os === osFilter);
+    }
+    return result;
+  }, [records, categoryFilter, osFilter]);
+
   const columns = useMemo(() => [
+    columnHelper.display({
+      id: 'select',
+      header: () => {
+        const allIds = filteredRecords.map(r => r.timestamp);
+        const allSelected = allIds.length > 0 && allIds.every(id => selectedRowIds.has(id));
+        return (
+          <input
+            type="checkbox"
+            checked={allSelected}
+            onChange={() => toggleAllSelection(allIds)}
+            className="rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500/30"
+          />
+        );
+      },
+      cell: info => (
+        <input
+          type="checkbox"
+          checked={selectedRowIds.has(info.row.original.timestamp)}
+          onChange={() => toggleRowSelection(info.row.original.timestamp)}
+          className="rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500/30"
+        />
+      ),
+      size: 32,
+    }),
     columnHelper.accessor('timestamp', {
       id: 'timestamp',
       header: t('time'),
@@ -115,14 +153,15 @@ export const LiveTable: React.FC = () => {
       id: 'domain',
       header: t('domain'),
       cell: info => (
-        <span
-          className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer group/domain"
-          onClick={() => runTraceroute(info.getValue())}
+        <a
+          href={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
           title={t('start_traceroute')}
         >
           {info.getValue()}
-          <Route className="h-2.5 w-2.5 opacity-0 group-hover/domain:opacity-50 transition-opacity shrink-0" />
-        </span>
+        </a>
       ),
       size: 250,
     }),
@@ -130,14 +169,15 @@ export const LiveTable: React.FC = () => {
       id: 'resultIp',
       header: 'RESULT IP',
       cell: info => (
-        <span
-          className="inline-flex items-center gap-1 text-slate-600 dark:text-slate-300 font-mono hover:text-cyan-600 dark:hover:text-cyan-400 hover:underline cursor-pointer group/ip"
-          onClick={() => runTraceroute(info.getValue())}
+        <a
+          href={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-slate-600 dark:text-slate-300 font-mono hover:underline hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
           title={t('start_traceroute')}
         >
           {info.getValue()}
-          <Route className="h-2.5 w-2.5 opacity-0 group-hover/ip:opacity-50 transition-opacity shrink-0" />
-        </span>
+        </a>
       ),
       size: 160,
     }),
@@ -147,7 +187,8 @@ export const LiveTable: React.FC = () => {
       cell: info => {
         const country = info.getValue();
         const row = info.row.original;
-        const isLocal = country === 'TW';
+        const localCountry = useDnsStore.getState().localCountry;
+        const isLocal = localCountry ? country === localCountry : country === 'TW';
         const confidence = row.foreignConfidence;
         return (
           <div className="flex items-center gap-1.5">
@@ -190,7 +231,7 @@ export const LiveTable: React.FC = () => {
         );
       },
     }),
-  ], [t, runTraceroute]);
+  ], [t, selectedRowIds, toggleRowSelection, toggleAllSelection, filteredRecords]);
 
   const allColumnIds = useMemo(() => columns.map(c => (c as any).id as string), [columns]);
   const columnLabels: Record<string, string> = {
@@ -221,18 +262,6 @@ export const LiveTable: React.FC = () => {
     }
     return Array.from(osSet).sort();
   }, [records]);
-
-  // Filter records by category and OS
-  const filteredRecords = useMemo(() => {
-    let result = records;
-    if (categoryFilter) {
-      result = result.filter(r => r.appCategory === categoryFilter);
-    }
-    if (osFilter) {
-      result = result.filter(r => r.os === osFilter);
-    }
-    return result;
-  }, [records, categoryFilter, osFilter]);
 
   const table = useReactTable({
     data: filteredRecords,
@@ -345,6 +374,17 @@ export const LiveTable: React.FC = () => {
             )}
           </div>
 
+          <button
+            onClick={onOpenReport}
+            disabled={selectedRowIds.size === 0}
+            className={`transition-colors ${selectedRowIds.size > 0 ? 'text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300' : 'opacity-30 cursor-not-allowed'}`}
+            title={t('report_export')}
+          >
+            <FileText className="h-3.5 w-3.5" />
+            {selectedRowIds.size > 0 && (
+              <span className="ml-0.5 text-[9px] font-bold">{selectedRowIds.size}</span>
+            )}
+          </button>
           <button onClick={handleShare} className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" title={t('share_data')}>
             <Share2 className="h-3.5 w-3.5" />
           </button>
@@ -441,7 +481,7 @@ export const LiveTable: React.FC = () => {
             table.getRowModel().rows.map((row, index) => (
               <tr
                 key={row.id}
-                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''}`}
+                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''} ${selectedRowIds.has(row.original.timestamp) ? 'bg-cyan-500/10 dark:bg-cyan-500/5' : ''}`}
               >
                 {row.getVisibleCells().map(cell => (
                   <td key={cell.id} className="px-4 py-2 whitespace-nowrap">

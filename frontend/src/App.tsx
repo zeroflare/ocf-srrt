@@ -13,27 +13,46 @@ import { LiveTable } from './components/LiveTable';
 import { TrafficDashboard } from './components/TrafficDashboard';
 import { LiveTrafficChart } from './components/LiveTrafficChart';
 import { CyberMap } from './components/CyberMap';
-import { TracerouteDrawer } from './components/TracerouteDrawer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { DnsSetupBanner } from './components/DnsSetupBanner';
 import { useTranslation } from 'react-i18next';
-import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, Route } from 'lucide-react';
+import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, RefreshCw } from 'lucide-react';
 import { AboutModal } from './components/AboutModal';
-import { logger } from './utils/logger';
 import { Tooltip } from './components/Tooltip';
+import { ReportModal, ReportData, AppInfo } from './components/ReportModal';
+import { ReportView } from './components/ReportView';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 
-type TabKey = 'table' | 'chart' | 'stats' | 'route';
+type TabKey = 'table' | 'chart' | 'stats';
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, maxRecords } = useDnsStore();
-  const { isLoading: traceLoading, hasResult: traceHasResult, activeResult: traceActiveResult } = useTracerouteStore();
-  const { isConnected, reconnectDelay } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
+  const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, maxRecords, localCountry, setLocalCountry } = useDnsStore();
+  const { activeResult: traceActiveResult } = useTracerouteStore();
+  const { isConnected, reconnectDelay, myIp } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [activeTab, setActiveTab] = useState<TabKey>('table');
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [lastAppInfo, setLastAppInfo] = useState<AppInfo | undefined>(undefined);
 
   useSharedReport();
+
+  const refreshLocalCountry = useCallback(async () => {
+    localStorage.removeItem('localCountry');
+    localStorage.removeItem('localCountryUpdatedAt');
+    try {
+      const resp = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/token` : '/api/token');
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.localCountry) {
+          setLocalCountry(data.localCountry);
+          localStorage.setItem('localCountry', data.localCountry);
+          localStorage.setItem('localCountryUpdatedAt', new Date().toISOString());
+        }
+      }
+    } catch { /* ignore */ }
+  }, [setLocalCountry]);
 
   // Sync .dark class to <html> so that:
   // 1. body dark: styles in index.css work
@@ -85,17 +104,12 @@ function App() {
     };
   }, [isResizing, resize, stopResizing]);
 
-  // Fetch Public IP
+  // 使用後端 /api/token 回傳的 IP 預填，取代外部 api.ipify.org 呼叫
   useEffect(() => {
-    if (!monitoringIp && !isSharedReport) {
-      fetch('https://api.ipify.org?format=json')
-        .then(res => res.json())
-        .then(data => {
-          if (data.ip) setIpInput(data.ip);
-        })
-        .catch(err => logger.error('Failed to fetch public IP', err));
+    if (myIp && !monitoringIp && !isSharedReport && !ipInput) {
+      setIpInput(myIp);
     }
-  }, [monitoringIp, isSharedReport]);
+  }, [myIp, monitoringIp, isSharedReport]);
 
   const handleTourCallback = useCallback((data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
@@ -103,13 +117,6 @@ function App() {
       setRunTour(false);
     }
   }, []);
-
-  // Auto-switch to route tab when traceroute starts
-  useEffect(() => {
-    if (traceLoading) {
-      setActiveTab('route');
-    }
-  }, [traceLoading]);
 
   // Traceroute → Cable store 連動
   useEffect(() => {
@@ -134,11 +141,10 @@ function App() {
     setIpInput('');
   };
 
-  const tabs: { key: TabKey; label: string; icon: React.ReactNode; indicator?: boolean }[] = [
+  const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
     { key: 'table', label: t('tab_table'), icon: <TableProperties className="h-3.5 w-3.5" /> },
     { key: 'chart', label: t('tab_chart'), icon: <BarChart3 className="h-3.5 w-3.5" /> },
     { key: 'stats', label: t('tab_stats'), icon: <PieChart className="h-3.5 w-3.5" /> },
-    { key: 'route', label: t('tab_route'), icon: <Route className="h-3.5 w-3.5" />, indicator: traceLoading || traceHasResult },
   ];
 
   return (
@@ -280,9 +286,6 @@ function App() {
                   >
                     {tab.icon}
                     {tab.label}
-                    {tab.indicator && activeTab !== tab.key && (
-                      <span className={`w-1.5 h-1.5 rounded-full ${traceLoading ? 'bg-amber-400 animate-pulse' : 'bg-cyan-400'}`} />
-                    )}
                   </button>
                 ))}
               </div>
@@ -291,7 +294,7 @@ function App() {
               <div className="flex-1 overflow-hidden flex flex-col">
                 {activeTab === 'table' && (
                   <ErrorBoundary>
-                    <LiveTable />
+                    <LiveTable onOpenReport={() => setShowReportModal(true)} />
                   </ErrorBoundary>
                 )}
 
@@ -310,7 +313,12 @@ function App() {
                             <span className="text-slate-400 dark:text-slate-500 uppercase">{t('local_country')}:</span>
                             <Tooltip text={t('tip_local_country')} />
                           </div>
-                          <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-100 dark:bg-blue-400/10 px-2 py-0.5 rounded">TW</span>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-100 dark:bg-blue-400/10 px-2 py-0.5 rounded">{localCountry || '—'}</span>
+                            <button onClick={refreshLocalCountry} className="text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors" title={t('refresh')}>
+                              <RefreshCw className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
 
                         <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
@@ -374,11 +382,6 @@ function App() {
                   </div>
                 )}
 
-                {activeTab === 'route' && (
-                  <ErrorBoundary>
-                    <TracerouteDrawer />
-                  </ErrorBoundary>
-                )}
               </div>
 
               <footer className="px-4 py-3 text-center text-slate-400 dark:text-slate-600 text-[9px] uppercase tracking-widest bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/5">
@@ -403,6 +406,30 @@ function App() {
           </button>
         </div>
 
+        {/* Report Modal */}
+        <ReportModal
+          isOpen={showReportModal}
+          onClose={() => setShowReportModal(false)}
+          selectedRecords={useDnsStore.getState().getSelectedRecords()}
+          initialAppInfo={lastAppInfo}
+          onGenerate={(data) => {
+            setShowReportModal(false);
+            setReportData(data);
+            setLastAppInfo(data.appInfo);
+          }}
+        />
+
+        {/* Report View Overlay */}
+        {reportData && (
+          <ReportView
+            data={reportData}
+            onClose={() => setReportData(null)}
+            onEdit={() => {
+              setReportData(null);
+              setShowReportModal(true);
+            }}
+          />
+        )}
       </div>
   );
 }

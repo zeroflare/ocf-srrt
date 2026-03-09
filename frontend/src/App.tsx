@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
+import { Routes, Route } from 'react-router';
 import { useDnsStore } from './stores/useDnsStore';
 
 // 獨立 Traceroute 頁面（懶載入）
@@ -435,22 +436,24 @@ function App() {
 }
 
 /**
- * AppRouter — 頂層路由器，根據 pathname 決定渲染哪個頁面
- * 不含任何 hook，避免違反 React Rules of Hooks
+ * AppRouter — 頂層路由器，使用 React Router 實現 client-side routing
+ * 頁面切換不會觸發完整重載，Zustand 狀態得以保留
  */
 function AppRouter() {
-  if (window.location.pathname === '/traceroute') {
-    return (
-      <Suspense fallback={
-        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono text-xs uppercase tracking-widest animate-pulse">
-          Loading...
-        </div>
-      }>
-        <TraceroutePage />
-      </Suspense>
-    );
-  }
-  return <App />;
+  return (
+    <Routes>
+      <Route path="/traceroute" element={
+        <Suspense fallback={
+          <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono text-xs uppercase tracking-widest animate-pulse">
+            Loading...
+          </div>
+        }>
+          <TraceroutePage />
+        </Suspense>
+      } />
+      <Route path="*" element={<App />} />
+    </Routes>
+  );
 }
 
 export default AppRouter;

@@ -43,6 +43,8 @@ const COUNTRY_COORDS: Record<string, [number, number]> = {
 };
 const ISPS = ['Chunghwa Telecom', 'Google Cloud', 'Amazon Data Services', 'Cloudflare', 'Microsoft Azure'];
 
+let _mockIdCounter = 0;
+
 export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
   const country = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
   const localCountry = useDnsStore.getState().localCountry || 'TW';
@@ -53,6 +55,7 @@ export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
   const lat = coords[1] + (Math.random() - 0.5) * 4;
   const app = MOCK_APPS[Math.floor(Math.random() * MOCK_APPS.length)];
   return {
+    _id: `mock-${++_mockIdCounter}`,
     timestamp: new Date().toISOString(),
     domain: app.domain,
     type: Math.random() > 0.8 ? 'AAAA' : 'A',

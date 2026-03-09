@@ -71,8 +71,8 @@ func LogResult(result *TraceResult) {
 			if countryStr == "" {
 				countryStr = "??"
 			}
-			fmt.Fprintf(logFile, "  HOP %3d: %-20s (%s)%s  %.2fms\n",
-				hop.Index, hop.IP, countryStr, coordStr, hop.Latency)
+			fmt.Fprintf(logFile, "  HOP %3d: %-20s (%s)%s  avg=%.2fms best=%.2fms worst=%.2fms stdev=%.2fms loss=%.1f%%\n",
+				hop.Index, hop.IP, countryStr, coordStr, hop.Latency, hop.Best, hop.Worst, hop.StDev, hop.Loss)
 		}
 	}
 }

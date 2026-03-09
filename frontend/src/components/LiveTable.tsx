@@ -6,6 +6,7 @@ import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, SlidersHorizo
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import { detectCloudProvider } from '../utils/cloudProvider';
+import { Link } from 'react-router';
 import {
   createColumnHelper,
   flexRender,
@@ -78,7 +79,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     columnHelper.display({
       id: 'select',
       header: () => {
-        const allIds = filteredRecords.map(r => r.timestamp);
+        const allIds = filteredRecords.map(r => r._id);
         const allSelected = allIds.length > 0 && allIds.every(id => selectedRowIds.has(id));
         return (
           <input
@@ -92,8 +93,8 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       cell: info => (
         <input
           type="checkbox"
-          checked={selectedRowIds.has(info.row.original.timestamp)}
-          onChange={() => toggleRowSelection(info.row.original.timestamp)}
+          checked={selectedRowIds.has(info.row.original._id)}
+          onChange={() => toggleRowSelection(info.row.original._id)}
           className="rounded border-slate-300 dark:border-slate-600 text-cyan-500 focus:ring-cyan-500/30"
         />
       ),
@@ -153,15 +154,13 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       id: 'domain',
       header: t('domain'),
       cell: info => (
-        <a
-          href={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
           className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
           title={t('start_traceroute')}
         >
           {info.getValue()}
-        </a>
+        </Link>
       ),
       size: 250,
     }),
@@ -169,15 +168,13 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       id: 'resultIp',
       header: 'RESULT IP',
       cell: info => (
-        <a
-          href={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <Link
+          to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
           className="text-slate-600 dark:text-slate-300 font-mono hover:underline hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
           title={t('start_traceroute')}
         >
           {info.getValue()}
-        </a>
+        </Link>
       ),
       size: 160,
     }),
@@ -481,7 +478,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
             table.getRowModel().rows.map((row, index) => (
               <tr
                 key={row.id}
-                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''} ${selectedRowIds.has(row.original.timestamp) ? 'bg-cyan-500/10 dark:bg-cyan-500/5' : ''}`}
+                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''} ${selectedRowIds.has(row.original._id) ? 'bg-cyan-500/10 dark:bg-cyan-500/5' : ''}`}
               >
                 {row.getVisibleCells().map(cell => (
                   <td key={cell.id} className="px-4 py-2 whitespace-nowrap">

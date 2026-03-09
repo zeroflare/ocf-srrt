@@ -1,6 +1,24 @@
 import { create } from 'zustand';
-import { TraceResult } from '../types';
+import { TraceResult, Hop } from '../types';
 import { useDnsStore } from './useDnsStore';
+
+const MOCK_HOPS: Hop[] = [
+  { index: 1, ip: '192.168.1.1', host: 'gateway', latency: 2.5, rtts: [], loss: 0, best: 2.3, worst: 2.7, stdev: 0.2, country: 'TW', coords: [121.5, 25.0], asn: 0, isp: 'Private' },
+  { index: 2, ip: '168.95.1.1', host: 'hinet.net', latency: 8.2, rtts: [], loss: 0, best: 7.8, worst: 8.6, stdev: 0.4, country: 'TW', coords: [121.3, 24.8], asn: 3462, isp: 'Chunghwa Telecom' },
+  { index: 3, ip: '203.75.1.1', host: 'tp-core.hinet.net', latency: 12.5, rtts: [], loss: 0, best: 11.9, worst: 13.1, stdev: 0.6, country: 'TW', coords: [121.0, 24.5], asn: 3462, isp: 'Chunghwa Telecom' },
+  { index: 4, ip: '72.14.232.1', host: 'google-gw.net', latency: 45.1, rtts: [], loss: 10, best: 43.2, worst: 47.0, stdev: 1.9, country: 'US', coords: [-122.08, 37.38], asn: 15169, isp: 'Google LLC' },
+  { index: 5, ip: '142.250.1.1', host: 'google.com', latency: 155.8, rtts: [], loss: 0, best: 152.1, worst: 159.5, stdev: 3.7, country: 'US', coords: [-74.00, 40.71], asn: 15169, isp: 'Google LLC' },
+];
+
+/** 產生 mock TraceResult，供 mock 模式使用 */
+export function createMockTraceResult(target: string): TraceResult {
+  return {
+    target,
+    time: new Date().toISOString(),
+    status: 'completed',
+    hops: MOCK_HOPS,
+  };
+}
 
 interface TracerouteState {
   activeResult: TraceResult | null;
@@ -29,23 +47,8 @@ export const useTracerouteStore = create<TracerouteState>((set) => ({
     const useMock = import.meta.env.VITE_USE_MOCK === 'true';
 
     if (useMock) {
-      // 模擬 API 延遲
       await new Promise(resolve => setTimeout(resolve, 1500));
-
-      const mockResult: TraceResult = {
-        target: ip,
-        time: new Date().toISOString(),
-        status: 'completed',
-        hops: [
-          { index: 1, ip: '192.168.1.1', host: 'gateway', latency: 2.5, rtts: [2.3, 2.5, 2.7], country: 'TW', coords: [121.5, 25.0], asn: 0, isp: 'Private' },
-          { index: 2, ip: '168.95.1.1', host: 'hinet.net', latency: 8.2, rtts: [7.8, 8.2, 8.6], country: 'TW', coords: [121.3, 24.8], asn: 3462, isp: 'Chunghwa Telecom' },
-          { index: 3, ip: '203.75.1.1', host: 'tp-core.hinet.net', latency: 12.5, rtts: [11.9, 12.5, 13.1], country: 'TW', coords: [121.0, 24.5], asn: 3462, isp: 'Chunghwa Telecom' },
-          { index: 4, ip: '72.14.232.1', host: 'google-gw.net', latency: 45.1, rtts: [43.2, 45.1, 47.0], country: 'US', coords: [-122.08, 37.38], asn: 15169, isp: 'Google LLC' },
-          { index: 5, ip: '142.250.1.1', host: 'google.com', latency: 155.8, rtts: [152.1, 155.8, 159.5], country: 'US', coords: [-74.00, 40.71], asn: 15169, isp: 'Google LLC' },
-        ]
-      };
-
-      set({ activeResult: mockResult, isLoading: false, hasResult: true });
+      set({ activeResult: createMockTraceResult(ip), isLoading: false, hasResult: true });
       return;
     }
 

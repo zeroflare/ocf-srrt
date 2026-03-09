@@ -1,4 +1,7 @@
 export interface DnsRecord {
+    // 前端自動產生的唯一 ID（不來自後端）
+    _id: string;
+
     // 對應 Go: Timestamp time.Time `json:"timestamp"`
     timestamp: string;
 
@@ -50,8 +53,12 @@ export interface Hop {
   index: number;
   ip: string;
   host: string;
-  latency: number;
-  rtts?: number[];
+  latency: number;       // Avg ms
+  rtts?: number[];       // 保留（可能為空陣列）
+  loss: number;          // 丟包率 0~100
+  best: number;          // 最低延遲 ms
+  worst: number;         // 最高延遲 ms
+  stdev: number;         // 標準差 ms
   country: string;
   coords: [number, number]; // [lon, lat]
   asn?: number;

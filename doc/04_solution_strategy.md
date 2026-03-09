@@ -5,7 +5,7 @@
 - 使用 WebSocket 確保低延遲的資料推送。
 - 前端採用 Zustand 管理全域狀態，並使用 React Simple Maps 進行地理視覺化。
 
-- **Interactive Debugging**: 整合 Traceroute 到 DNS 列表點擊，簡化診斷流程。
+- **Interactive Debugging**: 整合 MTR (My Traceroute) 到 DNS 列表點擊，一次取得完整路徑統計（Loss%、Avg、Best、Worst、StDev），簡化診斷流程。
 - **Context-aware Onboarding**: 提供浮動的 DNS 設定說明（Overlay），減少使用者離開畫面查找說明的斷裂感。
 - **Client-side Enrichment**: 在前端執行 ISP/Cloud Provider 偵測，減輕後端負載並保持靈活性。
 

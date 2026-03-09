@@ -5,6 +5,12 @@ import { DnsRecord } from '../types';
 import { useTracerouteStore } from './useTracerouteStore';
 import { logger } from '../utils/logger';
 
+let _idCounter = 0;
+const assignId = (record: DnsRecord): DnsRecord => {
+  if (record._id) return record;
+  return { ...record, _id: `dns-${++_idCounter}-${Date.now()}` };
+};
+
 interface DnsState {
   records: DnsRecord[];
   totalQueries: number;
@@ -106,7 +112,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
       if (!get().isPaused && !get().isSharedReport) {
-        batchBuffer.push(record);
+        batchBuffer.push(assignId(record));
         flushBuffer(); // 嘗試觸發更新 (會被 throttle 擋住直到時間到)
       }
     },
@@ -121,7 +127,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
       if (!monitoringIp) return;
 
       const filtered = historyRecords.filter(r => r.sourceIp === monitoringIp);
-      const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
+      const sortedRecords = [...filtered].reverse().slice(0, maxRecords).map(assignId);
       const historyForeignCount = sortedRecords.reduce(
           (acc, r) => acc + (r.isForeign ? 1 : 0), 0
       );
@@ -140,7 +146,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
       // 如果有暫存快照且設定了新 IP，立即重播快照
       if (ip && pendingSnapshot && pendingSnapshot.length > 0) {
         const filtered = pendingSnapshot.filter(r => r.sourceIp === ip);
-        const sortedRecords = [...filtered].reverse().slice(0, maxRecords);
+        const sortedRecords = [...filtered].reverse().slice(0, maxRecords).map(assignId);
         const historyForeignCount = sortedRecords.reduce(
             (acc, r) => acc + (r.isForeign ? 1 : 0), 0
         );
@@ -191,7 +197,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     getSelectedRecords: () => {
       const { records, selectedRowIds } = get();
-      return records.filter(r => selectedRowIds.has(r.timestamp));
+      return records.filter(r => selectedRowIds.has(r._id));
     },
 
     exportToUrl: () => {
@@ -229,6 +235,10 @@ export const useDnsStore = create<DnsState>((set, get) => {
               ip: h.ip,
               l: h.latency,
               r: h.rtts,
+              ls: h.loss,
+              bs: h.best,
+              ws: h.worst,
+              sd: h.stdev,
               c: h.country,
               co: h.coords,
               a: h.asn,

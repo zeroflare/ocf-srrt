@@ -36,8 +36,9 @@ FROM nginx:stable-alpine AS runner
 # 移除 Nginx 預設頁面
 RUN rm -rf /usr/share/nginx/html/*
 
-# 複製編譯好的靜態檔案
+# 複製編譯好的靜態檔案，並確保 Nginx worker (nginx 用戶) 有讀取權限
 COPY --from=builder /app/dist /usr/share/nginx/html
+RUN chmod -R 755 /usr/share/nginx/html
 
 # 複製自訂的 Nginx 設定 (支援環境變數)
 # 將 template 放入 templates 目錄，Nginx 啟動時會自動 envsubst 並產出到 /etc/nginx/conf.d/default.conf

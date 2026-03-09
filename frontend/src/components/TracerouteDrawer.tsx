@@ -1,49 +1,22 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
 import { Activity, Zap, ExternalLink, Share2, Check } from 'lucide-react';
-import { isLikelySubmarine } from '../utils/geo';
 import { useTranslation } from 'react-i18next';
-import { buildTracerouteShareUrl, buildTracerouteRunUrl } from '../utils/tracerouteShare';
-import { Hop } from '../types';
-
-const LatencyBar: React.FC<{ hop: Hop; maxLatency: number }> = ({ hop, maxLatency }) => {
-  const avg = hop.latency;
-  if (hop.ip === '*' || avg === 0) return <span className="text-slate-500 dark:text-slate-600">—</span>;
-
-  const pct = maxLatency > 0 ? Math.min((avg / maxLatency) * 100, 100) : 0;
-  const color = avg < 50 ? 'bg-emerald-500' : avg < 150 ? 'bg-amber-500' : 'bg-rose-500';
-
-  return (
-    <div className="flex items-center gap-2 min-w-[80px]">
-      <div className="flex-1 h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        <div className={`h-full rounded-full ${color} transition-all`} style={{ width: `${Math.max(pct, 4)}%` }} />
-      </div>
-    </div>
-  );
-};
-
-const RttCell: React.FC<{ value?: number }> = ({ value }) => {
-  if (value === undefined) return <span className="text-slate-400 dark:text-slate-600">*</span>;
-  const color = value < 50 ? 'text-emerald-600 dark:text-emerald-400' : value < 150 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-500';
-  return <span className={`font-mono ${color}`}>{value.toFixed(1)}</span>;
-};
+import { buildTracerouteShareUrl } from '../utils/tracerouteShare';
+import { HopTable } from './HopTable';
 
 export const TracerouteDrawer: React.FC = () => {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const { activeResult, isLoading, error } = useTracerouteStore();
   const { theme, token } = useDnsStore();
   const [copied, setCopied] = useState(false);
 
-  const maxLatency = useMemo(() => {
-    if (!activeResult) return 0;
-    return Math.max(...activeResult.hops.filter(h => h.ip !== '*').map(h => h.latency), 1);
-  }, [activeResult]);
-
   const handleOpenNewPage = () => {
     if (!activeResult) return;
-    const url = buildTracerouteRunUrl(activeResult.target, token || '');
-    window.open(url, '_blank', 'noopener,noreferrer');
+    navigate(`/traceroute?target=${encodeURIComponent(activeResult.target)}&token=${encodeURIComponent(token || '')}`);
   };
 
   const handleCopyShare = () => {
@@ -119,81 +92,7 @@ export const TracerouteDrawer: React.FC = () => {
             <p className="text-[10px] opacity-60">{t('traceroute_no_data_hint')}</p>
           </div>
         ) : (
-          <table className="w-full text-[11px]">
-            <thead className={`sticky top-0 z-10 ${isDark ? 'bg-slate-950' : 'bg-slate-50'}`}>
-              <tr>
-                <th className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 w-8">#</th>
-                <th className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">IP</th>
-                <th className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">ASN/ISP</th>
-                <th className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 w-12"></th>
-                <th className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">{t('traceroute_latency')}</th>
-                <th className="px-3 py-2.5 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">RTT 1</th>
-                <th className="px-3 py-2.5 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">RTT 2</th>
-                <th className="px-3 py-2.5 text-right font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5 whitespace-nowrap">RTT 3</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-              {activeResult.hops.map((hop, index) => {
-                const nextHop = activeResult.hops[index + 1];
-                const hasSubmarineJump = nextHop && isLikelySubmarine(hop, nextHop);
-                const isStar = hop.ip === '*';
-                const rtts = hop.rtts || [];
-
-                return (
-                  <React.Fragment key={index}>
-                    <tr className={`group transition-colors ${isStar ? 'opacity-40' : 'hover:bg-cyan-500/5'}`}>
-                      <td className="px-3 py-2 font-mono font-bold text-slate-400 dark:text-slate-500">{hop.index}</td>
-                      <td className="px-3 py-2">
-                        {isStar ? (
-                          <span className="text-slate-500 dark:text-slate-600 font-mono">*</span>
-                        ) : (
-                          <div>
-                            <span className="text-cyan-600 dark:text-cyan-400 font-mono font-bold">{hop.ip}</span>
-                            {hop.host && hop.host !== hop.ip && (
-                              <div className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[180px]">{hop.host}</div>
-                            )}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {!isStar && hop.asn ? (
-                          <div className="max-w-[120px]">
-                            <span className="text-[10px] text-slate-400 dark:text-slate-600 block">AS{hop.asn}</span>
-                            <span className="text-slate-500 dark:text-slate-400 truncate block text-[10px]">{hop.isp}</span>
-                          </div>
-                        ) : (
-                          <span className="text-slate-400 dark:text-slate-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        {!isStar && hop.country && (
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                            {hop.country}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-3 py-2">
-                        <LatencyBar hop={hop} maxLatency={maxLatency} />
-                      </td>
-                      <td className="px-3 py-2 text-right text-[10px]"><RttCell value={rtts[0]} /></td>
-                      <td className="px-3 py-2 text-right text-[10px]"><RttCell value={rtts[1]} /></td>
-                      <td className="px-3 py-2 text-right text-[10px]"><RttCell value={rtts[2]} /></td>
-                    </tr>
-                    {hasSubmarineJump && (
-                      <tr>
-                        <td colSpan={8} className="px-3 py-1">
-                          <div className={`inline-flex items-center gap-2 px-3 py-1 ${isDark ? 'bg-purple-500/10 border-purple-500/30 text-purple-400' : 'bg-purple-50 border-purple-200 text-purple-600'} border rounded-full text-[10px] font-bold uppercase tracking-wider animate-pulse`}>
-                            <Activity className="h-3 w-3" />
-                            {t('traceroute_submarine')}
-                          </div>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
+          <HopTable hops={activeResult.hops} compact isDark={isDark} />
         )}
       </div>
 

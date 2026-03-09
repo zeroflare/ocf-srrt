@@ -35,7 +35,7 @@ FROM alpine:latest
 # libpcap: 執行期需要此 library 才能抓封包
 # tzdata: 設定時區 (Log 時間才會正確)
 # ca-certificates: 支援 HTTPS 請求
-RUN apk --no-cache add ca-certificates libpcap tzdata
+RUN apk --no-cache add ca-certificates libpcap tzdata mtr
 
 # 設定時區為台北 (方便除錯 Log)
 ENV TZ=Asia/Taipei

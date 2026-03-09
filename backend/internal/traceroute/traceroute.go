@@ -1,24 +1,46 @@
 package traceroute
 
 import (
-	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"ocf-srrt/backend/internal/geoip"
 	"os/exec"
 	"regexp"
-	"strconv"
-	"strings"
 	"time"
 )
+
+// mtrReport 對應 mtr --json 的完整輸出
+type mtrReport struct {
+	Report struct {
+		Hubs []mtrHub `json:"hubs"`
+	} `json:"report"`
+}
+
+// mtrHub 對應 report.hubs 中的每一跳
+type mtrHub struct {
+	Count int     `json:"count"`
+	Host  string  `json:"host"`
+	Loss  float64 `json:"Loss%"`
+	Snt   int     `json:"Snt"`
+	Last  float64 `json:"Last"`
+	Avg   float64 `json:"Avg"`
+	Best  float64 `json:"Best"`
+	Wrst  float64 `json:"Wrst"`
+	StDev float64 `json:"StDev"`
+}
 
 // Hop 代表 Traceroute 中的一跳
 type Hop struct {
 	Index   int       `json:"index"`
 	IP      string    `json:"ip"`
 	Host    string    `json:"host"`
-	Latency float64   `json:"latency"` // 單位：ms（取 RTTs 平均值，向後相容）
-	RTTs    []float64 `json:"rtts"`    // 多次探測的 RTT 值 (ms)
+	Latency float64   `json:"latency"` // 對應 mtr 的 Avg (ms)
+	RTTs    []float64 `json:"rtts"`    // 保留為空陣列（向後相容）
+	Loss    float64   `json:"loss"`    // 丟包率 (0.0 ~ 100.0)
+	Best    float64   `json:"best"`    // 最低延遲 ms
+	Worst   float64   `json:"worst"`   // 最高延遲 ms
+	StDev   float64   `json:"stdev"`   // 標準差 ms
 	Country string    `json:"country"`
 	Coords  []float64 `json:"coords"` // [lon, lat]
 	ASN     uint      `json:"asn"`
@@ -33,120 +55,69 @@ type TraceResult struct {
 	Time   time.Time `json:"time"`
 }
 
-// Run 執行系統 traceroute 指令並解析結果
+// Run 執行 mtr 指令並解析 JSON 結果
 func Run(ctx context.Context, target string) (*TraceResult, error) {
 	// 驗證輸入，防止指令注入
 	if matched, _ := regexp.MatchString(`^[a-zA-Z0-9\.-]+$`, target); !matched {
 		return nil, fmt.Errorf("invalid target")
 	}
 
-	// 使用系統 traceroute 指令
-	// -n: 不解析網域名稱 (加速)
-	// -w 1: 等待回應時間 1 秒
-	// -q 3: 每一跳送 3 個封包 (取得多次 RTT)
-	cmd := exec.CommandContext(ctx, "traceroute", "-n", "-w", "1", "-q", "3", target)
-	stdout, err := cmd.StdoutPipe()
+	// 使用 mtr --report --report-cycles 10 --json
+	cmd := exec.CommandContext(ctx, "mtr", "--report", "--report-cycles", "10", "--json", target)
+	output, err := cmd.Output()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("mtr execution failed: %w", err)
 	}
 
-	if err := cmd.Start(); err != nil {
-		return nil, err
+	var report mtrReport
+	if err := json.Unmarshal(output, &report); err != nil {
+		return nil, fmt.Errorf("failed to parse mtr JSON output: %w", err)
 	}
 
 	result := &TraceResult{
 		Target: target,
 		Hops:   []Hop{},
+		Status: "completed",
 		Time:   time.Now(),
 	}
 
-	scanner := bufio.NewScanner(stdout)
-	for scanner.Scan() {
-		line := scanner.Text()
-		// 試著解析每一行（-q 3 模式）
-		hop := parseLine(line)
-		if hop != nil {
-			if hop.IP != "*" {
-				country, _ := geoip.GetCountry(hop.IP)
-				coords, _ := geoip.GetCoords(hop.IP)
-				hop.Country = country
-				hop.Coords = coords
-				asn, isp, _ := geoip.GetASN(hop.IP)
-				hop.ASN = asn
-				hop.ISP = isp
-			}
-			result.Hops = append(result.Hops, *hop)
+	for i, hub := range report.Report.Hubs {
+		hop := Hop{
+			Index:   i + 1,
+			IP:      hub.Host,
+			Host:    hub.Host,
+			Latency: hub.Avg,
+			RTTs:    []float64{},
+			Loss:    hub.Loss,
+			Best:    hub.Best,
+			Worst:   hub.Wrst,
+			StDev:   hub.StDev,
 		}
-	}
 
-	if err := cmd.Wait(); err != nil {
-		// 如果部分成功但最後報錯，我們還是回傳已抓到的資料
-		result.Status = "error"
-	} else {
-		result.Status = "completed"
+		// 無回應跳點（host 為 "???" 代表無法解析）
+		if hub.Host == "???" {
+			hop.IP = "*"
+			hop.Host = ""
+			hop.Latency = 0
+			hop.Loss = 100
+			hop.Best = 0
+			hop.Worst = 0
+			hop.StDev = 0
+		}
+
+		// 對有效 IP 執行 GeoIP 補全
+		if hop.IP != "*" {
+			country, _ := geoip.GetCountry(hop.IP)
+			coords, _ := geoip.GetCoords(hop.IP)
+			hop.Country = country
+			hop.Coords = coords
+			asn, isp, _ := geoip.GetASN(hop.IP)
+			hop.ASN = asn
+			hop.ISP = isp
+		}
+
+		result.Hops = append(result.Hops, hop)
 	}
 
 	return result, nil
-}
-
-func parseLine(line string) *Hop {
-	// -q 3 模式範例:
-	// " 1  192.168.1.1  0.582 ms  0.491 ms  0.523 ms"
-	// " 2  * * *"
-	// " 3  10.0.0.1  1.234 ms  * 1.567 ms"
-	fields := strings.Fields(line)
-	if len(fields) < 2 {
-		return nil
-	}
-
-	index, err := strconv.Atoi(fields[0])
-	if err != nil {
-		return nil
-	}
-
-	ip := fields[1]
-
-	// 全部是 * 的情況
-	allStar := true
-	for _, f := range fields[1:] {
-		if f != "*" && f != "ms" {
-			if _, parseErr := strconv.ParseFloat(f, 64); parseErr != nil {
-				// 可能是 IP 位址
-				if f != ip {
-					continue
-				}
-			}
-			allStar = false
-		}
-	}
-	if ip == "*" && allStar {
-		return &Hop{Index: index, IP: "*", Latency: 0, RTTs: []float64{}}
-	}
-
-	// 收集所有 RTT 值
-	var rtts []float64
-	for i := 2; i < len(fields); i++ {
-		if fields[i] == "ms" && i > 0 {
-			if v, parseErr := strconv.ParseFloat(fields[i-1], 64); parseErr == nil {
-				rtts = append(rtts, v)
-			}
-		}
-	}
-
-	// 計算平均延遲
-	latency := 0.0
-	if len(rtts) > 0 {
-		sum := 0.0
-		for _, r := range rtts {
-			sum += r
-		}
-		latency = sum / float64(len(rtts))
-	}
-
-	return &Hop{
-		Index:   index,
-		IP:      ip,
-		Latency: latency,
-		RTTs:    rtts,
-	}
 }

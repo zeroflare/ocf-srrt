@@ -5,6 +5,7 @@
 - **Sniffing Permission**: 在容器內需要特定權限才能擷取封包。
 
 ## Technical Debt
+- `mtr --json` 輸出格式可能因版本差異而不同（例如 key 名稱），Dockerfile 應固定套件版本以降低風險。
 - 應用程式識別規則 (`apps.json`) 需要持續維護。
 - 目前尚未實作完善的單元測試覆蓋。
 - Cloud provider 識別規則（`utils/cloudProvider.ts`）採用靜態字串 pattern，需隨雲端服務商 ASN 異動定期更新。

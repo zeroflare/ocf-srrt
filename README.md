@@ -19,7 +19,7 @@
 - **核心**: React 19, TypeScript, Vite (HMR Enabled).
 - **樣式**: Tailwind CSS v4, Lucide Icons.
 - **狀態**: Zustand (Global Store), TanStack Table (Data Grid).
-- **視覺化**: React Simple Maps (Mercator Projection + Pulse Animation).
+- **視覺化**: MapLibre GL (CyberMap + TraceMap).
 - **多國語言**: i18next (支援中/英切換).
 
 ### Deployment
@@ -136,6 +136,11 @@ dig @<GCP_PUBLIC_IP> google.com
     - 擴充全球座標庫 (G7/BRICS/Asia)，解決地圖連線遺失問題。
     - 實作 SVG Pulse 動畫，即時呈現威脅擴散效果。
 - **Live Table**: 支援 Source IP 追蹤、DNS 類型 (A/AAAA) 顯示與 CSV 匯出。
+- **MTR 路徑追蹤**:
+    - 使用 MTR (My Traceroute) 取代傳統 traceroute，單次執行即可獲得 Loss%、Avg、Best、Worst、StDev 統計。
+    - **TraceMap**: 獨立 MapLibre GL 嵌入地圖，依延遲漸變色繪製路徑線條，支援 Popup 顯示 IP/ASN/延遲。
+    - **HopTable**: 共用跳點表格元件，支援 Loss% 紅色高亮、延遲進度條視覺化。
+    - 支援 URL 分享（壓縮編碼），舊連結向後相容。
 
 ---
 

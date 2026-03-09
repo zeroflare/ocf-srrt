@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useSearchParams } from 'react-router';
 import pako from 'pako';
 import { useDnsStore } from '../stores/useDnsStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
@@ -9,10 +10,10 @@ const MAX_ZDATA_LENGTH = 100 * 1024;
 
 export const useSharedReport = () => {
   const { setMonitoringIp, loadSnapshot, setSharedReport } = useDnsStore();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const zdata = params.get('zdata');
+    const zdata = searchParams.get('zdata');
 
     if (zdata) {
       try {
@@ -42,7 +43,9 @@ export const useSharedReport = () => {
     }
 
     function loadRecords(decoded: any[], traceData: any | null) {
+      let idCounter = 0;
       const records: DnsRecord[] = decoded.map((r: any) => ({
+        _id: `shared-${++idCounter}`,
         timestamp: r.t,
         domain: r.d,
         resultIp: r.ip,
@@ -77,6 +80,10 @@ export const useSharedReport = () => {
             host: '',
             latency: h.l,
             rtts: h.r,
+            loss: h.ls ?? 0,
+            best: h.bs ?? 0,
+            worst: h.ws ?? 0,
+            stdev: h.sd ?? 0,
             country: h.c,
             coords: h.co,
             asn: h.a,
@@ -86,5 +93,5 @@ export const useSharedReport = () => {
         useTracerouteStore.getState().loadSharedResult(traceResult);
       }
     }
-  }, [setMonitoringIp, loadSnapshot, setSharedReport]);
+  }, [searchParams, setMonitoringIp, loadSnapshot, setSharedReport]);
 };

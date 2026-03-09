@@ -9,7 +9,20 @@ SRRT (Real-time DNS Traffic Analyzer) 是一個專為資安分析設計的即時
 - 智慧網域識別引擎
 - 前端視覺化戰情室
 - **海纜地圖 (CyberMap)**: 整合全球海纜資料，並標註「台灣出發可用路徑」。
-- **Traceroute 工具**: 提供即時網路路徑追蹤與視覺化。
+- **MTR 路徑追蹤工具**: 使用 MTR (My Traceroute) 提供即時網路路徑追蹤，含丟包率、延遲統計（Avg/Best/Worst/StDev）與 MapLibre GL 地圖視覺化。
+
+```mermaid
+graph TB
+    DNS["DNS 封包擷取"] --> Enrich["GeoIP / ASN 富化"]
+    Enrich --> Recog["智慧應用識別"]
+    Recog --> Stream["WebSocket 即時推送"]
+    Stream --> Dashboard["📊 Dashboard"]
+    Stream --> CyberMap["🗺 CyberMap<br/>海纜地圖"]
+    Stream --> LiveTable["📋 LiveTable<br/>DNS 查詢列表"]
+    LiveTable -->|"點擊 IP"| MTR["🔍 MTR 路徑追蹤"]
+    MTR --> TraceMap["🗺 TraceMap<br/>路徑地圖"]
+    MTR --> HopTable["📋 HopTable<br/>跳點統計表"]
+```
 
 ## Quality Goals
 1. **即時性 (Real-time)**: 能夠快速處理並展示 DNS 流量。

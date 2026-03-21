@@ -124,6 +124,8 @@
   "traceroute_page_back_main": "Back to main",
   "traceroute_share_decode_error": "Failed to decode shared data",
   "traceroute_page_no_params": "No target or shared data provided",
+  "traceroute_timeout_warning": "Timeout — showing partial results",
+  "traceroute_error_warning": "Error — showing partial results",
   "about": "About",
   "about_title": "About SRRT DNS Analyzer",
   "about_what_title": "What is this?",

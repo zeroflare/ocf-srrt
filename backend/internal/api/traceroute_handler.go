@@ -51,8 +51,20 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// 解析 mode/port 參數（預設 TCP 443）
+	mode := r.URL.Query().Get("mode")
+	if mode == "" {
+		mode = "tcp"
+	}
+	port := r.URL.Query().Get("port")
+	if port == "" {
+		port = "443"
+	}
+
+	cacheKey := traceroute.CacheKey(target, mode, port)
+
 	// 查詢快取（快取命中時跳過速率限制，避免誤觸 429）
-	if cached, ok := h.Cache.Get(target); ok {
+	if cached, ok := h.Cache.Get(cacheKey); ok {
 		cachedCopy := *cached
 		cachedCopy.Cached = true
 		w.Header().Set("Content-Type", "application/json")
@@ -77,15 +89,18 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	result, err := traceroute.Run(ctx, target, h.LocalIP)
+	opts := traceroute.RunOptions{Mode: mode, Port: port}
+	result, err := traceroute.Run(ctx, target, h.LocalIP, opts)
 	if err != nil {
-		slog.Error("traceroute failed", "component", "traceroute", "target", target, "error", err)
+		slog.Error("traceroute failed", "component", "traceroute", "target", target, "mode", mode, "port", port, "error", err)
 		http.Error(w, "traceroute execution failed", http.StatusInternalServerError)
 		return
 	}
 
-	// 寫入快取與日誌
-	h.Cache.Set(target, result)
+	// 僅對完整結果寫入快取（timeout/error 不快取，允許重試）
+	if result.Status == "completed" {
+		h.Cache.Set(cacheKey, result)
+	}
 	traceroute.LogResult(result)
 
 	w.Header().Set("Content-Type", "application/json")

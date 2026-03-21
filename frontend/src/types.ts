@@ -68,8 +68,16 @@ export interface Hop {
 
 export interface TraceResult {
   target: string;
+  resolvedIP?: string;        // DNS 預解析的 IP（當 target 為域名時）
   hops: Hop[];
   status: 'completed' | 'timeout' | 'error';
   time: string;
   cached?: boolean;
+
+  // 可觀測性欄位
+  mode?: string;              // "tcp" / "icmp"
+  port?: number;              // TCP port
+  dnsResolveMs?: number;      // DNS 解析耗時 (ms)
+  mtrExecutionMs?: number;    // mtr 執行耗時 (ms)
+  mtrVersion?: string;        // mtr 版本
 }

@@ -193,9 +193,41 @@ const TraceroutePage: React.FC = () => {
         ) : (
           <>
             {/* 摘要資訊 */}
-            <div className={`mb-6 px-4 py-3 rounded-xl border text-xs font-mono flex items-center justify-between ${isDark ? 'bg-slate-900/50 border-white/5 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
-              <span>{t('traceroute_status', { status: result.status })}</span>
-              <span>{new Date(result.time).toLocaleString()}</span>
+            <div className={`mb-6 px-4 py-3 rounded-xl border text-xs font-mono ${isDark ? 'bg-slate-900/50 border-white/5 text-slate-400' : 'bg-white border-slate-200 text-slate-500'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span>{t('traceroute_status', { status: result.status })}</span>
+                  {result.mode && (
+                    <span className={`px-2 py-0.5 rounded font-bold uppercase ${isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
+                      {result.mode}{result.port ? `:${result.port}` : ''}
+                    </span>
+                  )}
+                  {result.resolvedIP && (
+                    <span className={`px-2 py-0.5 rounded ${isDark ? 'bg-cyan-500/10 text-cyan-400' : 'bg-cyan-50 text-cyan-600'}`}>
+                      {result.target} → {result.resolvedIP}
+                    </span>
+                  )}
+                  {result.status !== 'completed' && (
+                    <span className={`px-2 py-0.5 rounded font-bold ${isDark ? 'bg-amber-500/15 text-amber-400' : 'bg-amber-50 text-amber-600'}`}>
+                      {result.status === 'timeout' ? t('traceroute_timeout_warning') : t('traceroute_error_warning')}
+                    </span>
+                  )}
+                </div>
+                <span className="flex-shrink-0">{new Date(result.time).toLocaleString()}</span>
+              </div>
+              {(result.dnsResolveMs || result.mtrExecutionMs) && (
+                <div className={`flex items-center gap-4 mt-2 pt-2 border-t text-[10px] ${isDark ? 'border-white/5 text-slate-500' : 'border-slate-100 text-slate-400'}`}>
+                  {result.dnsResolveMs != null && result.dnsResolveMs > 0 && (
+                    <span>DNS: {result.dnsResolveMs.toFixed(1)}ms</span>
+                  )}
+                  {result.mtrExecutionMs != null && result.mtrExecutionMs > 0 && (
+                    <span>MTR: {(result.mtrExecutionMs / 1000).toFixed(2)}s</span>
+                  )}
+                  {result.mtrVersion && (
+                    <span className="opacity-60">{result.mtrVersion}</span>
+                  )}
+                </div>
+              )}
             </div>
 
             {/* 地圖 + 表格 Grid */}

@@ -45,6 +45,9 @@ export const TracerouteDrawer: React.FC = () => {
               {activeResult ? (
                 <>
                   {t('traceroute_target', { ip: activeResult.target })}
+                  {activeResult.resolvedIP && (
+                    <span className={`ml-1.5 opacity-70`}>→ {activeResult.resolvedIP}</span>
+                  )}
                   {activeResult.cached && (
                     <span className={`ml-1.5 px-1 py-0.5 rounded text-[9px] ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-600'}`}>
                       {t('traceroute_cached')}
@@ -153,14 +156,34 @@ export const TracerouteDrawer: React.FC = () => {
             <p className="text-[10px] opacity-60">{t('traceroute_no_data_hint')}</p>
           </div>
         ) : (
-          <HopTable hops={activeResult.hops} compact isDark={isDark} />
+          <div>
+            {activeResult.status !== 'completed' && (
+              <div className={`mx-3 mt-3 px-3 py-2 rounded-lg border text-[10px] font-bold uppercase tracking-wider ${
+                isDark ? 'bg-amber-500/10 border-amber-500/20 text-amber-400' : 'bg-amber-50 border-amber-200 text-amber-600'
+              }`}>
+                {activeResult.status === 'timeout' ? t('traceroute_timeout_warning') : t('traceroute_error_warning')}
+              </div>
+            )}
+            <HopTable hops={activeResult.hops} compact isDark={isDark} />
+          </div>
         )}
       </div>
 
       {/* Footer */}
       <div className={`px-5 py-3 ${isDark ? 'bg-slate-950/50' : 'bg-slate-50'} border-t ${isDark ? 'border-white/5' : 'border-slate-100'} flex items-center justify-between transition-colors`}>
-        <div className="text-[9px] text-slate-500 font-mono uppercase tracking-[0.2em]">
-          {t('traceroute_status', { status: activeResult?.status || (isLoading ? t('traceroute_status_loading') : t('traceroute_status_ready')) })}
+        <div className="flex items-center gap-3 text-[9px] text-slate-500 font-mono uppercase tracking-[0.2em]">
+          <span>{t('traceroute_status', { status: activeResult?.status || (isLoading ? t('traceroute_status_loading') : t('traceroute_status_ready')) })}</span>
+          {activeResult?.mode && (
+            <span className={`px-1.5 py-0.5 rounded font-bold ${isDark ? 'bg-violet-500/10 text-violet-400' : 'bg-violet-50 text-violet-600'}`}>
+              {activeResult.mode}{activeResult.port ? `:${activeResult.port}` : ''}
+            </span>
+          )}
+          {activeResult?.dnsResolveMs != null && activeResult.dnsResolveMs > 0 && (
+            <span>DNS {activeResult.dnsResolveMs.toFixed(1)}ms</span>
+          )}
+          {activeResult?.mtrExecutionMs != null && activeResult.mtrExecutionMs > 0 && (
+            <span>MTR {(activeResult.mtrExecutionMs / 1000).toFixed(2)}s</span>
+          )}
         </div>
         <div className="text-[9px] text-slate-600">
           {activeResult?.time ? new Date(activeResult.time).toLocaleString() : ''}

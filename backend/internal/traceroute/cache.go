@@ -1,10 +1,22 @@
 package traceroute
 
 import (
+	"fmt"
 	"strings"
 	"sync"
 	"time"
 )
+
+// CacheKey 根據 target、mode、port 組合產生快取鍵，避免不同模式的結果碰撞
+func CacheKey(target, mode, port string) string {
+	if mode == "" {
+		mode = "tcp"
+	}
+	if port == "" {
+		port = "443"
+	}
+	return fmt.Sprintf("%s:%s:%s", strings.ToLower(target), mode, port)
+}
 
 // CacheEntry 快取中的單筆記錄
 type CacheEntry struct {
@@ -31,9 +43,9 @@ func NewCache(ttl time.Duration) *Cache {
 	return c
 }
 
-// Get 取得快取結果，若不存在或已過期回傳 nil, false
-func (c *Cache) Get(target string) (*TraceResult, bool) {
-	key := strings.ToLower(target)
+// Get 取得快取結果，若不存在或已過期回傳 nil, false。
+// key 應由 CacheKey() 產生。
+func (c *Cache) Get(key string) (*TraceResult, bool) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -44,9 +56,8 @@ func (c *Cache) Get(target string) (*TraceResult, bool) {
 	return e.Result, true
 }
 
-// Set 寫入快取
-func (c *Cache) Set(target string, result *TraceResult) {
-	key := strings.ToLower(target)
+// Set 寫入快取。key 應由 CacheKey() 產生。
+func (c *Cache) Set(key string, result *TraceResult) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 

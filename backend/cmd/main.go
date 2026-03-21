@@ -130,6 +130,9 @@ func main() {
 	traceLimiter := ratelimit.NewTokenLimiter(30*time.Second, 1)
 	traceSemaphore := ratelimit.NewSemaphore(5)
 
+	// 偵測 mtr 版本（啟動時記錄一次）
+	traceroute.DetectMtrVersion()
+
 	// 初始化 traceroute 結果快取（TTL 5 分鐘）
 	traceCache := traceroute.NewCache(5 * time.Minute)
 	defer traceCache.Stop()

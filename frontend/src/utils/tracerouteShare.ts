@@ -8,8 +8,13 @@ import { TraceResult } from '../types';
 export function encodeTraceResult(result: TraceResult): string {
   const compact = {
     target: result.target,
+    ...(result.resolvedIP ? { rip: result.resolvedIP } : {}),
     status: result.status,
     time: result.time,
+    ...(result.mode ? { md: result.mode } : {}),
+    ...(result.port ? { pt: result.port } : {}),
+    ...(result.dnsResolveMs ? { dns: result.dnsResolveMs } : {}),
+    ...(result.mtrExecutionMs ? { mtr: result.mtrExecutionMs } : {}),
     hops: result.hops.map(h => ({
       i: h.index,
       ip: h.ip,
@@ -74,8 +79,13 @@ export function decodeTraceResult(zdata: string): TraceResult | null {
 
     return {
       target: data.target,
+      ...(data.rip ? { resolvedIP: data.rip } : {}),
       status: data.status,
       time: data.time || new Date().toISOString(),
+      ...(data.md ? { mode: data.md } : {}),
+      ...(data.pt ? { port: data.pt } : {}),
+      ...(data.dns ? { dnsResolveMs: data.dns } : {}),
+      ...(data.mtr ? { mtrExecutionMs: data.mtr } : {}),
       hops: data.hops.map((h: { i: number; ip: string; h?: string; l: number; r?: number[]; ls?: number; bs?: number; ws?: number; sd?: number; c: string; co: [number, number]; a?: number; isp?: string; gc?: string }) => ({
         index: h.i,
         ip: h.ip,

@@ -124,6 +124,8 @@
   "traceroute_page_back_main": "返回主頁",
   "traceroute_share_decode_error": "無法解析分享資料",
   "traceroute_page_no_params": "未提供追蹤目標或分享資料",
+  "traceroute_timeout_warning": "逾時 — 顯示部分結果",
+  "traceroute_error_warning": "錯誤 — 顯示部分結果",
   "about": "關於",
   "about_title": "關於 SRRT DNS Analyzer",
   "about_what_title": "這是什麼？",

@@ -84,6 +84,53 @@ func GetCoords(ipStr string) ([]float64, error) {
 	return []float64{lon, lat}, nil
 }
 
+// GeoResult 合併 Country + Coords + ASN 的查詢結果
+type GeoResult struct {
+	Country string
+	Coords  []float64 // [lon, lat]，nil 表示無有效座標
+	ASN     uint
+	ISP     string
+}
+
+// GetAll 一次 IP 解析，合併查詢 Country/Coords/ASN，減少重複 MMDB 查詢
+func GetAll(ipStr string) (GeoResult, error) {
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return GeoResult{}, &net.ParseError{Type: "IP address", Text: ipStr}
+	}
+
+	var result GeoResult
+
+	if countryDB != nil {
+		record, err := countryDB.City(ip)
+		if err == nil {
+			result.Country = record.Country.IsoCode
+			lat := record.Location.Latitude
+			lon := record.Location.Longitude
+			if !(lat == 0 && lon == 0) {
+				result.Coords = []float64{lon, lat}
+			}
+		}
+	}
+
+	if asnDB != nil {
+		record, err := asnDB.ASN(ip)
+		if err == nil {
+			result.ASN = record.AutonomousSystemNumber
+			result.ISP = record.AutonomousSystemOrganization
+		}
+	}
+
+	if result.Country == "" {
+		result.Country = "XX"
+	}
+	if result.ISP == "" {
+		result.ISP = "Unknown"
+	}
+
+	return result, nil
+}
+
 // GetASN 根據 IP 位址查找 ASN 和 ISP 名稱 (B-05)
 func GetASN(ipStr string) (uint, string, error) {
 	if asnDB == nil {

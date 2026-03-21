@@ -4,16 +4,39 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net"
 	"ocf-srrt/backend/internal/geoip"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
 // validTargetRe 預編譯的合法 target 正規表達式（FQDN 或 IP）
 var validTargetRe = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9.\-]{0,252}$`)
+
+// mtrVersion 快取偵測到的 mtr 版本字串（啟動時偵測一次）
+var (
+	mtrVersion     string
+	mtrVersionOnce sync.Once
+)
+
+// DetectMtrVersion 偵測並記錄 mtr 版本，供啟動時呼叫
+func DetectMtrVersion() string {
+	mtrVersionOnce.Do(func() {
+		out, err := exec.Command("mtr", "--version").Output()
+		if err != nil {
+			mtrVersion = "unknown"
+		} else {
+			mtrVersion = strings.TrimSpace(string(out))
+		}
+		slog.Info("mtr version detected", "component", "traceroute", "version", mtrVersion)
+	})
+	return mtrVersion
+}
 
 // mtrReport 對應 mtr --json 的完整輸出
 type mtrReport struct {
@@ -55,16 +78,30 @@ type Hop struct {
 
 // TraceResult 包含完整的 Traceroute 結果
 type TraceResult struct {
-	Target string    `json:"target"`
-	Hops   []Hop     `json:"hops"`
-	Status string    `json:"status"` // "completed", "timeout", "error"
-	Time   time.Time `json:"time"`
-	Cached bool      `json:"cached"` // 是否為快取結果
+	Target     string    `json:"target"`
+	ResolvedIP string    `json:"resolvedIP,omitempty"` // DNS 預解析的 IP（當 target 為域名時）
+	Hops       []Hop     `json:"hops"`
+	Status     string    `json:"status"` // "completed", "timeout", "error"
+	Time       time.Time `json:"time"`
+	Cached     bool      `json:"cached"` // 是否為快取結果
+
+	// 可觀測性欄位
+	Mode           string  `json:"mode"`                     // "tcp" / "icmp"
+	Port           int     `json:"port,omitempty"`           // TCP port（ICMP 模式時省略）
+	DNSResolveMs   float64 `json:"dnsResolveMs,omitempty"`   // DNS 解析耗時 (ms)
+	MtrExecutionMs float64 `json:"mtrExecutionMs,omitempty"` // mtr 執行耗時 (ms)
+	MtrVersion     string  `json:"mtrVersion,omitempty"`     // mtr 版本
+}
+
+// RunOptions 控制 mtr 執行模式
+type RunOptions struct {
+	Mode string // "tcp" 或 "icmp"，預設 "tcp"
+	Port string // TCP 模式的目標 port，預設 "443"
 }
 
 // Run 執行 mtr 指令並解析 JSON 結果。
 // localIP 為本機公網 IP（用於 Hop 0），空字串則跳過。
-func Run(ctx context.Context, target string, localIP string) (*TraceResult, error) {
+func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*TraceResult, error) {
 	// 驗證輸入，防止指令注入
 	if strings.HasPrefix(target, "-") {
 		return nil, fmt.Errorf("invalid target")
@@ -84,23 +121,137 @@ func Run(ctx context.Context, target string, localIP string) (*TraceResult, erro
 		return nil, fmt.Errorf("mtr is not installed or not found in PATH")
 	}
 
-	// 使用 mtr --report --report-cycles 10 --json
-	cmd := exec.CommandContext(ctx, "mtr", "--report", "--report-cycles", "10", "--json", target)
+	// DNS 預解析：在 Go 層級完成，確保 mtr 探測的 IP 與 GeoIP 查詢一致
+	resolvedIP := target
+	originalTarget := target
+	var dnsResolveMs float64
+	if net.ParseIP(target) == nil {
+		// target 是域名，先解析為 IPv4
+		dnsStart := time.Now()
+		ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", target)
+		dnsResolveMs = float64(time.Since(dnsStart).Microseconds()) / 1000.0
+		if err != nil || len(ips) == 0 {
+			return nil, fmt.Errorf("DNS resolution failed for %s: %w", target, err)
+		}
+		resolvedIP = ips[0].String()
+	}
+
+	// 預設 TCP 模式
+	mode := opts.Mode
+	if mode == "" {
+		mode = "tcp"
+	}
+	port := opts.Port
+	if port == "" {
+		port = "443"
+	}
+
+	// 組裝 mtr 指令參數：模擬 mtr -T -P 443 <target> -r -c 1
+	args := []string{"--report", "--report-cycles", "1", "--max-ttl", "30", "--json"}
+	if mode == "tcp" {
+		args = append(args, "--tcp", "--port", port)
+	}
+	args = append(args, resolvedIP)
+
+	cmd := exec.CommandContext(ctx, "mtr", args...)
+	mtrStart := time.Now()
 	output, err := cmd.Output()
+	mtrExecutionMs := float64(time.Since(mtrStart).Microseconds()) / 1000.0
+
+	// 錯誤分類：區分 timeout、非零退出碼、完全失敗
+	status := "completed"
 	if err != nil {
-		return nil, fmt.Errorf("mtr execution failed: %w", err)
+		if ctx.Err() == context.DeadlineExceeded {
+			status = "timeout"
+			slog.Warn("mtr timed out, returning partial result", "component", "traceroute", "target", originalTarget)
+		} else if exitErr, ok := err.(*exec.ExitError); ok {
+			status = "error"
+			slog.Warn("mtr exited with non-zero", "component", "traceroute", "target", originalTarget, "code", exitErr.ExitCode())
+		} else {
+			// 完全無法執行（例如 binary 不存在）
+			return nil, fmt.Errorf("mtr execution failed: %w", err)
+		}
+		// timeout 或非零退出碼：嘗試解析已收集的 partial output
+		if len(output) == 0 {
+			portNum, _ := strconv.Atoi(port)
+			return &TraceResult{
+				Target:         originalTarget,
+				Status:         status,
+				Time:           time.Now(),
+				Hops:           []Hop{},
+				Mode:           mode,
+				Port:           portNum,
+				DNSResolveMs:   dnsResolveMs,
+				MtrExecutionMs: mtrExecutionMs,
+				MtrVersion:     mtrVersion,
+			}, nil
+		}
 	}
 
 	var report mtrReport
 	if err := json.Unmarshal(output, &report); err != nil {
+		if status != "completed" {
+			portNum, _ := strconv.Atoi(port)
+			return &TraceResult{
+				Target:         originalTarget,
+				Status:         status,
+				Time:           time.Now(),
+				Hops:           []Hop{},
+				Mode:           mode,
+				Port:           portNum,
+				DNSResolveMs:   dnsResolveMs,
+				MtrExecutionMs: mtrExecutionMs,
+				MtrVersion:     mtrVersion,
+			}, nil
+		}
 		return nil, fmt.Errorf("failed to parse mtr JSON output: %w", err)
 	}
 
+	portNum, _ := strconv.Atoi(port)
 	result := &TraceResult{
-		Target: target,
-		Hops:   []Hop{},
-		Status: "completed",
-		Time:   time.Now(),
+		Target:         originalTarget,
+		Status:         status,
+		Time:           time.Now(),
+		Mode:           mode,
+		Port:           portNum,
+		DNSResolveMs:   dnsResolveMs,
+		MtrExecutionMs: mtrExecutionMs,
+		MtrVersion:     mtrVersion,
+	}
+	// 當 target 為域名時，記錄解析後的 IP
+	if resolvedIP != originalTarget {
+		result.ResolvedIP = resolvedIP
+	}
+
+	// Slice 預分配：避免多次記憶體重新分配
+	hopsLen := len(report.Report.Hubs)
+	if localIP != "" {
+		hopsLen++
+	}
+	hops := make([]Hop, 0, hopsLen)
+
+	// 先插入 Hop 0（本機位置），避免後續 O(n) 的 slice 複製
+	if localIP != "" {
+		hop0 := Hop{
+			Index:         0,
+			IP:            localIP,
+			Host:          "local",
+			Latency:       0,
+			RTTs:          []float64{},
+			Loss:          0,
+			GeoConfidence: "high",
+		}
+		geo, err := geoip.GetAll(localIP)
+		if err == nil {
+			hop0.Country = geo.Country
+			hop0.Coords = geo.Coords
+			hop0.ASN = geo.ASN
+			hop0.ISP = geo.ISP
+		}
+		if hop0.Country == "" || hop0.Country == "XX" {
+			hop0.GeoConfidence = "none"
+		}
+		hops = append(hops, hop0)
 	}
 
 	for i, hub := range report.Report.Hubs {
@@ -127,49 +278,35 @@ func Run(ctx context.Context, target string, localIP string) (*TraceResult, erro
 			hop.StDev = 0
 		}
 
-		// 對有效 IP 執行 GeoIP 補全
+		// 對有效 IP 執行 GeoIP 補全（合併查詢，一次 IP 解析）
 		if hop.IP != "*" {
-			country, _ := geoip.GetCountry(hop.IP)
-			coords, _ := geoip.GetCoords(hop.IP)
-			hop.Country = country
-			hop.Coords = coords
-			asn, isp, _ := geoip.GetASN(hop.IP)
-			hop.ASN = asn
-			hop.ISP = isp
+			geo, err := geoip.GetAll(hop.IP)
+			if err == nil {
+				hop.Country = geo.Country
+				hop.Coords = geo.Coords
+				hop.ASN = geo.ASN
+				hop.ISP = geo.ISP
+			}
 			hop.GeoConfidence = "high"
 			if hop.Country == "" || hop.Country == "XX" {
 				hop.GeoConfidence = "none"
+			}
+
+			// rDNS 主動反查：若 mtr 未解析到 hostname（Host == IP），主動查詢
+			if hop.Host == hop.IP {
+				names, err := net.LookupAddr(hop.IP)
+				if err == nil && len(names) > 0 {
+					hop.Host = strings.TrimSuffix(names[0], ".")
+				}
 			}
 		} else {
 			hop.GeoConfidence = "none"
 		}
 
-		result.Hops = append(result.Hops, hop)
+		hops = append(hops, hop)
 	}
 
-	// 插入 Hop 0（本機位置）
-	if localIP != "" {
-		hop0 := Hop{
-			Index:         0,
-			IP:            localIP,
-			Host:          "local",
-			Latency:       0,
-			RTTs:          []float64{},
-			Loss:          0,
-			GeoConfidence: "high",
-		}
-		country, _ := geoip.GetCountry(localIP)
-		coords, _ := geoip.GetCoords(localIP)
-		hop0.Country = country
-		hop0.Coords = coords
-		asn, isp, _ := geoip.GetASN(localIP)
-		hop0.ASN = asn
-		hop0.ISP = isp
-		if hop0.Country == "" || hop0.Country == "XX" {
-			hop0.GeoConfidence = "none"
-		}
-		result.Hops = append([]Hop{hop0}, result.Hops...)
-	}
+	result.Hops = hops
 
 	// 後處理階段 1：用延遲差異修正 CDN/Anycast 的可疑 GeoIP 結果
 	enrichWithLatencyHeuristic(result.Hops)

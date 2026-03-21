@@ -95,8 +95,11 @@ export const HopTable: React.FC<HopTableProps> = ({ hops, compact = false, isDar
                 </td>
                 <td className={`${px} ${py}`}>
                   {!isStar && hop.country && (
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'}`}>
-                      {hop.country}
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'} ${hop.geoConfidence === 'low' ? 'opacity-50' : ''}`}
+                      title={hop.geoConfidence === 'low' ? 'GeoIP confidence: low (CDN/Anycast)' : undefined}
+                    >
+                      {hop.country}{hop.geoConfidence === 'low' ? '?' : ''}
                     </span>
                   )}
                 </td>

@@ -4,6 +4,8 @@ import { useDnsStore } from './stores/useDnsStore';
 
 // 獨立 Traceroute 頁面（懶載入）
 const TraceroutePage = lazy(() => import('./pages/TraceroutePage'));
+// 獨立報告頁面（懶載入）
+const ReportPage = lazy(() => import('./pages/ReportPage'));
 import { useDnsStream } from './hooks/useDnsStream';
 import { useMockDnsStream } from './hooks/useMockDnsStream';
 import { useSharedReport } from './hooks/useSharedReport';
@@ -22,6 +24,7 @@ import { AboutModal } from './components/AboutModal';
 import { Tooltip } from './components/Tooltip';
 import { ReportModal, ReportData, AppInfo } from './components/ReportModal';
 import { ReportView } from './components/ReportView';
+import { buildReportUrl } from './utils/reportShare';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 
 type TabKey = 'table' | 'chart' | 'stats';
@@ -386,7 +389,7 @@ function App() {
               </div>
 
               <footer className="px-4 py-3 text-center text-slate-400 dark:text-slate-600 text-[9px] uppercase tracking-widest bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/5">
-                &copy; {new Date().getFullYear()} ZEROFLARE TECH. ALL RIGHTS RESERVED.
+                &copy; {new Date().getFullYear()} OCF (Open Culture Foundation)
               </footer>
             </aside>
           )}
@@ -415,8 +418,9 @@ function App() {
           initialAppInfo={lastAppInfo}
           onGenerate={(data) => {
             setShowReportModal(false);
-            setReportData(data);
             setLastAppInfo(data.appInfo);
+            // 在新分頁開啟報告頁面
+            window.open(buildReportUrl(data), '_blank', 'noopener,noreferrer');
           }}
         />
 
@@ -440,15 +444,21 @@ function App() {
  * 頁面切換不會觸發完整重載，Zustand 狀態得以保留
  */
 function AppRouter() {
+  const fallback = (
+    <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono text-xs uppercase tracking-widest animate-pulse">
+      Loading...
+    </div>
+  );
   return (
     <Routes>
       <Route path="/traceroute" element={
-        <Suspense fallback={
-          <div className="min-h-screen bg-slate-950 flex items-center justify-center text-cyan-400 font-mono text-xs uppercase tracking-widest animate-pulse">
-            Loading...
-          </div>
-        }>
+        <Suspense fallback={fallback}>
           <TraceroutePage />
+        </Suspense>
+      } />
+      <Route path="/report" element={
+        <Suspense fallback={fallback}>
+          <ReportPage />
         </Suspense>
       } />
       <Route path="*" element={<App />} />

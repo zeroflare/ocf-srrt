@@ -63,6 +63,7 @@ export interface Hop {
   coords: [number, number]; // [lon, lat]
   asn?: number;
   isp?: string;
+  geoConfidence?: 'high' | 'low' | 'none';
 }
 
 export interface TraceResult {
@@ -70,4 +71,5 @@ export interface TraceResult {
   hops: Hop[];
   status: 'completed' | 'timeout' | 'error';
   time: string;
+  cached?: boolean;
 }

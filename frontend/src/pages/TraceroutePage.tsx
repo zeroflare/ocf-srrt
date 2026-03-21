@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
 import { Activity, Zap, Share2, Check, ExternalLink } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -32,10 +32,15 @@ const TraceroutePage: React.FC = () => {
     else root.classList.remove('dark');
   }, [theme]);
 
+  // 使用 ref 持有 searchParams 以穩定 useEffect 依賴
+  const searchParamsRef = useRef(searchParams);
+  searchParamsRef.current = searchParams;
+
   useEffect(() => {
-    const zdata = searchParams.get('zdata');
-    const target = searchParams.get('target');
-    const token = searchParams.get('token');
+    const params = searchParamsRef.current;
+    const zdata = params.get('zdata');
+    const target = params.get('target');
+    const token = params.get('token');
 
     if (zdata) {
       const decoded = decodeTraceResult(zdata);
@@ -45,41 +50,58 @@ const TraceroutePage: React.FC = () => {
       } else {
         setError(t('traceroute_share_decode_error'));
       }
-    } else if (target) {
-      const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-      if (useMock) {
-        setIsLoading(true);
-        setTimeout(() => {
-          setResult(createMockTraceResult(target));
-          setIsLoading(false);
-        }, 1500);
-      } else {
-        const runTrace = async () => {
-          setIsLoading(true);
-          try {
-            let effectiveToken = token;
-            if (!effectiveToken) {
-              const tokenResp = await fetch('/api/token');
-              if (!tokenResp.ok) throw new Error(`Token fetch failed: ${tokenResp.status}`);
-              const tokenData = await tokenResp.json();
-              effectiveToken = tokenData.token;
-            }
-            const res = await fetch(`/api/traceroute?target=${encodeURIComponent(target)}&token=${encodeURIComponent(effectiveToken!)}`);
-            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
-            const data: TraceResult = await res.json();
-            setResult(data);
-          } catch (err: any) {
-            setError(err.message);
-          } finally {
-            setIsLoading(false);
-          }
-        };
-        runTrace();
-      }
-    } else {
-      setError(t('traceroute_page_no_params'));
+      return;
     }
-  }, [searchParams, t]);
+
+    if (!target) {
+      setError(t('traceroute_page_no_params'));
+      return;
+    }
+
+    const useMock = import.meta.env.VITE_USE_MOCK === 'true';
+    if (useMock) {
+      setIsLoading(true);
+      const timer = setTimeout(() => {
+        setResult(createMockTraceResult(target));
+        setIsLoading(false);
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+
+    const abortController = new AbortController();
+    const runTrace = async () => {
+      setIsLoading(true);
+      try {
+        let effectiveToken = token;
+        if (!effectiveToken) {
+          const tokenResp = await fetch('/api/token', { signal: abortController.signal });
+          if (!tokenResp.ok) throw new Error(`Token fetch failed: ${tokenResp.status}`);
+          const tokenData = await tokenResp.json();
+          effectiveToken = tokenData.token;
+        }
+        const res = await fetch(`/api/traceroute?target=${encodeURIComponent(target)}`, {
+          headers: { 'Authorization': `Bearer ${effectiveToken}` },
+          signal: abortController.signal,
+        });
+        if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+        const data: TraceResult = await res.json();
+        setResult(data);
+      } catch (err: any) {
+        if (err.name !== 'AbortError') {
+          setError(err.message);
+        }
+      } finally {
+        if (!abortController.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+    runTrace();
+
+    return () => abortController.abort();
+    // 僅在 mount 時根據 URL 參數執行一次
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [t]);
 
   const handleCopyShare = () => {
     if (!result) return;
@@ -195,7 +217,7 @@ const TraceroutePage: React.FC = () => {
       </div>
 
       <footer className={`px-4 py-3 text-center text-[9px] uppercase tracking-widest border-t mt-8 ${isDark ? 'text-slate-600 bg-slate-950 border-white/5' : 'text-slate-400 bg-white border-slate-100'}`}>
-        &copy; {new Date().getFullYear()} ZEROFLARE TECH. ALL RIGHTS RESERVED.
+        &copy; {new Date().getFullYear()} OCF (Open Culture Foundation)
       </footer>
     </div>
   );

@@ -8,19 +8,22 @@ import (
 	"time"
 )
 
-// logEnabled 控制是否啟用 traceroute 日誌
-var logEnabled bool
+// traceLogger 封裝 traceroute 日誌狀態，透過 mutex 保護所有讀寫
+type traceLogger struct {
+	mu      sync.Mutex
+	enabled bool
+	file    *os.File
+}
 
-// logFile 是日誌輸出的檔案
-var logFile *os.File
-
-// logMu 保護並發寫入
-var logMu sync.Mutex
+var logger traceLogger
 
 // InitLogger 初始化 traceroute 日誌記錄器
 // enabled: 是否啟用；path: 日誌檔路徑（空字串代表停用）
 func InitLogger(enabled bool, path string) error {
-	logEnabled = enabled
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+
+	logger.enabled = enabled
 	if !enabled || path == "" {
 		slog.Info("Traceroute logger disabled", "component", "traceroute")
 		return nil
@@ -30,37 +33,37 @@ func InitLogger(enabled bool, path string) error {
 	if err != nil {
 		return fmt.Errorf("cannot open traceroute log file %q: %w", path, err)
 	}
-	logFile = f
+	logger.file = f
 	slog.Info("Traceroute logger initialized", "component", "traceroute", "path", path)
 	return nil
 }
 
 // CloseLogger 關閉日誌檔（在程式結束時呼叫）
 func CloseLogger() {
-	logMu.Lock()
-	defer logMu.Unlock()
-	if logFile != nil {
-		logFile.Close()
-		logFile = nil
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+	if logger.file != nil {
+		logger.file.Close()
+		logger.file = nil
 	}
 }
 
 // LogResult 將一筆 traceroute 結果寫入日誌檔
 func LogResult(result *TraceResult) {
-	if !logEnabled || logFile == nil {
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+
+	if !logger.enabled || logger.file == nil {
 		return
 	}
 
-	logMu.Lock()
-	defer logMu.Unlock()
-
 	ts := time.Now().Format("2006-01-02 15:04:05")
-	fmt.Fprintf(logFile, "\n[%s] TARGET: %s | STATUS: %s | HOPS: %d\n",
+	fmt.Fprintf(logger.file, "\n[%s] TARGET: %s | STATUS: %s | HOPS: %d\n",
 		ts, result.Target, result.Status, len(result.Hops))
 
 	for _, hop := range result.Hops {
 		if hop.IP == "*" {
-			fmt.Fprintf(logFile, "  HOP %3d: *\n", hop.Index)
+			fmt.Fprintf(logger.file, "  HOP %3d: *\n", hop.Index)
 		} else {
 			coordStr := ""
 			if len(hop.Coords) >= 2 {
@@ -71,7 +74,7 @@ func LogResult(result *TraceResult) {
 			if countryStr == "" {
 				countryStr = "??"
 			}
-			fmt.Fprintf(logFile, "  HOP %3d: %-20s (%s)%s  avg=%.2fms best=%.2fms worst=%.2fms stdev=%.2fms loss=%.1f%%\n",
+			fmt.Fprintf(logger.file, "  HOP %3d: %-20s (%s)%s  avg=%.2fms best=%.2fms worst=%.2fms stdev=%.2fms loss=%.1f%%\n",
 				hop.Index, hop.IP, countryStr, coordStr, hop.Latency, hop.Best, hop.Worst, hop.StDev, hop.Loss)
 		}
 	}

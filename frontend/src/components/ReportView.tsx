@@ -8,9 +8,11 @@ interface ReportViewProps {
   data: ReportData;
   onClose: () => void;
   onEdit: () => void;
+  /** standalone=true 時為獨立分頁，隱藏 Edit 按鈕並調整容器樣式 */
+  standalone?: boolean;
 }
 
-export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit }) => {
+export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit, standalone = false }) => {
   const { t } = useTranslation();
   const { records, appInfo, generatedAt } = data;
 
@@ -23,7 +25,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit })
   };
 
   return (
-    <div className="fixed inset-0 z-[9998] bg-white dark:bg-slate-950 overflow-y-auto transition-colors">
+    <div className={standalone ? "min-h-screen bg-white dark:bg-slate-950 overflow-y-auto transition-colors" : "fixed inset-0 z-[9998] bg-white dark:bg-slate-950 overflow-y-auto transition-colors"}>
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200 dark:border-white/10 px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
@@ -54,10 +56,12 @@ export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit })
             <button onClick={handleShare} className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg border border-slate-200 dark:border-white/10" title={t('share_data')}>
               <Share2 className="h-4 w-4" />
             </button>
-            <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg border border-slate-200 dark:border-white/10">
-              <Pencil className="h-3.5 w-3.5" />
-              {t('report_edit')}
-            </button>
+            {!standalone && (
+              <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg border border-slate-200 dark:border-white/10">
+                <Pencil className="h-3.5 w-3.5" />
+                {t('report_edit')}
+              </button>
+            )}
             <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors rounded-lg border border-slate-200 dark:border-white/10">
               <X className="h-4 w-4" />
             </button>
@@ -134,7 +138,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit })
         <div className="mt-8 pt-4 border-t border-slate-200 dark:border-white/10 text-center text-[10px] text-slate-400 dark:text-slate-600 font-mono uppercase tracking-widest">
           {t('report_generated_at', { time: new Date(generatedAt).toLocaleString() })}
           <span className="mx-2">·</span>
-          &copy; {new Date().getFullYear()} ZEROFLARE TECH
+          &copy; {new Date().getFullYear()} OCF (Open Culture Foundation)
         </div>
       </div>
     </div>

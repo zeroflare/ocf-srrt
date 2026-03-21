@@ -85,8 +85,8 @@
   "cable_monitor": "Submarine Cable Monitor",
   "cable_tw_routes": "Taiwan Available Routes",
   "cable_international": "Other International Cables",
-  "dns_local": "Local DNS",
-  "dns_foreign": "Foreign DNS",
+  "dns_local": "Local Target",
+  "dns_foreign": "Foreign Target",
   "cable_selected": "Selected: {{id}}",
   "cable_hint": "Hint: Hover to Inspect",
   "realtime_traffic": "Real-time Traffic",
@@ -140,7 +140,7 @@
   "about_tech_title": "Tech stack",
   "about_tech_backend": "Backend: Go + miekg/dns + GeoIP + WebSocket",
   "about_tech_frontend": "Frontend: React 19 + TypeScript + Zustand + MapLibre GL",
-  "about_footer": "Built and maintained by Zeroflare Tech",
+  "about_footer": "Built and maintained by OCF",
   "back_to_table": "Back to Table",
   "refresh": "Refresh",
   "report_export": "Export Report",
@@ -157,5 +157,9 @@
   "report_cloud": "Cloud",
   "report_status": "Status",
   "report_generated_at": "Generated at {{time}}",
-  "cancel": "Cancel"
+  "cancel": "Cancel",
+  "traceroute_history": "History",
+  "traceroute_history_empty": "No history yet",
+  "traceroute_clear_history": "Clear history",
+  "traceroute_cached": "Cached result"
 }

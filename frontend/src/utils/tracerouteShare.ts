@@ -9,9 +9,11 @@ export function encodeTraceResult(result: TraceResult): string {
   const compact = {
     target: result.target,
     status: result.status,
+    time: result.time,
     hops: result.hops.map(h => ({
       i: h.index,
       ip: h.ip,
+      h: h.host,
       l: h.latency,
       r: h.rtts,
       ls: h.loss,
@@ -22,12 +24,19 @@ export function encodeTraceResult(result: TraceResult): string {
       co: h.coords,
       a: h.asn,
       isp: h.isp,
+      gc: h.geoConfidence,
     })),
   };
 
   const json = JSON.stringify(compact);
   const compressed = pako.deflate(json);
-  const b64 = btoa(String.fromCharCode(...Array.from(compressed)))
+  // chunk-based 編碼避免 spread 造成 call stack overflow
+  const chunks: string[] = [];
+  const chunkSize = 8192;
+  for (let i = 0; i < compressed.length; i += chunkSize) {
+    chunks.push(String.fromCharCode(...compressed.subarray(i, i + chunkSize)));
+  }
+  const b64 = btoa(chunks.join(''))
     .replace(/\+/g, '-')
     .replace(/\//g, '_')
     .replace(/=/g, '');
@@ -66,11 +75,11 @@ export function decodeTraceResult(zdata: string): TraceResult | null {
     return {
       target: data.target,
       status: data.status,
-      time: new Date().toISOString(),
-      hops: data.hops.map((h: { i: number; ip: string; l: number; r?: number[]; ls?: number; bs?: number; ws?: number; sd?: number; c: string; co: [number, number]; a?: number; isp?: string }) => ({
+      time: data.time || new Date().toISOString(),
+      hops: data.hops.map((h: { i: number; ip: string; h?: string; l: number; r?: number[]; ls?: number; bs?: number; ws?: number; sd?: number; c: string; co: [number, number]; a?: number; isp?: string; gc?: string }) => ({
         index: h.i,
         ip: h.ip,
-        host: '',
+        host: h.h || '',
         latency: h.l,
         rtts: h.r,
         loss: h.ls ?? 0,
@@ -81,6 +90,7 @@ export function decodeTraceResult(zdata: string): TraceResult | null {
         coords: h.co as [number, number],
         asn: h.a,
         isp: h.isp,
+        geoConfidence: h.gc,
       })),
     };
   } catch {

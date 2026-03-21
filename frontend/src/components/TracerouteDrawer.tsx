@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
-import { Activity, Zap, ExternalLink, Share2, Check } from 'lucide-react';
+import { Activity, Zap, ExternalLink, Share2, Check, Clock, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { buildTracerouteShareUrl } from '../utils/tracerouteShare';
 import { HopTable } from './HopTable';
@@ -10,9 +10,10 @@ import { HopTable } from './HopTable';
 export const TracerouteDrawer: React.FC = () => {
   const { t } = useTranslation();
   const navigate = useNavigate();
-  const { activeResult, isLoading, error } = useTracerouteStore();
+  const { activeResult, isLoading, error, history, selectHistory, clearHistory } = useTracerouteStore();
   const { theme, token } = useDnsStore();
   const [copied, setCopied] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleOpenNewPage = () => {
     if (!activeResult) return;
@@ -41,38 +42,98 @@ export const TracerouteDrawer: React.FC = () => {
           <div className="min-w-0">
             <h2 className={`text-sm font-bold ${isDark ? 'text-slate-100' : 'text-slate-800'} uppercase tracking-tight`}>{t('traceroute_title')}</h2>
             <p className={`text-[10px] font-mono ${isDark ? 'text-cyan-400' : 'text-cyan-600'} uppercase tracking-widest truncate`}>
-              {activeResult ? t('traceroute_target', { ip: activeResult.target }) : (isLoading ? t('traceroute_probing') : t('traceroute_na'))}
+              {activeResult ? (
+                <>
+                  {t('traceroute_target', { ip: activeResult.target })}
+                  {activeResult.cached && (
+                    <span className={`ml-1.5 px-1 py-0.5 rounded text-[9px] ${isDark ? 'bg-amber-500/20 text-amber-300' : 'bg-amber-100 text-amber-600'}`}>
+                      {t('traceroute_cached')}
+                    </span>
+                  )}
+                </>
+              ) : (isLoading ? t('traceroute_probing') : t('traceroute_na'))}
             </p>
           </div>
         </div>
 
-        {activeResult && (
-          <div className="flex items-center gap-1.5 flex-shrink-0">
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {history.length > 0 && (
             <button
-              onClick={handleCopyShare}
-              title={t('traceroute_copy_share')}
+              onClick={() => setShowHistory(!showHistory)}
+              title={t('traceroute_history')}
               className={`p-1.5 rounded-lg border text-xs transition-all ${
-                copied
-                  ? isDark ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                showHistory
+                  ? isDark ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-400' : 'bg-cyan-50 border-cyan-300 text-cyan-600'
                   : isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'
               }`}
             >
-              {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+              <Clock className="h-3.5 w-3.5" />
             </button>
-            <button
-              onClick={handleOpenNewPage}
-              title={t('traceroute_open_new_tab')}
-              className={`p-1.5 rounded-lg border text-xs transition-all ${isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'}`}
-            >
-              <ExternalLink className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        )}
+          )}
+          {activeResult && (
+            <>
+              <button
+                onClick={handleCopyShare}
+                title={t('traceroute_copy_share')}
+                className={`p-1.5 rounded-lg border text-xs transition-all ${
+                  copied
+                    ? isDark ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400' : 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                    : isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'
+                }`}
+              >
+                {copied ? <Check className="h-3.5 w-3.5" /> : <Share2 className="h-3.5 w-3.5" />}
+              </button>
+              <button
+                onClick={handleOpenNewPage}
+                title={t('traceroute_open_new_tab')}
+                className={`p-1.5 rounded-lg border text-xs transition-all ${isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'}`}
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto custom-scrollbar">
-        {isLoading ? (
+        {showHistory ? (
+          /* 歷史紀錄列表 */
+          <div className="p-3 space-y-1.5">
+            <div className="flex items-center justify-between mb-2">
+              <span className={`text-[10px] font-bold uppercase tracking-widest ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                {t('traceroute_history')} ({history.length})
+              </span>
+              <button
+                onClick={clearHistory}
+                className={`flex items-center gap-1 text-[10px] px-2 py-1 rounded transition-colors ${isDark ? 'text-slate-500 hover:text-rose-400 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-500 hover:bg-rose-50'}`}
+              >
+                <Trash2 className="h-3 w-3" />
+                {t('traceroute_clear_history')}
+              </button>
+            </div>
+            {history.map((item, idx) => (
+              <button
+                key={`${item.target}-${item.time}-${idx}`}
+                onClick={() => { selectHistory(idx); setShowHistory(false); }}
+                className={`w-full text-left px-3 py-2.5 rounded-lg border transition-all ${
+                  activeResult?.target === item.target && activeResult?.time === item.time
+                    ? isDark ? 'bg-cyan-500/10 border-cyan-500/30' : 'bg-cyan-50 border-cyan-200'
+                    : isDark ? 'bg-slate-900/50 border-white/5 hover:border-white/10' : 'bg-white border-slate-100 hover:border-slate-200'
+                }`}
+              >
+                <div className={`font-mono text-xs font-bold truncate ${isDark ? 'text-slate-200' : 'text-slate-700'}`}>
+                  {item.target}
+                </div>
+                <div className={`flex items-center gap-2 mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                  <span>{item.hops.length} hops</span>
+                  <span>{item.status}</span>
+                  <span className="ml-auto">{new Date(item.time).toLocaleTimeString()}</span>
+                </div>
+              </button>
+            ))}
+          </div>
+        ) : isLoading ? (
           <div className="h-full flex flex-col items-center justify-center space-y-4">
             <div className="relative">
               <div className={`w-16 h-16 border-4 ${isDark ? 'border-cyan-500/20' : 'border-cyan-100'} rounded-full`}></div>

@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -11,6 +12,7 @@ import (
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/dns"
 	"ocf-srrt/backend/internal/geoip"
+	"ocf-srrt/backend/internal/ratelimit"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/traceroute"
 	"os"
@@ -56,6 +58,39 @@ func parseTrustedProxies() map[string]bool {
 	return proxies
 }
 
+// detectPublicIP 嘗試自動偵測本機公網 IP。
+// 依序嘗試多個 IP 查詢服務，任一成功即回傳。
+func detectPublicIP() string {
+	services := []string{
+		"https://api.ipify.org",
+		"https://icanhazip.com",
+		"https://ifconfig.me/ip",
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	client := &http.Client{}
+	for _, url := range services {
+		req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+		if err != nil {
+			continue
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			continue
+		}
+		body, err := io.ReadAll(io.LimitReader(resp.Body, 64))
+		resp.Body.Close()
+		if err != nil {
+			continue
+		}
+		ip := strings.TrimSpace(string(body))
+		if net.ParseIP(ip) != nil {
+			return ip
+		}
+	}
+	return ""
+}
+
 func main() {
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
 		Level: slog.LevelInfo,
@@ -91,6 +126,14 @@ func main() {
 	// 註冊 session 移除回呼，同步清除 token
 	buffer.SetOnSessionRemoved(tokenStore.RemoveByIP)
 
+	// 初始化 traceroute 速率限制（每 token 每 30 秒 1 次）與並發控制（最多 5 個同時執行）
+	traceLimiter := ratelimit.NewTokenLimiter(30*time.Second, 1)
+	traceSemaphore := ratelimit.NewSemaphore(5)
+
+	// 初始化 traceroute 結果快取（TTL 5 分鐘）
+	traceCache := traceroute.NewCache(5 * time.Minute)
+	defer traceCache.Stop()
+
 	// 初始化 WebSocket Hub
 	hub := api.NewHub()
 	go hub.Run()
@@ -110,6 +153,15 @@ func main() {
 		api.ServeWs(hub, tokenStore, w, r)
 	})
 	dnsPublicIP := os.Getenv("DNS_PUBLIC_IP")
+	if dnsPublicIP == "" {
+		slog.Info("DNS_PUBLIC_IP not set, attempting auto-detection", "component", "main")
+		dnsPublicIP = detectPublicIP()
+		if dnsPublicIP != "" {
+			slog.Info("Auto-detected public IP", "component", "main", "ip", dnsPublicIP)
+		} else {
+			slog.Warn("Could not auto-detect public IP; hop 0 and DNS banner will be unavailable", "component", "main")
+		}
+	}
 	localCountryOverride := os.Getenv("LOCAL_COUNTRY")
 
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
@@ -143,38 +195,12 @@ func main() {
 		}
 		json.NewEncoder(w).Encode(resp)
 	})
-	mux.HandleFunc("/api/traceroute", func(w http.ResponseWriter, r *http.Request) {
-		// 驗證 token，防止未授權的 traceroute 探測
-		token := r.URL.Query().Get("token")
-		if token == "" {
-			http.Error(w, "missing token", http.StatusUnauthorized)
-			return
-		}
-		if _, ok := tokenStore.ValidateToken(token); !ok {
-			http.Error(w, "invalid token", http.StatusUnauthorized)
-			return
-		}
-
-		target := r.URL.Query().Get("target")
-		if target == "" {
-			http.Error(w, "target is required", http.StatusBadRequest)
-			return
-		}
-
-		ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
-		defer cancel()
-
-		result, err := traceroute.Run(ctx, target)
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-
-		// 寫入日誌（若已啟用）
-		traceroute.LogResult(result)
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(result)
+	mux.Handle("/api/traceroute", &api.TracerouteHandler{
+		TokenStore: tokenStore,
+		Limiter:    traceLimiter,
+		Semaphore:  traceSemaphore,
+		Cache:      traceCache,
+		LocalIP:    dnsPublicIP,
 	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -188,7 +214,7 @@ func main() {
 
 	httpServer := &http.Server{
 		Addr:    ":8080",
-		Handler: mux,
+		Handler: api.CORSMiddleware(mux),
 	}
 
 	go func() {

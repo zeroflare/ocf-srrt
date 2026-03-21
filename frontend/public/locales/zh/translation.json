@@ -85,8 +85,8 @@
   "cable_monitor": "海底電纜監控網",
   "cable_tw_routes": "台灣可用路徑",
   "cable_international": "其他國際海纜",
-  "dns_local": "境內 DNS",
-  "dns_foreign": "境外 DNS",
+  "dns_local": "境內目標",
+  "dns_foreign": "境外目標",
   "cable_selected": "已選擇: {{id}}",
   "cable_hint": "提示: 懸停查看",
   "realtime_traffic": "即時流量",
@@ -140,7 +140,7 @@
   "about_tech_title": "技術架構",
   "about_tech_backend": "後端：Go + miekg/dns + GeoIP + WebSocket",
   "about_tech_frontend": "前端：React 19 + TypeScript + Zustand + MapLibre GL",
-  "about_footer": "由 Zeroflare Tech 開發與維護",
+  "about_footer": "由 OCF 開發與維護",
   "back_to_table": "返回列表",
   "refresh": "重新整理",
   "report_export": "匯出報表",
@@ -157,5 +157,9 @@
   "report_cloud": "雲端",
   "report_status": "狀態",
   "report_generated_at": "報告產生於 {{time}}",
-  "cancel": "取消"
+  "cancel": "取消",
+  "traceroute_history": "歷史紀錄",
+  "traceroute_history_empty": "尚無歷史紀錄",
+  "traceroute_clear_history": "清除歷史",
+  "traceroute_cached": "快取結果"
 }

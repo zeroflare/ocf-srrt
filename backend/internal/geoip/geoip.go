@@ -75,7 +75,13 @@ func GetCoords(ipStr string) ([]float64, error) {
 		return nil, err
 	}
 
-	return []float64{record.Location.Longitude, record.Location.Latitude}, nil
+	lat := record.Location.Latitude
+	lon := record.Location.Longitude
+	// [0, 0] 座標（大西洋幾內亞灣）視為無有效地理資料
+	if lat == 0 && lon == 0 {
+		return nil, nil
+	}
+	return []float64{lon, lat}, nil
 }
 
 // GetASN 根據 IP 位址查找 ASN 和 ISP 名稱 (B-05)

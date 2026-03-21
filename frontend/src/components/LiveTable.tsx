@@ -158,6 +158,8 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
           to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
           className="text-cyan-600 dark:text-cyan-400 hover:underline cursor-pointer"
           title={t('start_traceroute')}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           {info.getValue()}
         </Link>
@@ -172,6 +174,8 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
           to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
           className="text-slate-600 dark:text-slate-300 font-mono hover:underline hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
           title={t('start_traceroute')}
+          target="_blank"
+          rel="noopener noreferrer"
         >
           {info.getValue()}
         </Link>

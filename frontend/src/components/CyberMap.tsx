@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import maplibregl, { ExpressionSpecification } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { Feature } from 'geojson';
+import { Feature, Point } from 'geojson';
 import { useCableStore } from '../stores/useCableStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
@@ -140,6 +140,37 @@ export const CyberMap: React.FC = () => {
           'circle-stroke-color': ['get', 'color'],
           'circle-stroke-opacity': 0.4,
         },
+      });
+
+      // DNS node hover popup
+      map.current.on('mouseenter', 'dns-points-core', (e) => {
+        if (!map.current || !popup.current) return;
+        map.current.getCanvas().style.cursor = 'pointer';
+        const feat = e.features?.[0];
+        if (!feat || !feat.properties) return;
+        const coords = (feat.geometry as Point).coordinates.slice() as [number, number];
+        const { ip, domain } = feat.properties;
+        const isForeign = feat.properties.color === '#ef4444';
+        const isDk = useDnsStore.getState().theme === 'dark';
+        const bg = isDk ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)';
+        const text = isDk ? '#e2e8f0' : '#1e293b';
+        const sub = isDk ? '#94a3b8' : '#64748b';
+        const tag = isForeign
+          ? `<span style="color:#ef4444;font-weight:700;font-size:9px;letter-spacing:0.05em">FOREIGN</span>`
+          : `<span style="color:#10b981;font-weight:700;font-size:9px;letter-spacing:0.05em">LOCAL</span>`;
+        popup.current
+          .setLngLat(coords)
+          .setHTML(`<div style="background:${bg};color:${text};padding:8px 12px;border-radius:10px;border:1px solid ${isDk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};font-size:11px;font-family:ui-monospace,monospace;line-height:1.6;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+            <div style="font-weight:700;margin-bottom:2px">${domain || '—'}</div>
+            <div style="color:${sub}">${ip}</div>
+            <div style="margin-top:4px">${tag}</div>
+          </div>`)
+          .addTo(map.current);
+      });
+      map.current.on('mouseleave', 'dns-points-core', () => {
+        if (!map.current || !popup.current) return;
+        map.current.getCanvas().style.cursor = '';
+        popup.current.remove();
       });
     });
 

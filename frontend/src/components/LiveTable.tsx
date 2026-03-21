@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useDnsStore } from '../stores/useDnsStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
-import { Pause, Play, Trash2, Download, Search, GitBranch, Share2, SlidersHorizontal, Radio, Tag, Monitor, FileText } from 'lucide-react';
+import { Trash2, Download, Search, Share2, SlidersHorizontal, Radio, Filter, FileText } from 'lucide-react';
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import { detectCloudProvider } from '../utils/cloudProvider';
@@ -18,16 +18,31 @@ import {
 
 const columnHelper = createColumnHelper<DnsRecord>();
 
+/** 推測標記 badge — 小型標籤顯示推測來源 */
+const InferenceBadge: React.FC<{ label: string; tooltip: string; color?: 'amber' | 'slate' }> = ({ label, tooltip, color = 'amber' }) => (
+  <span
+    title={tooltip}
+    className={`inline-flex items-center ml-1 px-1 py-px rounded text-[8px] font-bold leading-none cursor-help ${
+      color === 'amber'
+        ? 'bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-200 dark:border-amber-500/30'
+        : 'bg-slate-100 dark:bg-slate-700/50 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-600'
+    }`}
+  >
+    {label}
+  </span>
+);
+
 interface LiveTableProps {
   onOpenReport?: () => void;
 }
 
 export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
   const { t } = useTranslation();
-  const { records, isPaused, setPaused, clearRecords, exportToUrl, maxRecords, monitoringIp, selectedRowIds, toggleRowSelection, toggleAllSelection } = useDnsStore();
+  const { records, clearRecords, exportToUrl, maxRecords, monitoringIp, selectedRowIds, toggleRowSelection, toggleAllSelection } = useDnsStore();
   const [globalFilter, setGlobalFilter] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<string | null>(null);
-  const [osFilter, setOsFilter] = useState<string | null>(null);
+  // null = 全選（未操作），Set = 僅顯示 Set 內的 OS（可為空 = 只顯示無 OS 標記的）
+  const [enabledOs, setEnabledOs] = useState<Set<string> | null>(null);
   const [showColumnPicker, setShowColumnPicker] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     sourceIp: false,
@@ -69,11 +84,12 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     if (categoryFilter) {
       result = result.filter(r => r.appCategory === categoryFilter);
     }
-    if (osFilter) {
-      result = result.filter(r => r.os === osFilter);
+    // OS toggle filter：null = 全選不過濾，Set = 只顯示 Set 內的（空 Set = 只顯示無 OS 標記的）
+    if (enabledOs !== null) {
+      result = result.filter(r => !r.os || enabledOs.has(r.os));
     }
     return result;
-  }, [records, categoryFilter, osFilter]);
+  }, [records, categoryFilter, enabledOs]);
 
   const columns = useMemo(() => [
     columnHelper.display({
@@ -116,8 +132,16 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       id: 'appName',
       header: t('app'),
       cell: info => {
-        const appName = info.row.original.appName;
+        const row = info.row.original;
+        const appName = row.appName;
+        const matchMethod = row.appMatchMethod;
+        const isHeuristic = matchMethod === 'heuristic';
         const appInfo = getAppInfoByName(appName);
+
+        const badge = isHeuristic ? (
+          <InferenceBadge label={t('inferred_short')} tooltip={t('inferred_app_heuristic')} />
+        ) : null;
+
         if (appInfo) {
           return (
             <AppInfoTooltip appInfo={appInfo}>
@@ -130,16 +154,22 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
                 />
               )}
               <span className="text-slate-600 dark:text-slate-300">{appName}</span>
+              {badge}
             </AppInfoTooltip>
           );
         }
-        return <span className="text-slate-600 dark:text-slate-300">{appName}</span>;
+        return (
+          <span className="flex items-center">
+            <span className="text-slate-600 dark:text-slate-300">{appName}</span>
+            {badge}
+          </span>
+        );
       },
       size: 150,
     }),
     columnHelper.accessor('type', {
       id: 'type',
-      header: 'TYPE',
+      header: t('type'),
       cell: info => (
         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
           info.getValue() === 'A' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' :
@@ -168,7 +198,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     }),
     columnHelper.accessor('resultIp', {
       id: 'resultIp',
-      header: 'RESULT IP',
+      header: t('result_ip'),
       cell: info => (
         <Link
           to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
@@ -201,6 +231,9 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
               <div className={`w-1.5 h-1.5 rounded-full ${isLocal ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-700'}`} />
             )}
             <span className="text-slate-600 dark:text-slate-400">{country}</span>
+            {country && (
+              <InferenceBadge label="GeoIP" tooltip={t('inferred_geoip')} color="slate" />
+            )}
             {row.isForeign && confidence === 'low' && (
               <span className="text-[9px] text-orange-400 dark:text-orange-500" title={t('confidence_low')}>?</span>
             )}
@@ -211,7 +244,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     }),
     columnHelper.accessor('isp', {
       id: 'isp',
-      header: 'ASN/ISP',
+      header: t('asn') + '/ISP',
       cell: info => {
         const isp = info.getValue();
         const provider = detectCloudProvider(isp);
@@ -234,14 +267,14 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     }),
   ], [t, selectedRowIds, toggleRowSelection, toggleAllSelection, filteredRecords]);
 
-  const allColumnIds = useMemo(() => columns.map(c => (c as any).id as string), [columns]);
+  const allColumnIds = useMemo(() => columns.map(c => (c as any).id as string).filter(id => id !== 'select'), [columns]);
   const columnLabels: Record<string, string> = {
     timestamp: t('time'),
-    sourceIp: 'Source IP',
+    sourceIp: t('source') + ' IP',
     appName: t('app'),
-    type: 'Type',
+    type: t('type'),
     domain: t('domain'),
-    resultIp: 'Result IP',
+    resultIp: t('result_ip'),
     country: t('country'),
     isp: 'ASN/ISP',
   };
@@ -321,37 +354,29 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       >
         {toastMessage}
       </div>
-      {/* Header Bar */}
+      {/* Toolbar */}
       <div className="flex items-center justify-between px-4 py-2 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-white/5">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2 text-cyan-600 dark:text-cyan-400">
-            <GitBranch className="h-4 w-4 rotate-90" />
-            <h2 className="text-sm font-bold uppercase tracking-wider">
-              {t('live_queries')}
-            </h2>
-          </div>
-
-          <div className="relative group">
-            <Search className="absolute left-2 top-1.5 h-3 w-3 text-slate-400 dark:text-slate-500 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors" />
-            <input
-              type="text"
-              value={globalFilter ?? ''}
-              onChange={e => setGlobalFilter(e.target.value)}
-              placeholder={t('search_placeholder')}
-              className="pl-7 pr-3 py-1 bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded text-[10px] focus:outline-none focus:border-cyan-500/50 w-48 text-slate-600 dark:text-slate-300 transition-colors"
-            />
-          </div>
+        <div className="relative group">
+          <Search className="absolute left-2 top-1.5 h-3 w-3 text-slate-400 dark:text-slate-500 group-focus-within:text-cyan-600 dark:group-focus-within:text-cyan-400 transition-colors" />
+          <input
+            type="text"
+            value={globalFilter ?? ''}
+            onChange={e => setGlobalFilter(e.target.value)}
+            placeholder={t('search_placeholder')}
+            className="pl-7 pr-3 py-1 bg-white dark:bg-slate-950/50 border border-slate-200 dark:border-slate-800 rounded text-[10px] focus:outline-none focus:border-cyan-500/50 w-48 text-slate-600 dark:text-slate-300 transition-colors"
+          />
         </div>
 
-        <div className="flex items-center gap-3 text-slate-400 dark:text-slate-500">
+        <div className="flex items-center gap-1 text-slate-500 dark:text-slate-400">
           {/* Column visibility toggle */}
           <div className="relative">
             <button
               onClick={() => setShowColumnPicker(!showColumnPicker)}
-              className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] font-bold uppercase tracking-wider"
               title={t('columns')}
             >
-              <SlidersHorizontal className="h-3.5 w-3.5" />
+              <SlidersHorizontal className="h-3 w-3" />
+              {t('columns')}
             </button>
             {showColumnPicker && (
               <div className="absolute right-0 top-full mt-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 p-3 min-w-[160px]">
@@ -378,88 +403,131 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
           <button
             onClick={onOpenReport}
             disabled={selectedRowIds.size === 0}
-            className={`transition-colors ${selectedRowIds.size > 0 ? 'text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300' : 'opacity-30 cursor-not-allowed'}`}
+            className={`flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wider transition-colors ${
+              selectedRowIds.size > 0
+                ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-100 dark:hover:bg-cyan-900/50 border border-cyan-200 dark:border-cyan-500/30'
+                : 'opacity-30 cursor-not-allowed'
+            }`}
             title={t('report_export')}
           >
-            <FileText className="h-3.5 w-3.5" />
+            <FileText className="h-3 w-3" />
+            {t('report_export')}
             {selectedRowIds.size > 0 && (
-              <span className="ml-0.5 text-[9px] font-bold">{selectedRowIds.size}</span>
+              <span className="ml-0.5 bg-cyan-600 dark:bg-cyan-500 text-white text-[9px] font-bold rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                {selectedRowIds.size}
+              </span>
             )}
           </button>
-          <button onClick={handleShare} className="hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" title={t('share_data')}>
-            <Share2 className="h-3.5 w-3.5" />
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] font-bold uppercase tracking-wider"
+            title={t('share_data')}
+          >
+            <Share2 className="h-3 w-3" />
+            {t('share_data')}
           </button>
-          <div className="h-3 w-px bg-slate-200 dark:bg-slate-800" />
-          <button onClick={() => setPaused(!isPaused)} className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors" title={isPaused ? t('resume') : t('pause')}>
-            {isPaused ? <Play className="h-3.5 w-3.5" /> : <Pause className="h-3.5 w-3.5" />}
+
+          <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+          <button
+            onClick={exportToCSV}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-[10px] font-bold uppercase tracking-wider"
+            title={t('export_csv')}
+          >
+            <Download className="h-3 w-3" />
+            {t('export_csv')}
           </button>
-          <button onClick={exportToCSV} className="hover:text-slate-600 dark:hover:text-slate-300 transition-colors" title={t('export_csv')}>
-            <Download className="h-3.5 w-3.5" />
-          </button>
-          <div className="h-3 w-px bg-slate-200 dark:bg-slate-800" />
-          <button className="hover:text-red-600 dark:hover:text-red-400 transition-colors" onClick={clearRecords} title={t('clear')}>
-            <Trash2 className="h-3.5 w-3.5" />
+
+          <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-0.5" />
+
+          <button
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 transition-colors text-[10px] font-bold uppercase tracking-wider"
+            onClick={clearRecords}
+            title={t('clear')}
+          >
+            <Trash2 className="h-3 w-3" />
+            {t('clear')}
           </button>
         </div>
       </div>
 
-      {/* Category filter chips */}
-      {availableCategories.length > 0 && (
-        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-100 dark:border-white/5 overflow-x-auto">
-          <Tag className="h-3 w-3 text-slate-400 dark:text-slate-600 shrink-0" />
-          <button
-            onClick={() => setCategoryFilter(null)}
-            className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
-              !categoryFilter
-                ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-500/40'
-                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
-            }`}
-          >
-            {t('all') || 'All'}
-          </button>
-          {availableCategories.map(cat => (
-            <button
-              key={cat}
-              onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
-              className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
-                categoryFilter === cat
-                  ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-500/40'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
-              }`}
-            >
-              {cat}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* OS filter chips */}
-      {availableOsTypes.length > 0 && (
-        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-100 dark:border-white/5 overflow-x-auto">
-          <Monitor className="h-3 w-3 text-slate-400 dark:text-slate-600 shrink-0" />
-          <button
-            onClick={() => setOsFilter(null)}
-            className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
-              !osFilter
-                ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-500/40'
-                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
-            }`}
-          >
-            {t('all') || 'All'}
-          </button>
-          {availableOsTypes.map(os => (
-            <button
-              key={os}
-              onClick={() => setOsFilter(osFilter === os ? null : os)}
-              className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider transition-all ${
-                osFilter === os
-                  ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border border-violet-300 dark:border-violet-500/40'
-                  : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
-              }`}
-            >
-              {os}
-            </button>
-          ))}
+      {/* Filters: Category + OS merged */}
+      {(availableCategories.length > 0 || availableOsTypes.length > 0) && (
+        <div className="flex items-center gap-1.5 px-4 py-1.5 bg-slate-50/50 dark:bg-slate-900/30 border-b border-slate-100 dark:border-white/5 overflow-x-auto flex-wrap">
+          <Filter className="h-3 w-3 text-slate-400 dark:text-slate-600 shrink-0" />
+          {/* Category chips */}
+          {availableCategories.length > 0 && (
+            <>
+              <button
+                onClick={() => setCategoryFilter(null)}
+                className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider transition-all ${
+                  !categoryFilter
+                    ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-500/40'
+                    : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
+                }`}
+              >
+                {t('all')}
+              </button>
+              {availableCategories.map(cat => (
+                <button
+                  key={cat}
+                  onClick={() => setCategoryFilter(categoryFilter === cat ? null : cat)}
+                  className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider transition-all ${
+                    categoryFilter === cat
+                      ? 'bg-cyan-100 dark:bg-cyan-500/20 text-cyan-700 dark:text-cyan-400 border border-cyan-300 dark:border-cyan-500/40'
+                      : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 border border-transparent'
+                  }`}
+                >
+                  {t(`cat_${cat.toLowerCase()}`, cat)}
+                </button>
+              ))}
+            </>
+          )}
+          {/* Separator if both exist */}
+          {availableCategories.length > 0 && availableOsTypes.length > 0 && (
+            <div className="h-3 w-px bg-slate-200 dark:bg-slate-700 mx-1 shrink-0" />
+          )}
+          {/* OS toggle chips — 全亮 = 不過濾，點擊切換開/關 */}
+          {availableOsTypes.length > 0 && (
+            <>
+              {availableOsTypes.map(os => {
+                const isActive = enabledOs === null || enabledOs.has(os);
+                return (
+                  <button
+                    key={os}
+                    onClick={() => {
+                      setEnabledOs(prev => {
+                        if (prev === null) {
+                          // 從「全選」狀態 → 關掉這一個 = 啟用其他所有
+                          const next = new Set<string>();
+                          for (const o of availableOsTypes) {
+                            if (o !== os) next.add(o);
+                          }
+                          return next;
+                        }
+                        const next = new Set(prev);
+                        if (next.has(os)) {
+                          next.delete(os);
+                        } else {
+                          next.add(os);
+                        }
+                        // 全部重新啟用 → 回到 null（全選）
+                        if (next.size === availableOsTypes.length) return null;
+                        return next;
+                      });
+                    }}
+                    className={`shrink-0 px-2 py-0.5 rounded text-[10px] font-bold tracking-wider transition-all border ${
+                      isActive
+                        ? 'bg-violet-100 dark:bg-violet-500/20 text-violet-700 dark:text-violet-400 border-violet-300 dark:border-violet-500/40'
+                        : 'text-slate-400/40 dark:text-slate-600 border-transparent line-through decoration-slate-300 dark:decoration-slate-600'
+                    }`}
+                  >
+                    {t(`os_${os.toLowerCase()}`, os)}
+                  </button>
+                );
+              })}
+            </>
+          )}
         </div>
       )}
 

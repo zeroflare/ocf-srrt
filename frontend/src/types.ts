@@ -47,6 +47,14 @@ export interface DnsRecord {
     // 對應 Go: Longitude/Latitude float64
     longitude?: number;
     latitude?: number;
+
+    // 推測標記欄位
+    // 對應 Go: AppMatchMethod string — "exact" / "regex" / "heuristic" / ""
+    appMatchMethod?: 'exact' | 'regex' | 'heuristic' | '';
+    // 對應 Go: OsInferred bool — OS 一律為推測
+    osInferred?: boolean;
+    // 對應 Go: GeoInferred bool — GeoIP 資料庫推估
+    geoInferred?: boolean;
 }
 
 export interface Hop {

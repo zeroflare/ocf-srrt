@@ -20,4 +20,9 @@ type DNSQueryRecord struct {
 	OS                string    `json:"os,omitempty"`
 	Longitude         float64   `json:"longitude,omitempty"`
 	Latitude          float64   `json:"latitude,omitempty"`
+
+	// 推測標記欄位 — 標示各欄位的推測程度
+	AppMatchMethod string `json:"appMatchMethod,omitempty"` // "exact" / "regex" / "heuristic" / ""
+	OsInferred     bool   `json:"osInferred,omitempty"`     // OS 一律為推測
+	GeoInferred    bool   `json:"geoInferred,omitempty"`    // GeoIP 資料庫推估
 }

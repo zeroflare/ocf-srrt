@@ -81,8 +81,25 @@ func LoadRules(path string) {
 	})
 }
 
-// IdentifyApp 根據域名識別 App
-func IdentifyApp(domain string) (string, string) {
+// MatchMethod 表示辨識所使用的比對方式
+type MatchMethod string
+
+const (
+	MatchExact     MatchMethod = "exact"     // 精確 / 後綴規則命中
+	MatchRegex     MatchMethod = "regex"     // 正規表達式規則命中
+	MatchHeuristic MatchMethod = "heuristic" // 啟發式推測（從 SLD 擷取）
+	MatchNone      MatchMethod = ""          // 完全未命中 (Unknown)
+)
+
+// AppResult 包含辨識結果與比對方式
+type AppResult struct {
+	Name        string      `json:"name"`
+	Category    string      `json:"category"`
+	MatchMethod MatchMethod `json:"matchMethod"`
+}
+
+// IdentifyApp 根據域名識別 App，並回傳比對方式
+func IdentifyApp(domain string) AppResult {
 	// 1. 資料清理：移除末尾的點，轉小寫
 	cleanDomain := strings.TrimSuffix(strings.ToLower(domain), ".")
 
@@ -94,7 +111,7 @@ func IdentifyApp(domain string) (string, string) {
 			// 避免 google.com 匹配到 notgoogle.com，但允許 www.google.com
 			if !strings.Contains(pattern, "*") {
 				if cleanDomain == pattern || strings.HasSuffix(cleanDomain, "."+pattern) {
-					return rule.Name, rule.Category
+					return AppResult{Name: rule.Name, Category: rule.Category, MatchMethod: MatchExact}
 				}
 			}
 		}
@@ -103,7 +120,7 @@ func IdentifyApp(domain string) (string, string) {
 	// B. Regex 比對 (針對有 wildcard 的規則)
 	for _, cr := range compiledRules {
 		if cr.Regexp.MatchString(cleanDomain) {
-			return cr.Rule.Name, cr.Rule.Category
+			return AppResult{Name: cr.Rule.Name, Category: cr.Rule.Category, MatchMethod: MatchRegex}
 		}
 	}
 
@@ -111,10 +128,10 @@ func IdentifyApp(domain string) (string, string) {
 	// 如果規則都沒中，嘗試從網域中提取主名稱
 	guessedName := extractSLD(cleanDomain)
 	if guessedName != "" {
-		return capitalize(guessedName), "General"
+		return AppResult{Name: capitalize(guessedName), Category: "General", MatchMethod: MatchHeuristic}
 	}
 
-	return "Unknown", "General"
+	return AppResult{Name: "Unknown", Category: "General", MatchMethod: MatchNone}
 }
 
 // extractSLD 提取二級網域 (SLD)

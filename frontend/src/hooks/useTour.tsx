@@ -86,7 +86,8 @@ export const useTour = (theme: 'dark' | 'light') => {
       content: t('tour_monitoring_content'),
     },
     {
-      target: '.tour-dashboard',
+      target: 'body',
+      placement: 'center' as const,
       title: t('tour_dashboard_title'),
       content: t('tour_dashboard_content'),
     },

@@ -72,6 +72,10 @@ export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
     os: Math.random() > 0.5 ? 'Windows' : (Math.random() > 0.5 ? 'macOS' : 'iOS'),
     longitude: lon,
     latitude: lat,
+    // 推測標記：隨機分配以模擬真實情境
+    appMatchMethod: Math.random() > 0.6 ? 'exact' : (Math.random() > 0.5 ? 'regex' : 'heuristic'),
+    osInferred: true,
+    geoInferred: true,
   };
 };
 

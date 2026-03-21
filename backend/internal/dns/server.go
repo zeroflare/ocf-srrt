@@ -362,7 +362,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 
 		asn, isp, _ := geoip.GetASN(resultIP)
 		coords, _ := geoip.GetCoords(resultIP)
-		appName, appCat := recognition.IdentifyApp(question.Name)
+		appResult := recognition.IdentifyApp(question.Name)
 
 		// OS Fingerprinting: 嘗試從域名推斷 OS，結果快取在 Per-IP osCache 中
 		detectedOS := ""
@@ -386,16 +386,19 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			Country:           resultCountry,
 			ASN:               asn,
 			ISP:               isp,
-			AppName:           appName,
-			AppCategory:       appCat,
+			AppName:           appResult.Name,
+			AppCategory:       appResult.Category,
 			OS:                detectedOS,
+			AppMatchMethod:    string(appResult.MatchMethod),
+			OsInferred:        detectedOS != "",
+			GeoInferred:       resultCountry != "",
 		}
 		if coords != nil && len(coords) == 2 {
 			record.Longitude = coords[0]
 			record.Latitude = coords[1]
 		}
 
-		slog.Info("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appName, "sourceIp", sourceIp)
+		slog.Info("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)
 
 		// 存入 Ring Buffer
 		buffer.Add(sourceIp, record)

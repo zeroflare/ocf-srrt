@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, Suspense, lazy } from 'react';
+import { useState, useCallback, useEffect, useMemo, Suspense, lazy } from 'react';
 import { Routes, Route } from 'react-router';
 import { useDnsStore } from './stores/useDnsStore';
 
@@ -13,55 +13,33 @@ import { useTour } from './hooks/useTour';
 import { useTracerouteStore } from './stores/useTracerouteStore';
 import { useCableStore } from './stores/useCableStore';
 import { LiveTable } from './components/LiveTable';
-import { TrafficDashboard } from './components/TrafficDashboard';
-import { LiveTrafficChart } from './components/LiveTrafficChart';
+// TrafficDashboard 已內聯至監控控制區塊
 import { CyberMap } from './components/CyberMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { DnsSetupBanner } from './components/DnsSetupBanner';
+import { DnsSetupBanner, DnsServerBadge } from './components/DnsSetupBanner';
 import { useTranslation } from 'react-i18next';
-import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, TableProperties, BarChart3, PieChart, RefreshCw } from 'lucide-react';
+import { Shield, Search, Activity, LayoutPanelLeft, Sun, Moon, BookOpen, AlertTriangle, TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import { AboutModal } from './components/AboutModal';
-import { Tooltip } from './components/Tooltip';
 import { ReportModal, ReportData, AppInfo } from './components/ReportModal';
 import { ReportView } from './components/ReportView';
 import { buildReportUrl } from './utils/reportShare';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 
-type TabKey = 'table' | 'chart' | 'stats';
+// tabs removed — table is the only view
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, maxRecords, localCountry, setLocalCountry } = useDnsStore();
+  const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, isPaused, setPaused, totalQueries, foreignQueries, records } = useDnsStore();
   const { activeResult: traceActiveResult } = useTracerouteStore();
-  const { isConnected, reconnectDelay, myIp } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
+  const { myIp } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
-  const [activeTab, setActiveTab] = useState<TabKey>('table');
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [lastAppInfo, setLastAppInfo] = useState<AppInfo | undefined>(undefined);
 
   useSharedReport();
 
-  const refreshLocalCountry = useCallback(async () => {
-    localStorage.removeItem('localCountry');
-    localStorage.removeItem('localCountryUpdatedAt');
-    try {
-      const resp = await fetch(import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/token` : '/api/token');
-      if (resp.ok) {
-        const data = await resp.json();
-        if (data.localCountry) {
-          setLocalCountry(data.localCountry);
-          localStorage.setItem('localCountry', data.localCountry);
-          localStorage.setItem('localCountryUpdatedAt', new Date().toISOString());
-        }
-      }
-    } catch { /* ignore */ }
-  }, [setLocalCountry]);
-
-  // Sync .dark class to <html> so that:
-  // 1. body dark: styles in index.css work
-  // 2. Portal components (Tooltip) inherit dark mode
-  // 3. .dark .foo CSS selectors work globally
+  // Sync .dark class to <html> so that Tailwind dark mode works globally
   useEffect(() => {
     const root = document.documentElement;
     if (theme === 'dark') {
@@ -72,6 +50,7 @@ function App() {
   }, [theme]);
 
   const [runTour, setRunTour] = useState(() => !localStorage.getItem('srrt_tour_done'));
+  const [tourKey, setTourKey] = useState(0);
   const [showRightPanel, setShowRightPanel] = useState(true);
   const [rightPanelWidth, setRightPanelWidth] = useState(50); // 預設 50%
   const [isResizing, setIsResizing] = useState(false);
@@ -145,15 +124,36 @@ function App() {
     setIpInput('');
   };
 
-  const tabs: { key: TabKey; label: string; icon: React.ReactNode }[] = [
-    { key: 'table', label: t('tab_table'), icon: <TableProperties className="h-3.5 w-3.5" /> },
-    { key: 'chart', label: t('tab_chart'), icon: <BarChart3 className="h-3.5 w-3.5" /> },
-    { key: 'stats', label: t('tab_stats'), icon: <PieChart className="h-3.5 w-3.5" /> },
-  ];
+  // 內聯流量統計
+  const percentageVal = totalQueries > 0 ? (foreignQueries / totalQueries) * 100 : 0;
+  const foreignPercentage = percentageVal.toFixed(1);
+
+  const recentForeignPct = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now - 30_000;
+    const recent = records.filter(r => new Date(r.timestamp).getTime() > cutoff);
+    if (recent.length === 0) return 0;
+    const recentForeign = recent.filter(r => r.isForeign).length;
+    return (recentForeign / recent.length) * 100;
+  }, [records]);
+
+  const trend = useMemo(() => {
+    const diff = percentageVal - recentForeignPct;
+    if (Math.abs(diff) < 1) return 'stable';
+    return diff > 0 ? 'up' : 'down';
+  }, [percentageVal, recentForeignPct]);
+
+  const burstCount = useMemo(() => {
+    const now = Date.now();
+    const cutoff = now - 10_000;
+    const recentCount = records.filter(r => new Date(r.timestamp).getTime() > cutoff).length;
+    return recentCount > 20 ? recentCount : 0;
+  }, [records]);
 
   return (
       <div className={`relative w-screen h-screen ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-slate-50 text-slate-900'} overflow-hidden font-sans transition-colors duration-300`}>
         <Joyride
+          key={tourKey}
           steps={tourSteps}
           run={runTour}
           continuous
@@ -204,7 +204,20 @@ function App() {
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 relative" style={{ zIndex: 10001 }}>
+                  <div className="flex items-center gap-1.5 relative" style={{ zIndex: 10001 }}>
+                    <DnsServerBadge />
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem('srrt_tour_done');
+                        setTourKey(k => k + 1);
+                        setRunTour(true);
+                      }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 bg-slate-100 dark:bg-slate-900/60 hover:bg-slate-200 dark:hover:bg-slate-800/80 rounded-lg text-slate-600 dark:text-slate-300 transition-all border border-slate-200 dark:border-white/10 text-[11px] font-bold"
+                    >
+                      <BookOpen className="h-3.5 w-3.5" />
+                      {t('guided_tour')}
+                    </button>
+                    <DnsSetupBanner />
                     <AboutModal />
                     <button
                       onClick={toggleTheme}
@@ -222,15 +235,18 @@ function App() {
                 </div>
               </div>
 
-              {/* DNS Setup Banner */}
-              <DnsSetupBanner />
-
               {/* IP Monitoring Controller */}
               <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5">
                 <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md p-4 rounded-xl border border-slate-200 dark:border-white/10 shadow-xl tour-monitoring transition-colors">
                   <h3 className="text-xs font-bold mb-3 text-slate-500 dark:text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
                     <Search className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
                     {t('monitoring_control')}
+                    {burstCount > 0 && (
+                      <span className="flex items-center gap-1 ml-auto px-2 py-0.5 bg-red-50 dark:bg-red-500/10 border border-red-200 dark:border-red-500/30 rounded text-[9px] font-bold text-red-600 dark:text-red-400 animate-pulse normal-case tracking-normal">
+                        <AlertTriangle className="h-3 w-3" />
+                        {t('burst_alert', { count: burstCount })}
+                      </span>
+                    )}
                   </h3>
                   {!monitoringIp ? (
                     <div className="space-y-3">
@@ -258,134 +274,70 @@ function App() {
                       )}
                     </div>
                   ) : (
-                    <div className={`flex items-center justify-between ${isSharedReport ? 'bg-amber-100/50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-500/30' : 'bg-cyan-50 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-500/30'} border p-3 rounded-lg`}>
-                      <div>
-                        <span className={`text-[9px] ${isSharedReport ? 'text-amber-600 dark:text-amber-300' : 'text-cyan-600 dark:text-cyan-300'} block uppercase font-bold tracking-widest mb-1`}>
-                          {isSharedReport ? t('shared_report_tag') : t('monitoring_active')}
-                        </span>
-                        <span className={`text-lg font-mono ${isSharedReport ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-600 dark:text-cyan-400'} font-bold`}>{monitoringIp}</span>
+                    <>
+                      <div className={`${isSharedReport ? 'bg-amber-100/50 dark:bg-amber-900/30 border-amber-300 dark:border-amber-500/30' : 'bg-cyan-50 dark:bg-cyan-900/30 border-cyan-200 dark:border-cyan-500/30'} border p-3 rounded-lg`}>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className={`text-[9px] ${isSharedReport ? 'text-amber-600 dark:text-amber-300' : 'text-cyan-600 dark:text-cyan-300'} block uppercase font-bold tracking-widest mb-1`}>
+                              {isSharedReport ? t('shared_report_tag') : t('monitoring_active')}
+                            </span>
+                            <span className={`text-lg font-mono ${isSharedReport ? 'text-amber-600 dark:text-amber-400' : 'text-cyan-600 dark:text-cyan-400'} font-bold`}>{monitoringIp}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <button
+                              onClick={() => setPaused(!isPaused)}
+                              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors border ${
+                                isPaused
+                                  ? 'bg-cyan-50 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400 border-cyan-200 dark:border-cyan-500/30 hover:bg-cyan-100 dark:hover:bg-cyan-900/50'
+                                  : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border-slate-200 dark:border-transparent hover:bg-slate-50 dark:hover:bg-slate-700'
+                              }`}
+                            >
+                              {isPaused ? t('resume') : t('pause')}
+                            </button>
+                            <button
+                              onClick={handleStopMonitoring}
+                              className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-800 hover:bg-red-50 dark:hover:bg-red-900/20 text-slate-400 hover:text-red-600 dark:hover:text-red-400 border border-slate-200 dark:border-transparent transition-colors"
+                            >
+                              {t('stop')}
+                            </button>
+                          </div>
+                        </div>
+                        {/* 內聯流量統計 */}
+                        <div className="flex items-center gap-4 mt-2 pt-2 border-t border-cyan-200/50 dark:border-cyan-500/20">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">{t('total_queries')}</span>
+                            <span className="text-sm font-bold font-mono text-slate-800 dark:text-slate-100">{totalQueries.toLocaleString()}</span>
+                          </div>
+                          <div className="w-px h-4 bg-slate-200 dark:bg-slate-700" />
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[9px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-bold">{t('foreign_traffic')}</span>
+                            <span className={`text-sm font-bold font-mono ${percentageVal > 50 ? 'text-red-500 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                              {foreignPercentage}%
+                            </span>
+                            {totalQueries > 0 && (
+                              <span className={`flex items-center ${
+                                trend === 'up' ? 'text-red-500 dark:text-red-400' :
+                                trend === 'down' ? 'text-emerald-500 dark:text-emerald-400' :
+                                'text-slate-400 dark:text-slate-500'
+                              }`}>
+                                {trend === 'up' && <TrendingUp className="h-3 w-3" />}
+                                {trend === 'down' && <TrendingDown className="h-3 w-3" />}
+                                {trend === 'stable' && <Minus className="h-3 w-3" />}
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <button
-                        onClick={handleStopMonitoring}
-                        className="bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700 p-2 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white border border-slate-200 dark:border-transparent transition-colors shadow-sm"
-                      >
-                        {t('stop')}
-                      </button>
-                    </div>
+                    </>
                   )}
                 </div>
               </div>
 
-              {/* Tab bar */}
-              <div className="flex border-b border-slate-200 dark:border-white/10 px-5">
-                {tabs.map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key)}
-                    className={`relative flex items-center gap-2 px-4 py-2.5 text-xs font-bold uppercase tracking-wider transition-all border-b-2 -mb-px ${
-                      activeTab === tab.key
-                        ? 'text-cyan-600 dark:text-cyan-400 border-cyan-500'
-                        : 'text-slate-400 dark:text-slate-500 border-transparent hover:text-slate-600 dark:hover:text-slate-300'
-                    }`}
-                  >
-                    {tab.icon}
-                    {tab.label}
-                  </button>
-                ))}
-              </div>
-
-              {/* Tab content — fills remaining height */}
+              {/* Table — fills remaining height */}
               <div className="flex-1 overflow-hidden flex flex-col">
-                {activeTab === 'table' && (
-                  <ErrorBoundary>
-                    <LiveTable onOpenReport={() => setShowReportModal(true)} />
-                  </ErrorBoundary>
-                )}
-
-                {activeTab === 'chart' && (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5 space-y-5 flex flex-col">
-                    <LiveTrafficChart className="flex-1 min-h-0 bg-slate-50 dark:bg-slate-900/50 transition-colors" />
-
-                    {/* System Status Panel */}
-                    <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md p-5 rounded-xl border border-slate-200 dark:border-white/10 shadow-xl transition-colors">
-                      <h3 className="text-xs font-bold mb-4 text-slate-500 dark:text-slate-400 uppercase tracking-wider font-sans">
-                        {t('system_status')}
-                      </h3>
-                      <div className="space-y-3 text-xs">
-                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
-                          <div className="flex items-center gap-1">
-                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('local_country')}:</span>
-                            <Tooltip text={t('tip_local_country')} />
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-blue-600 dark:text-blue-400 font-bold bg-blue-100 dark:bg-blue-400/10 px-2 py-0.5 rounded">{localCountry || '—'}</span>
-                            <button onClick={refreshLocalCountry} className="text-slate-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors" title={t('refresh')}>
-                              <RefreshCw className="w-3 h-3" />
-                            </button>
-                          </div>
-                        </div>
-
-                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
-                          <div className="flex items-center gap-1">
-                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('websocket_status')}:</span>
-                            <Tooltip text={t('tip_websocket_status')} />
-                          </div>
-                          <span className={`font-bold flex items-center gap-2 ${
-                              isSharedReport ? 'text-amber-600 dark:text-amber-400' : (isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-500')
-                          }`}>
-                            <span className={`w-1.5 h-1.5 rounded-full ${
-                                isSharedReport ? 'bg-amber-600 dark:bg-amber-400' : (isConnected ? 'bg-green-600 dark:bg-green-400 animate-pulse' : 'bg-red-600 dark:bg-red-500 animate-pulse')
-                            }`}></span>
-                            {isSharedReport ? t('static_report') : (isConnected ? t('connected') : (
-                              <>
-                                {t('disconnected')}
-                                {reconnectDelay !== null && (
-                                  <span className="ml-1 text-[10px] opacity-70">
-                                    ({t('reconnecting_in', { seconds: Math.ceil(reconnectDelay / 1000) })})
-                                  </span>
-                                )}
-                              </>
-                            ))}
-                          </span>
-                        </div>
-
-                        <div className="flex justify-between items-center py-2 border-b border-slate-200 dark:border-white/5 font-mono">
-                          <div className="flex items-center gap-1">
-                            <span className="text-slate-400 dark:text-slate-500 uppercase">{t('max_logs')}:</span>
-                            <Tooltip text={t('tip_max_logs')} />
-                          </div>
-                          <span className="text-slate-600 dark:text-slate-300">{maxRecords}</span>
-                        </div>
-
-                        <div className="flex justify-between items-center py-2 font-mono">
-                          <span className="text-slate-400 dark:text-slate-500 uppercase">{t('guided_tour')}:</span>
-                          <button
-                            onClick={() => {
-                              localStorage.removeItem('srrt_tour_done');
-                              setRunTour(true);
-                            }}
-                            className="text-[10px] font-bold text-cyan-600 dark:text-cyan-400 hover:text-cyan-700 dark:hover:text-cyan-300 transition-colors uppercase tracking-wider"
-                          >
-                            {t('replay_tour')}
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'stats' && (
-                  <div className="flex-1 overflow-y-auto custom-scrollbar p-5">
-                    <div className="bg-slate-50 dark:bg-slate-900/50 backdrop-blur-md rounded-xl border border-slate-200 dark:border-white/10 shadow-xl p-5 transition-colors tour-dashboard">
-                      <h3 className="text-xs font-bold mb-4 text-slate-500 dark:text-slate-400 flex items-center gap-2 uppercase tracking-wider font-sans">
-                        <Activity className="h-3.5 w-3.5 text-slate-400 dark:text-slate-500" />
-                        {t('dashboard')}
-                      </h3>
-                      <TrafficDashboard expanded className="p-0 bg-transparent border-none shadow-none" />
-                    </div>
-                  </div>
-                )}
-
+                <ErrorBoundary>
+                  <LiveTable onOpenReport={() => setShowReportModal(true)} />
+                </ErrorBoundary>
               </div>
 
               <footer className="px-4 py-3 text-center text-slate-400 dark:text-slate-600 text-[9px] uppercase tracking-widest bg-white dark:bg-slate-950 border-t border-slate-100 dark:border-white/5">

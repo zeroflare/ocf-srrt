@@ -4,9 +4,7 @@
 FROM golang:1.25-alpine AS builder
 
 # 安裝編譯所需的系統依賴
-# libpcap-dev: gopacket 需要 CGO binding
-# gcc, musl-dev: 編譯 CGO 必須
-RUN apk add --no-cache git gcc musl-dev libpcap-dev
+RUN apk add --no-cache git
 
 WORKDIR /app
 
@@ -19,10 +17,8 @@ RUN go mod download
 COPY . .
 
 # 編譯設定
-# 1. CGO_ENABLED=1: 因為我們需要 libpcap (gopacket)
-# 2. -ldflags="-s -w": 移除除錯訊息 (Symbol Table)，大幅縮小二進位檔案體積
-# 3. 注意：請確認您的 main.go 路徑，這裡假設是 ./cmd/main.go (依據上一步驟)
-RUN CGO_ENABLED=1 GOOS=linux go build \
+# -ldflags="-s -w": 移除除錯訊息 (Symbol Table)，大幅縮小二進位檔案體積
+RUN CGO_ENABLED=0 GOOS=linux go build \
     -ldflags="-s -w" \
     -o dns-analyzer ./cmd/main.go
 
@@ -32,10 +28,10 @@ RUN CGO_ENABLED=1 GOOS=linux go build \
 FROM alpine:latest
 
 # 安裝執行期依賴
-# libpcap: 執行期需要此 library 才能抓封包
 # tzdata: 設定時區 (Log 時間才會正確)
 # ca-certificates: 支援 HTTPS 請求
-RUN apk --no-cache add ca-certificates libpcap tzdata mtr
+# mtr: MTR 路徑追蹤工具
+RUN apk --no-cache add ca-certificates tzdata mtr
 
 # 設定時區為台北 (方便除錯 Log)
 ENV TZ=Asia/Taipei

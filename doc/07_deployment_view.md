@@ -54,5 +54,5 @@ graph TB
 
 ## Runtime Dependencies
 - Backend Docker 映像需安裝 `mtr` 套件（alpine: `apk add mtr`），用於 MTR 路徑追蹤功能。
-- MTR API timeout 設為 60 秒，以容納 `--report-cycles 10` 在高延遲網路的執行時間。
-- Dockerfile 使用多階段建構（multi-stage build）：`golang:1.25-alpine`（builder）→ `alpine:latest`（runner）。
+- MTR API timeout 設為 60 秒，以容納 `--report-cycles 1 --max-ttl 30` 在高延遲網路的執行時間。支援 TCP（預設 port 443）與 ICMP 模式。
+- Dockerfile 使用多階段建構（multi-stage build）：`golang:1.25-alpine`（builder，go.mod 要求 Go 1.24+）→ `alpine:latest`（runner）。純靜態編譯（`CGO_ENABLED=0`），無 CGO 依賴。

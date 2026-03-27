@@ -7,7 +7,6 @@
 - **URL Sharing Size Limit**: pako 壓縮後的 `?zdata=` 參數受瀏覽器 URL 長度限制（~2KB-8KB depending on browser），大量資料可能無法分享。
 
 ## Technical Debt
-- **libpcap 殘留**: Dockerfile 仍安裝 `libpcap-dev`（builder stage）與 `libpcap`（runner stage），但實際已不使用 gopacket，可移除以減少映像大小。
 - **Traceroute Rate Limiting 已停用**: `traceroute_handler.go` 中的 per-token rate limiting 目前被註解停用（有 TODO），僅依賴 semaphore 做全域併發限制。
 - `mtr --json` 輸出格式可能因版本差異而不同（例如 key 名稱），Dockerfile 應固定套件版本以降低風險。
 - 應用程式識別規則 (`apps.json`) 需要持續維護。
@@ -17,4 +16,8 @@
 
 ## 已解決
 - ~~Hardcoded DNS IP `35.221.247.16` 寫死於前端~~ → 已透過整合 `DnsSetupBanner`（動態讀取 `window.location.hostname`）解決。
-- ~~使用 gopacket 封包擷取需要 libpcap 依賴~~ → 已遷移至 `miekg/dns` 純 Go DNS Proxy 模式，不再需要 libpcap（但 Dockerfile 中尚未清除）。
+- ~~使用 gopacket 封包擷取需要 libpcap 依賴~~ → 已遷移至 `miekg/dns` 純 Go DNS Proxy 模式；Dockerfile 已移除 libpcap，改為 `CGO_ENABLED=0` 純靜態編譯。
+- ~~GeoIP 只取 Country + 座標，未利用 City DB 的城市級欄位~~ → 已擴充 `GeoResult` 加入 City、Subdivision，前後端同步顯示。
+- ~~DNS server.go 分三次呼叫 `GetCountry`+`GetCoords`+`GetASN`~~ → 已合併為一次 `GetAll()` 呼叫，減少 MMDB I/O。
+- ~~同座標 Traceroute 跳點在地圖上重疊不可辨識~~ → 已實作 `spreadOverlappingHops` 散開邏輯，CyberMap 與 TraceMap 共用。
+- ~~IPv6 地址觸發 Traceroute 導致 HTTP 500~~ → 後端偵測 IPv6 並嘗試 rDNS→IPv4 轉換，失敗回傳 400；前端 IPv6 改用 Domain 發起追蹤。

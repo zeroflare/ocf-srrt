@@ -1,10 +1,27 @@
 package auth
 
 import (
+	"net"
 	"sync"
 
 	"github.com/google/uuid"
 )
+
+// CanonicalizeIP 正規化 IP 字串：
+//   - IPv4-mapped IPv6（::ffff:10.0.0.1）→ 轉為 IPv4（10.0.0.1）
+//   - IPv6 壓縮/展開不一致 → 統一為 net.IP.String() 標準格式
+//   - 無效字串原樣回傳
+func CanonicalizeIP(ip string) string {
+	parsed := net.ParseIP(ip)
+	if parsed == nil {
+		return ip
+	}
+	// To4() 會把 IPv4-mapped IPv6 轉為 IPv4
+	if v4 := parsed.To4(); v4 != nil {
+		return v4.String()
+	}
+	return parsed.String()
+}
 
 // TokenStore 管理 Token ↔ IP 的雙向映射，純記憶體儲存
 type TokenStore struct {
@@ -22,8 +39,9 @@ func NewTokenStore() *TokenStore {
 	}
 }
 
-// GetOrCreateToken 冪等地為 IP 取得或建立 token
+// GetOrCreateToken 冪等地為 IP 取得或建立 token（自動正規化 IP）
 func (ts *TokenStore) GetOrCreateToken(ip string) string {
+	ip = CanonicalizeIP(ip)
 	ts.mu.RLock()
 	if token, ok := ts.byIP[ip]; ok {
 		ts.mu.RUnlock()

@@ -1,10 +1,11 @@
 # 08. Concepts
 
 ## Domain Model
-- **DnsQueryRecord**: 代表單次 DNS 查詢與其富化後的資訊（GeoIP、ASN/ISP、應用識別、OS 指紋、境外偵測結果）。
+- **DnsQueryRecord**: 代表單次 DNS 查詢與其富化後的資訊（Country、City、Subdivision、ASN/ISP、座標、應用識別、OS 指紋、境外偵測結果）。
+- **GeoResult**: 合併 GeoIP 查詢結果（Country、City、Subdivision、Coords、ASN、ISP），透過 `GetAll()` 一次查詢取得。
 - **AppRule**: 應用程式識別規則（exact/regex/heuristic）。
-- **Hop**: Traceroute 中的單一跳點（含延遲統計、GeoIP、geoConfidence）。
-- **TraceResult**: 完整的 Traceroute 結果（target、hops、status、cached）。
+- **Hop**: Traceroute 中的單一跳點（含 City、Subdivision、延遲統計、GeoIP、geoConfidence）。
+- **TraceResult**: 完整的 Traceroute 結果（target、resolvedIP、hops、status、cached、mode、port、可觀測性欄位）。
 
 ## App Recognition (Three-tier)
 
@@ -39,11 +40,11 @@ graph LR
 |-------|-----|-----|------|
 | DNS Response | `domain:qtype` | 30s | 避免重複 DNS 轉發 |
 | Probe Result | IP address | 10min | 避免重複 ICMP Ping |
-| Traceroute Result | target (lowercased) | 5min | 避免重複 MTR 執行 |
+| Traceroute Result | `target:mode:port` (lowercased) | 5min | 避免重複 MTR 執行（區分 TCP/ICMP 模式） |
 
 ## User Interface Concepts
 - **Dynamic Layout**: 提供地圖與資訊面板的可調節分割視窗（Resizable Split Panel），適應不同螢幕需求。
-- **Interactive Tracing**: 在日誌中點擊目標 Domain 或 IP 直接啟動 Traceroute 追蹤（開啟 TracerouteDrawer）。
+- **Interactive Tracing**: 在日誌中點擊目標 Domain 或 IP 直接啟動 Traceroute 追蹤（開啟新分頁 TraceroutePage）。IPv6 地址自動改用 Domain 發起追蹤。
 - **Cloud Detection**: 前端根據 ASN/ISP 自動標註雲端或 CDN 供應商（AWS, GCP, Cloudflare...）。
 - **Onboarding**: DnsSetupBanner（DNS 設定說明）+ react-joyride 引導式導覽。
 - **Report & Share**: ReportModal 產生分析報告，支援 URL 壓縮分享（pako deflate → Base64）。

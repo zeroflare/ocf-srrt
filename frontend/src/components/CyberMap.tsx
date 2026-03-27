@@ -5,7 +5,7 @@ import { Feature, Point } from 'geojson';
 import { useCableStore } from '../stores/useCableStore';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
-import { calculateDistance, createCurve } from '../utils/geo';
+import { calculateDistance, createCurve, spreadOverlappingHops } from '../utils/geo';
 import { addCableSources, addCableLayers, setupCableInteractions } from '../utils/cableLayer';
 import { useTranslation } from 'react-i18next';
 import { Radio, Search } from 'lucide-react';
@@ -108,11 +108,51 @@ export const CyberMap: React.FC = () => {
         clickToSelect: t('cable_click_to_select'),
       });
 
-      // DNS query points source
-      map.current.addSource('dns-points', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] },
+      // Traceroute source（資料由 activeResult useEffect 更新）
+      if (!map.current.getSource('traceroute')) {
+        map.current.addSource('traceroute', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+      }
+
+      // Traceroute hop 節點 hover popup
+      map.current.on('mouseenter', 'trace-nodes', (e) => {
+        if (!map.current || !popup.current) return;
+        map.current.getCanvas().style.cursor = 'pointer';
+        const feat = e.features?.[0];
+        if (!feat || !feat.properties) return;
+        const coords = (feat.geometry as Point).coordinates.slice() as [number, number];
+        const p = feat.properties;
+        const isDk = useDnsStore.getState().theme === 'dark';
+        const bg = isDk ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)';
+        const text = isDk ? '#e2e8f0' : '#1e293b';
+        const sub = isDk ? '#94a3b8' : '#64748b';
+        const location = [p.country, p.city].filter(Boolean).join(' · ') || '—';
+        popup.current
+          .setLngLat(coords)
+          .setHTML(`<div style="background:${bg};color:${text};padding:8px 12px;border-radius:10px;border:1px solid ${isDk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};font-size:11px;font-family:ui-monospace,monospace;line-height:1.6;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
+            <div style="font-weight:700;margin-bottom:2px">Hop ${p.index}</div>
+            <div style="color:${sub}">${p.ip || '—'}</div>
+            <div>${location}</div>
+            ${p.isp ? `<div style="color:${sub};font-size:10px">${p.isp}</div>` : ''}
+            <div style="margin-top:4px;color:#22d3ee">${Number(p.latency).toFixed(1)} ms</div>
+          </div>`)
+          .addTo(map.current);
       });
+      map.current.on('mouseleave', 'trace-nodes', () => {
+        if (!map.current || !popup.current) return;
+        map.current.getCanvas().style.cursor = '';
+        popup.current.remove();
+      });
+
+      // DNS query points source
+      if (!map.current.getSource('dns-points')) {
+        map.current.addSource('dns-points', {
+          type: 'geojson',
+          data: { type: 'FeatureCollection', features: [] },
+        });
+      }
 
       // Pulse ring (outer glow)
       map.current.addLayer({
@@ -149,7 +189,7 @@ export const CyberMap: React.FC = () => {
         const feat = e.features?.[0];
         if (!feat || !feat.properties) return;
         const coords = (feat.geometry as Point).coordinates.slice() as [number, number];
-        const { ip, domain } = feat.properties;
+        const { ip, domain, country, city } = feat.properties;
         const isForeign = feat.properties.color === '#ef4444';
         const isDk = useDnsStore.getState().theme === 'dark';
         const bg = isDk ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)';
@@ -158,11 +198,13 @@ export const CyberMap: React.FC = () => {
         const tag = isForeign
           ? `<span style="color:#ef4444;font-weight:700;font-size:9px;letter-spacing:0.05em">FOREIGN</span>`
           : `<span style="color:#10b981;font-weight:700;font-size:9px;letter-spacing:0.05em">LOCAL</span>`;
+        const location = [country, city].filter(Boolean).join(' · ');
         popup.current
           .setLngLat(coords)
           .setHTML(`<div style="background:${bg};color:${text};padding:8px 12px;border-radius:10px;border:1px solid ${isDk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};font-size:11px;font-family:ui-monospace,monospace;line-height:1.6;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
             <div style="font-weight:700;margin-bottom:2px">${domain || '—'}</div>
             <div style="color:${sub}">${ip}</div>
+            ${location ? `<div style="color:${sub};font-size:10px">${location}</div>` : ''}
             <div style="margin-top:4px">${tag}</div>
           </div>`)
           .addTo(map.current);
@@ -270,43 +312,41 @@ export const CyberMap: React.FC = () => {
     }
 
     const features: Feature[] = [];
-    const hops = activeResult.hops.filter(h => h.coords && h.coords.length === 2);
+    const rawHops = activeResult.hops.filter(h => h.coords && h.coords.length === 2);
+    const hops = spreadOverlappingHops(rawHops);
 
-    // 1. Add Hop Nodes
+    // 1. Add Hop Nodes（使用散開後的 displayCoords）
     hops.forEach(hop => {
       features.push({
         type: 'Feature',
-        geometry: { type: 'Point', coordinates: hop.coords },
+        geometry: { type: 'Point', coordinates: hop.displayCoords },
         properties: { ...hop, type: 'hop' }
       });
     });
 
-    // 2. Add Segments (Lines)
+    // 2. Add Segments (Lines)（使用散開後的 displayCoords）
     for (let i = 0; i < hops.length - 1; i++) {
       const start = hops[i];
       const end = hops[i+1];
 
-      // Calculate distance for visual logic
       const dist = calculateDistance(start.coords, end.coords);
       const isSubmarine = dist > 1000;
 
       if (isSubmarine) {
-        // Curved line for submarine cables
         features.push({
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: createCurve(start.coords, end.coords)
+            coordinates: createCurve(start.displayCoords, end.displayCoords)
           },
           properties: { type: 'submarine', distance: dist }
         });
       } else {
-        // Straight line for normal segments
         features.push({
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: [start.coords, end.coords]
+            coordinates: [start.displayCoords, end.displayCoords]
           },
           properties: { type: 'normal', distance: dist }
         });
@@ -366,15 +406,15 @@ export const CyberMap: React.FC = () => {
         filter: ['==', ['geometry-type'], 'Point'],
         layout: {
           'text-field': ['to-string', ['get', 'index']],
-          'text-size': 10,
+          'text-size': 12,
           'text-font': ['Open Sans Bold'],
-          'text-offset': [0, -1.5],
+          'text-offset': [0, -1.4],
           'text-allow-overlap': true,
         },
         paint: {
           'text-color': '#22d3ee',
           'text-halo-color': '#0f172a',
-          'text-halo-width': 1.5,
+          'text-halo-width': 2,
         },
       });
     }
@@ -382,7 +422,7 @@ export const CyberMap: React.FC = () => {
     // Zoom to fit the trace
     if (hops.length > 0) {
       const bounds = new maplibregl.LngLatBounds();
-      hops.forEach(h => bounds.extend(h.coords));
+      hops.forEach(h => bounds.extend(h.displayCoords));
       map.current.fitBounds(bounds, { padding: 100, maxZoom: 8 });
     }
   }, [activeResult]);
@@ -402,6 +442,8 @@ export const CyberMap: React.FC = () => {
         color: r.isForeign ? '#ef4444' : '#10b981',
         ip: r.resultIp,
         domain: r.domain,
+        country: r.country || '',
+        city: r.city || '',
       },
     }));
   }, [records]);

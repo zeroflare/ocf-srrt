@@ -29,6 +29,12 @@ export interface DnsRecord {
     // 對應 Go: Country string `json:"country"`
     country: string;
 
+    // 對應 Go: City string `json:"city,omitempty"`
+    city?: string;
+
+    // 對應 Go: Subdivision string `json:"subdivision,omitempty"`
+    subdivision?: string;
+
     // 對應 Go: ASN uint `json:"asn"`
     asn: number;
 
@@ -68,6 +74,8 @@ export interface Hop {
   worst: number;         // 最高延遲 ms
   stdev: number;         // 標準差 ms
   country: string;
+  city?: string;
+  subdivision?: string;
   coords: [number, number]; // [lon, lat]
   asn?: number;
   isp?: string;

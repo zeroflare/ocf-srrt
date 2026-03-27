@@ -199,17 +199,23 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     columnHelper.accessor('resultIp', {
       id: 'resultIp',
       header: t('result_ip'),
-      cell: info => (
-        <Link
-          to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
-          className="text-slate-600 dark:text-slate-300 font-mono hover:underline hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
-          title={t('start_traceroute')}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {info.getValue()}
-        </Link>
-      ),
+      cell: info => {
+        const ip = info.getValue();
+        // IPv6 地址含 ':'，traceroute 只支援 IPv4，改用 domain 做 target
+        const isIPv6 = ip.includes(':');
+        const traceTarget = isIPv6 ? info.row.original.domain : ip;
+        return (
+          <Link
+            to={`/traceroute?target=${encodeURIComponent(traceTarget)}`}
+            className="text-slate-600 dark:text-slate-300 font-mono hover:underline hover:text-cyan-600 dark:hover:text-cyan-400 cursor-pointer"
+            title={isIPv6 ? t('start_traceroute') + ' (via domain)' : t('start_traceroute')}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {ip}
+          </Link>
+        );
+      },
       size: 160,
     }),
     columnHelper.accessor('country', {
@@ -230,7 +236,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
             ) : (
               <div className={`w-1.5 h-1.5 rounded-full ${isLocal ? 'bg-emerald-500' : 'bg-slate-400 dark:bg-slate-700'}`} />
             )}
-            <span className="text-slate-600 dark:text-slate-400">{country}</span>
+            <span className="text-slate-600 dark:text-slate-400">{country}{row.city ? ` · ${row.city}` : ''}</span>
             {country && (
               <InferenceBadge label="GeoIP" tooltip={t('inferred_geoip')} color="slate" />
             )}

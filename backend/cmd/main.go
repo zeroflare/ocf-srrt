@@ -22,7 +22,7 @@ import (
 	"time"
 )
 
-// extractClientIP 從請求中取得真實 client IP。
+// extractClientIP 從請求中取得真實 client IP（已正規化）。
 // 只有當請求來自信任代理（TRUSTED_PROXIES 環境變數）時，才採用 X-Forwarded-For，
 // 避免惡意客戶端偽造 header 取得他人的 token。
 func extractClientIP(r *http.Request, trustedProxies map[string]bool) (string, error) {
@@ -30,6 +30,8 @@ func extractClientIP(r *http.Request, trustedProxies map[string]bool) (string, e
 	if err != nil {
 		return "", err
 	}
+	// 正規化 remoteIP，確保 IPv4-mapped IPv6（如 ::ffff:127.0.0.1）能匹配 trustedProxies
+	remoteIP = auth.CanonicalizeIP(remoteIP)
 
 	if len(trustedProxies) > 0 && trustedProxies[remoteIP] {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
@@ -37,13 +39,13 @@ func extractClientIP(r *http.Request, trustedProxies map[string]bool) (string, e
 			if i := strings.Index(xff, ","); i != -1 {
 				xff = strings.TrimSpace(xff[:i])
 			}
-			return strings.TrimSpace(xff), nil
+			return auth.CanonicalizeIP(strings.TrimSpace(xff)), nil
 		}
 	}
 	return remoteIP, nil
 }
 
-// parseTrustedProxies 解析 TRUSTED_PROXIES 環境變數（逗號分隔的 IP 清單）
+// parseTrustedProxies 解析 TRUSTED_PROXIES 環境變數（逗號分隔的 IP 清單），自動正規化
 func parseTrustedProxies() map[string]bool {
 	proxies := make(map[string]bool)
 	env := os.Getenv("TRUSTED_PROXIES")
@@ -52,7 +54,7 @@ func parseTrustedProxies() map[string]bool {
 	}
 	for _, p := range strings.Split(env, ",") {
 		if ip := strings.TrimSpace(p); ip != "" {
-			proxies[ip] = true
+			proxies[auth.CanonicalizeIP(ip)] = true
 		}
 	}
 	return proxies

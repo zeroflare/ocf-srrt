@@ -30,7 +30,7 @@ graph LR
     - **MaxMind GeoIP Database**: 提供 IP 地理位置、ASN/ISP 查詢（GeoLite2-City + GeoLite2-ASN MMDB）。
     - **Submarine Cable Data**: 整合全球海纜與台灣可用路徑資料 (GeoJSON)。
 - **External Tools**:
-    - **MTR (My Traceroute)**: 呼叫系統 `mtr --report --json --report-cycles 10` 獲取網路路徑追蹤與統計資訊（丟包率、延遲分佈）。
+    - **MTR (My Traceroute)**: 呼叫系統 `mtr --report --json --report-cycles 1 --max-ttl 30` 獲取網路路徑追蹤與統計資訊（丟包率、延遲分佈）。支援 TCP/ICMP 模式。
 - **Infrastructure**:
     - **Nginx**: 反向代理，提供 HTTPS（Let's Encrypt）、靜態檔案服務、WebSocket 代理。
 - **Users**:

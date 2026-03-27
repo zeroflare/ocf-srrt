@@ -70,6 +70,8 @@ type Hop struct {
 	Worst         float64   `json:"worst"`   // 最高延遲 ms
 	StDev         float64   `json:"stdev"`   // 標準差 ms
 	Country       string    `json:"country"`
+	City          string    `json:"city,omitempty"`
+	Subdivision   string    `json:"subdivision,omitempty"`
 	Coords        []float64 `json:"coords"` // [lon, lat]
 	ASN           uint      `json:"asn"`
 	ISP           string    `json:"isp"`
@@ -99,6 +101,9 @@ type RunOptions struct {
 	Port string // TCP 模式的目標 port，預設 "443"
 }
 
+// ErrIPv6NotSupported 表示 target 為 IPv6 且無法轉換為 IPv4
+var ErrIPv6NotSupported = fmt.Errorf("IPv6 traceroute is not supported, please use an IPv4 address or domain name")
+
 // Run 執行 mtr 指令並解析 JSON 結果。
 // localIP 為本機公網 IP（用於 Hop 0），空字串則跳過。
 func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*TraceResult, error) {
@@ -106,6 +111,31 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 	if strings.HasPrefix(target, "-") {
 		return nil, fmt.Errorf("invalid target")
 	}
+
+	// 偵測 IPv6 地址：嘗試 rDNS → 再解析為 IPv4，無法轉換則拒絕
+	if ip := net.ParseIP(target); ip != nil && ip.To4() == nil {
+		// 是 IPv6，嘗試 rDNS 取得域名
+		names, err := net.LookupAddr(target)
+		if err == nil && len(names) > 0 {
+			hostname := strings.TrimSuffix(names[0], ".")
+			// 用域名重新解析為 IPv4
+			ips, err := net.DefaultResolver.LookupIP(ctx, "ip4", hostname)
+			if err == nil && len(ips) > 0 {
+				slog.Info("IPv6 target converted to IPv4 via rDNS",
+					"component", "traceroute",
+					"originalIPv6", target,
+					"hostname", hostname,
+					"resolvedIPv4", ips[0].String(),
+				)
+				target = hostname // 改用域名，後續流程會解析為 IPv4
+			} else {
+				return nil, ErrIPv6NotSupported
+			}
+		} else {
+			return nil, ErrIPv6NotSupported
+		}
+	}
+
 	if !validTargetRe.MatchString(target) {
 		return nil, fmt.Errorf("invalid target")
 	}
@@ -244,9 +274,15 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 		geo, err := geoip.GetAll(localIP)
 		if err == nil {
 			hop0.Country = geo.Country
+			hop0.City = geo.City
+			hop0.Subdivision = geo.Subdivision
 			hop0.Coords = geo.Coords
 			hop0.ASN = geo.ASN
 			hop0.ISP = geo.ISP
+		}
+		// 座標 fallback
+		if hop0.Coords == nil && hop0.Country != "" && hop0.Country != "XX" {
+			hop0.Coords = geoip.GetCountryCentroid(hop0.Country)
 		}
 		if hop0.Country == "" || hop0.Country == "XX" {
 			hop0.GeoConfidence = "none"
@@ -283,9 +319,15 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 			geo, err := geoip.GetAll(hop.IP)
 			if err == nil {
 				hop.Country = geo.Country
+				hop.City = geo.City
+				hop.Subdivision = geo.Subdivision
 				hop.Coords = geo.Coords
 				hop.ASN = geo.ASN
 				hop.ISP = geo.ISP
+			}
+			// 座標 fallback：City DB 查不到精確座標時，使用國家中心座標
+			if hop.Coords == nil && hop.Country != "" && hop.Country != "XX" {
+				hop.Coords = geoip.GetCountryCentroid(hop.Country)
 			}
 			hop.GeoConfidence = "high"
 			if hop.Country == "" || hop.Country == "XX" {

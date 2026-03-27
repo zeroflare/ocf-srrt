@@ -63,12 +63,12 @@ graph TB
 | `api/` | HTTP 路由（REST + WebSocket）、CORS 中間件、Traceroute handler |
 | `auth/` | Token Store（UUID ↔ IP 雙向映射），自動產生 token |
 | `buffer/` | Per-IP Ring Buffer（5000 筆/session、2000 session 上限、10min 閒置清除） |
-| `geoip/` | MaxMind MMDB 查詢（Country、Coords、ASN/ISP） |
+| `geoip/` | MaxMind MMDB 查詢（Country、City、Subdivision、Coords、ASN/ISP），提供 `GetAll()` 合併查詢 |
 | `recognition/` | 三層應用識別（Exact → Regex → Heuristic） |
 | `osfingerprint/` | DNS 查詢模式 OS 辨識（Android/iOS/Windows） |
-| `traceroute/` | MTR 執行與解析、rDNS PoP 解析、TLD 輔助、結果快取 |
+| `traceroute/` | MTR 執行與解析、rDNS PoP 解析、TLD 輔助、結果快取、IPv6→IPv4 自動轉換 |
 | `ratelimit/` | Per-token 速率限制 + 全域 Semaphore 併發控制 |
-| `types/` | 共用 `DNSQueryRecord` struct |
+| `types/` | 共用 `DNSQueryRecord` struct（含 City、Subdivision 欄位） |
 
 ### DNS 富化管線
 
@@ -79,7 +79,7 @@ graph LR
     DNSProxy -->|"轉發"| Upstream["Upstream DNS"]
     Upstream -->|"回應"| DNSProxy
     DNSProxy -->|"立即回覆"| Client
-    DNSProxy -->|"異步"| GeoIP["GeoIP + ASN"]
+    DNSProxy -->|"異步"| GeoIP["GetAll()<br/>Country + City + ASN"]
     GeoIP --> OS["OS Fingerprint"]
     OS --> Recog["App Recognition<br/>Exact → Regex → Heuristic"]
     Recog --> Probe["Foreign IP Probe<br/>ICMP Ping"]
@@ -109,18 +109,19 @@ graph LR
 - **useCableStore**: 海纜 GeoJSON、選中海纜 ID、應用程式→海纜映射。
 
 ### UI Components
-- **CyberMap**: 基於 MapLibre GL 的海纜地圖，強調台灣可用路徑。左右面板支援拖動分割（預設各佔 50%）。
-- **LiveTable**: 即時 DNS 查詢列表。ISP/Cloud Provider badge（AWS、GCP、Azure、Cloudflare、Akamai 等），點擊 Domain 或 Result IP 觸發 MTR 追蹤。
+- **CyberMap**: 基於 MapLibre GL 的海纜地圖，強調台灣可用路徑。整合 DNS 查詢點（外國紅/本地綠）與 Traceroute 路徑視覺化。DNS 與 Traceroute 節點均支援 Hover Popup（顯示 IP、城市、ISP、延遲）。同座標跳點自動散開（fan-out）。
+- **LiveTable**: 即時 DNS 查詢列表。ISP/Cloud Provider badge（AWS、GCP、Azure、Cloudflare、Akamai 等），點擊 Domain 或 Result IP 觸發 MTR 追蹤（IPv6 地址自動改用 Domain 發起）。Country 欄附加城市名（如 `TW · Taipei`）。
 - **LiveTrafficChart**: 基於 Recharts 的即時流量圖表。
 - **TrafficDashboard**: 流量統計儀表板（指標與圖表）。
 - **TracerouteDrawer**: 側邊抽屜，嵌入 `HopTable`（緊湊模式）顯示 MTR 結果，含歷史紀錄與分享功能。
-- **HopTable**: 共用跳點表格元件（`TraceroutePage` 與 `TracerouteDrawer` 共用）。欄位：# / IP / ASN·ISP / Country / Loss% / Avg（含進度條）/ Best / Worst / StDev。支援 `compact` 模式。
-- **TraceMap**: 基於 MapLibre GL 的路徑地圖（僅 `TraceroutePage`）。圓形標記依延遲漸變色（綠→黃→紅），支援 Popup 與自動 fitBounds。
+- **HopTable**: 共用跳點表格元件（`TraceroutePage` 與 `TracerouteDrawer` 共用）。欄位：# / IP / ASN·ISP / Country·City / Loss% / Avg（含進度條）/ Best / Worst / StDev。支援 `compact` 模式。
+- **TraceMap**: 基於 MapLibre GL 的路徑地圖（僅 `TraceroutePage`）。圓形標記依延遲漸變色（綠→黃→紅），同座標跳點自動散開（fan-out），Popup 顯示 IP/Country·City/ASN·ISP/延遲，支援自動 fitBounds 與流向動畫。
 - **DnsSetupBanner**: DNS 設定說明，動態讀取 `window.location.hostname`，含一鍵複製。
 - **ReportModal**: 報告產生表單（app metadata、URL、logo），統計國內外流量佔比。
 - **ReportView**: 報告檢視 Overlay，含編輯/關閉操作。
 - **AboutModal**: 應用程式資訊與致謝。
 - **AppInfoTooltip**: 應用程式詳細資訊 Tooltip。
+- **Tooltip**: 通用 Tooltip 元件。
 - **ErrorBoundary**: 錯誤邊界元件。
 
 ### Hooks
@@ -128,3 +129,12 @@ graph LR
 - **useMockDnsStream**: Mock 模式 DNS 串流（`VITE_USE_MOCK=true`）。
 - **useSharedReport**: 解壓 URL `?zdata=` 參數，載入共享的 DNS 記錄與追蹤結果。
 - **useTour**: react-joyride 引導式導覽管理。
+
+### Utilities (`frontend/src/utils/`)
+- **geo.ts**: 地理計算（Haversine 距離、曲線生成、同座標跳點散開 `spreadOverlappingHops`）。
+- **cableLayer.ts**: CyberMap 海纜圖層管理。
+- **cloudProvider.ts**: ISP/ASN 字串 pattern matching 偵測雲端供應商。
+- **appInfo.ts**: 應用程式詳細資訊查詢。
+- **reportShare.ts**: 報告 URL 壓縮分享工具。
+- **tracerouteShare.ts**: Traceroute 結果 URL 壓縮分享工具。
+- **logger.ts**: 前端日誌工具。

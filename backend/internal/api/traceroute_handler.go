@@ -92,6 +92,10 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	opts := traceroute.RunOptions{Mode: mode, Port: port}
 	result, err := traceroute.Run(ctx, target, h.LocalIP, opts)
 	if err != nil {
+		if err == traceroute.ErrIPv6NotSupported {
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
+		}
 		slog.Error("traceroute failed", "component", "traceroute", "target", target, "mode", mode, "port", port, "error", err)
 		http.Error(w, "traceroute execution failed", http.StatusInternalServerError)
 		return

@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Hop } from '../types';
-import { calculateDistance, createCurve } from '../utils/geo';
+import { calculateDistance, createCurve, spreadOverlappingHops } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
 
 interface TraceMapProps {
@@ -74,33 +74,39 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
     let cleanupAnimation: (() => void) | null = null;
 
     m.on('load', () => {
-      const validHops = hops.filter(h =>
+      const rawValidHops = hops.filter(h =>
         h.ip !== '*' &&
         h.coords &&
         h.coords.length === 2 &&
         !(h.coords[0] === 0 && h.coords[1] === 0)
       );
 
+      // 同座標 hop 散開（fan-out），避免地圖上疊成一團
+      const validHops = spreadOverlappingHops(rawValidHops);
+
       // 建立 traceroute source
       const features: GeoJSON.Feature[] = [];
 
-      // 跳點標記
+      // 跳點標記（使用散開後的 displayCoords）
       validHops.forEach(hop => {
         const latencyColor = hop.latency < 50 ? '#10b981' : hop.latency < 150 ? '#f59e0b' : '#ef4444';
         features.push({
           type: 'Feature',
-          geometry: { type: 'Point', coordinates: hop.coords },
+          geometry: { type: 'Point', coordinates: hop.displayCoords },
           properties: {
             index: hop.index,
             ip: hop.ip,
             asn: hop.asn || 0,
+            isp: hop.isp || '',
+            city: hop.city || '',
+            country: hop.country || '',
             latency: hop.latency,
             color: latencyColor,
           },
         });
       });
 
-      // 連線
+      // 連線（使用散開後的 displayCoords，距離判斷仍用原始 coords）
       for (let i = 0; i < validHops.length - 1; i++) {
         const start = validHops[i];
         const end = validHops[i + 1];
@@ -113,7 +119,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
           type: 'Feature',
           geometry: {
             type: 'LineString',
-            coordinates: isSubmarine ? createCurve(start.coords, end.coords) : [start.coords, end.coords],
+            coordinates: isSubmarine ? createCurve(start.displayCoords, end.displayCoords) : [start.displayCoords, end.displayCoords],
           },
           properties: { type: isSubmarine ? 'submarine' : 'normal', color: segColor },
         });
@@ -161,7 +167,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         filter: ['==', ['geometry-type'], 'Point'],
         layout: {
           'text-field': ['to-string', ['get', 'index']],
-          'text-size': 10,
+          'text-size': 12,
           'text-font': ['Open Sans Bold'],
           'text-offset': [0, -1.4],
           'text-allow-overlap': true,
@@ -169,7 +175,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         paint: {
           'text-color': isDark ? '#e2e8f0' : '#334155',
           'text-halo-color': isDark ? '#0f172a' : '#ffffff',
-          'text-halo-width': 1.5,
+          'text-halo-width': 2,
         },
       });
 
@@ -189,7 +195,21 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         ipDiv.textContent = String(props.ip);
         container.appendChild(ipDiv);
 
-        if (props.asn) {
+        // 地理位置：country · city
+        const location = [props.country, props.city].filter(Boolean).join(' · ');
+        if (location) {
+          const locDiv = document.createElement('div');
+          locDiv.className = 'text-[10px] opacity-70';
+          locDiv.textContent = location;
+          container.appendChild(locDiv);
+        }
+
+        if (props.isp) {
+          const ispDiv = document.createElement('div');
+          ispDiv.className = 'text-[10px] opacity-60';
+          ispDiv.textContent = props.asn ? `AS${props.asn} · ${props.isp}` : String(props.isp);
+          container.appendChild(ispDiv);
+        } else if (props.asn) {
           const asnDiv = document.createElement('div');
           asnDiv.className = 'text-[10px] opacity-60';
           asnDiv.textContent = `AS${props.asn}`;
@@ -214,7 +234,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
       // fitBounds
       if (validHops.length > 0) {
         const bounds = new maplibregl.LngLatBounds();
-        validHops.forEach(h => bounds.extend(h.coords as [number, number]));
+        validHops.forEach(h => bounds.extend(h.displayCoords));
         m.fitBounds(bounds, { padding: 60, maxZoom: 10 });
       }
 
@@ -258,8 +278,8 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         // 每個 hop 間段的延遲（用於速度調整）
         const segLatencies: number[] = [];
         for (let i = 0; i < validHops.length - 1; i++) {
-          const start = validHops[i].coords;
-          const end = validHops[i + 1].coords;
+          const start = validHops[i].displayCoords;
+          const end = validHops[i + 1].displayCoords;
           const dist = calculateDistance(start, end);
           const segCoords = dist > 1000 ? createCurve(start, end) : [start, end];
           const latency = Math.max(validHops[i + 1].latency - validHops[i].latency, 1);

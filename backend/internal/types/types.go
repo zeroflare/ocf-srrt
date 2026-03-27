@@ -13,6 +13,8 @@ type DNSQueryRecord struct {
 	Latency           float64   `json:"latency"`           // ms
 	SourceIP          string    `json:"sourceIp"`
 	Country           string    `json:"country"`
+	City              string    `json:"city,omitempty"`
+	Subdivision       string    `json:"subdivision,omitempty"`
 	ASN               uint      `json:"asn"`
 	ISP               string    `json:"isp"`
 	AppName           string    `json:"appName"`

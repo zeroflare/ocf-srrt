@@ -4,7 +4,7 @@
 1. **DNS Proxy** 接收用戶端 DNS 查詢（UDP/TCP :53）。
 2. **Forward** 轉發至上游 DNS 解析器，取得回應後**立即回覆**用戶端。
 3. **Async Enrichment** 異步進行富化（不阻塞 DNS 回應）：
-   a. **GeoIP** 查詢 Country、Coords、ASN/ISP。
+   a. **GeoIP** 透過 `GetAll()` 一次查詢 Country、City、Subdivision、Coords、ASN/ISP。
    b. **OS Fingerprint** 根據查詢域名模式辨識裝置 OS。
    c. **App Recognition** 三層識別應用程式類型。
    d. **Foreign Probe** 境外 IP 觸發 ICMP Ping 測量延遲。
@@ -26,7 +26,7 @@ sequenceDiagram
     U-->>D: DNS Response
     D-->>C: DNS Response (立即回覆)
     D--)E: Async: processAndRecord()
-    Note over E: GeoIP → OS → Recognition → Probe
+    Note over E: GetAll(Country+City+ASN) → OS → Recognition → Probe
     E->>B: DNSQueryRecord
     B->>W: New Record Event
     W->>F: JSON Push
@@ -77,12 +77,12 @@ sequenceDiagram
     else 快取未命中
         API->>RL: 檢查速率限制 + Semaphore
         RL-->>API: OK (max 5 concurrent)
-        API->>MTR: exec mtr --report --json --report-cycles 10
-        Note over MTR: 執行約 10~50 秒
+        API->>MTR: exec mtr --report --json --report-cycles 1 --max-ttl 30
+        Note over MTR: 支援 TCP (--tcp --port) / ICMP 模式
         MTR-->>API: JSON stdout (hubs[])
         loop 每個 Hub
-            API->>GEO: 查詢 Country, Coords, ASN
-            GEO-->>API: 地理資訊
+            API->>GEO: GetAll(Country, City, Coords, ASN)
+            GEO-->>API: 地理資訊（含城市級精度）
         end
         Note over API: Stage 1: 延遲啟發式 CDN 修正
         Note over API: Stage 2: rDNS PoP IATA 解析

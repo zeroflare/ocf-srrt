@@ -4,7 +4,7 @@
 - **Backend**: Go 1.24+, 使用 `miekg/dns` 作為 DNS 協定處理庫
 - **Frontend**: React 19, TypeScript 5.9+, Vite 7, Tailwind CSS v4
 - **State Management**: Zustand 5
-- **Map**: MapLibre GL 5（主要）、react-simple-maps 3（輔助）
+- **Map**: MapLibre GL 5（所有地圖元件）；react-simple-maps 3 仍作為依賴但已不再主動使用，可考慮移除
 - **Tables**: TanStack Table 8
 - **Charts**: Recharts 3
 - **Testing**: Vitest（前端）、Go test（後端）

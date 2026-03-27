@@ -25,10 +25,10 @@
 - **取捨**: 若後端與前端分開部署於不同網域，需額外處理；目前架構中前後端同域，無此問題。
 
 ## MTR 取代 Traceroute
-選擇 MTR (`mtr --report --json`) 取代傳統 `traceroute` 作為路徑追蹤引擎。
+選擇 MTR (`mtr --report --json --report-cycles 1 --max-ttl 30`) 取代傳統 `traceroute` 作為路徑追蹤引擎。
 - **動機**: 傳統 traceroute 每跳僅提供 3 次 RTT，無法呈現丟包率與延遲穩定度。MTR 單次執行即可取得 Loss%、Avg、Best、Worst、StDev 完整統計。
-- **優點**: 資訊密度高，JSON 輸出可直接 `json.Unmarshal`，省去 text parsing 的脆弱性。
-- **取捨**: MTR 執行時間較長（10 cycles），API timeout 需調高至 60 秒；Docker 映像需額外安裝 `mtr` 套件。
+- **優點**: 資訊密度高，JSON 輸出可直接 `json.Unmarshal`，省去 text parsing 的脆弱性。支援 TCP（預設 port 443）與 ICMP 模式切換。
+- **取捨**: API timeout 需調高至 60 秒；Docker 映像需額外安裝 `mtr` 套件。
 
 ## Traceroute Multi-stage GeoIP Correction
 MTR 結果經三階段地理修正（延遲啟發式 → rDNS PoP → ccTLD），而非僅依賴 MaxMind GeoIP。
@@ -52,6 +52,23 @@ MTR 結果經三階段地理修正（延遲啟發式 → rDNS PoP → ccTLD）�
 - **動機**: 系統無資料庫，無法透過 server-side 儲存分享資料；需要一個 stateless 的分享機制。
 - **優點**: 完全 client-side，無需後端儲存；URL 可直接分享、書籤化。
 - **限制**: URL 長度有瀏覽器限制（壓縮後 max 100KB），大量資料時可能超限。
+
+## City-level GeoIP Enrichment
+擴充 `GeoResult` struct 加入 `City` 與 `Subdivision` 欄位，並在 `GetAll()` 中一次查詢取得，取代原本分三次呼叫 `GetCountry`/`GetCoords`/`GetASN` 的做法。
+- **動機**: MaxMind City DB 本來就包含城市與行政區資訊，卻只取用 Country + 座標，浪費現有資料。同國內多跳無城市級座標時全部 fallback 到國家中心點，地圖上重疊無法辨識。
+- **優點**: 零成本提升地理精度（不需額外資料來源）；合併查詢減少 MMDB I/O 次數。
+- **影響**: 前後端 struct/type 均新增 `city`、`subdivision` 欄位；HopTable、LiveTable、CyberMap popup 顯示城市名。
+
+## Traceroute Fan-out Spreading
+同座標的 Traceroute 跳點在地圖上以圓心等角散開（`spreadOverlappingHops`），避免重疊。
+- **動機**: 同一國家/城市內的多個跳點座標相同（尤其 fallback 到國家中心時），地圖上完全重疊，label 不可辨識。
+- **實作**: 偵測重複座標後以 ~0.08 度為半徑等角排列；僅調整渲染座標（`displayCoords`），不修改原始資料；連線連到散開後的座標。
+- **適用範圍**: CyberMap 與 TraceMap 共用同一 utility function。
+
+## IPv6 Traceroute Graceful Handling
+後端僅支援 IPv4 traceroute（mtr 預設行為）。收到 IPv6 target 時，嘗試 rDNS → 再解析為 IPv4；失敗則回傳 HTTP 400 明確錯誤。前端 LiveTable 對 IPv6 resultIp 改用 Domain 發起 traceroute。
+- **動機**: 點擊 AAAA 記錄的 IPv6 地址會導致 mtr 執行失敗（HTTP 500），使用者體驗差。
+- **優點**: 後端 graceful degradation，前端自動繞路，使用者無感知。
 
 ## Async DNS Enrichment
 DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 goroutine 中異步進行。

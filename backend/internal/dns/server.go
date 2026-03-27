@@ -106,7 +106,8 @@ func (s *Server) ServeDNS(w dns.ResponseWriter, r *dns.Msg) {
 		return
 	}
 
-	sourceIp, _, _ := net.SplitHostPort(w.RemoteAddr().String())
+	rawIp, _, _ := net.SplitHostPort(w.RemoteAddr().String())
+	sourceIp := auth.CanonicalizeIP(rawIp)
 	slog.Debug("DNS request received", "component", "dns", "sourceIp", sourceIp, "domain", r.Question[0].Name)
 
 	// 自動為新 IP 建立 token
@@ -296,8 +297,9 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 
 		recordType := dns.TypeToString[answer.Header().Rrtype]
 
-		// 這些查詢可能涉及 File IO 或大量運算
-		resultCountry, _ := geoip.GetCountry(resultIP)
+		// 合併查詢 Country/City/Coords/ASN，減少重複 MMDB 查詢
+		geoResult, _ := geoip.GetAll(resultIP)
+		resultCountry := geoResult.Country
 		isForeign := localCountry != "" && resultCountry != localCountry
 		foreignConfidence := ""
 		latency := -1.0
@@ -360,8 +362,6 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			}
 		}
 
-		asn, isp, _ := geoip.GetASN(resultIP)
-		coords, _ := geoip.GetCoords(resultIP)
 		appResult := recognition.IdentifyApp(question.Name)
 
 		// OS Fingerprinting: 嘗試從域名推斷 OS，結果快取在 Per-IP osCache 中
@@ -384,8 +384,10 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			Latency:           latency,
 			SourceIP:          sourceIp,
 			Country:           resultCountry,
-			ASN:               asn,
-			ISP:               isp,
+			City:              geoResult.City,
+			Subdivision:       geoResult.Subdivision,
+			ASN:               geoResult.ASN,
+			ISP:               geoResult.ISP,
 			AppName:           appResult.Name,
 			AppCategory:       appResult.Category,
 			OS:                detectedOS,
@@ -393,9 +395,9 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			OsInferred:        detectedOS != "",
 			GeoInferred:       resultCountry != "",
 		}
-		if coords != nil && len(coords) == 2 {
-			record.Longitude = coords[0]
-			record.Latitude = coords[1]
+		if geoResult.Coords != nil && len(geoResult.Coords) == 2 {
+			record.Longitude = geoResult.Coords[0]
+			record.Latitude = geoResult.Coords[1]
 		}
 
 		slog.Info("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)

@@ -56,6 +56,13 @@ const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boole
     ? newRecords.filter(r => r.sourceIp === monitoringIp)
     : [];
 
+  // DEBUG: 追蹤過濾結果
+  if (newRecords.length > 0) {
+    const sourceIps = [...new Set(newRecords.map(r => r.sourceIp))];
+    console.log('[Store] updateBatch:', newRecords.length, 'records, monitoringIp:', JSON.stringify(monitoringIp),
+      'sourceIps in batch:', sourceIps, 'filtered:', filteredRecords.length);
+  }
+
   if (filteredRecords.length === 0 && monitoringIp !== null) return;
 
   // 如果 monitoringIp 為 null，則表示不監控任何封包 (預設關閉)

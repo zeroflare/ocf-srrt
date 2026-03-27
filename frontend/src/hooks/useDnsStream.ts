@@ -31,6 +31,21 @@ const calculateBackoff = (attempt: number): number => {
   return Math.round(jitter);
 };
 
+// 判斷是否為 IPv6 位址（包含冒號即為 IPv6）
+const isIPv6 = (ip: string): boolean => ip.includes(':');
+
+// 當後端回傳 IPv6 時，嘗試從 IPv4-only API 取得使用者的 IPv4 位址
+const fetchIPv4Fallback = async (): Promise<string | null> => {
+  try {
+    const resp = await fetch('https://api4.ipify.org?format=json', { signal: AbortSignal.timeout(3000) });
+    if (!resp.ok) return null;
+    const data = await resp.json();
+    return data.ip || null;
+  } catch {
+    return null;
+  }
+};
+
 const LOCAL_COUNTRY_KEY = 'localCountry';
 const LOCAL_COUNTRY_UPDATED_KEY = 'localCountryUpdatedAt';
 const LOCAL_COUNTRY_TTL = 7 * 24 * 60 * 60 * 1000; // 7 天
@@ -75,6 +90,7 @@ export const useDnsStream = (enabled: boolean = true) => {
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
+        console.log('[WS] Connected, url:', url);
         setIsConnected(true);
         setReconnectDelay(null);
         attemptRef.current = 0;
@@ -89,9 +105,13 @@ export const useDnsStream = (enabled: boolean = true) => {
         try {
           const rawData = JSON.parse(event.data) as WebSocketPayload;
           if ('data' in rawData && Array.isArray(rawData.data)) {
+            console.log('[WS] Snapshot received, records:', rawData.data.length,
+              'sample sourceIps:', rawData.data.slice(0, 3).map((r: any) => r.sourceIp));
             loadSnapshot(rawData.data as DnsRecord[]);
           } else {
-            addRecord(rawData as DnsRecord);
+            const rec = rawData as DnsRecord;
+            console.log('[WS] Record received, sourceIp:', rec.sourceIp, 'domain:', rec.domain);
+            addRecord(rec);
           }
         } catch (error) {
           logger.error('[WS] Failed to parse message');
@@ -146,8 +166,14 @@ export const useDnsStream = (enabled: boolean = true) => {
         const data = await resp.json();
         tokenRef.current = data.token;
         setToken(data.token);
-        // 後端同時回傳 ip，供前端 IP 欄位預填
-        if (data.ip) { setMyIp(data.ip); }
+        // 後端同時回傳 ip，供前端 IP 欄位預填；若為 IPv6 則嘗試取得 IPv4
+        if (data.ip) {
+          if (isIPv6(data.ip)) {
+            fetchIPv4Fallback().then(ipv4 => setMyIp(ipv4 || data.ip));
+          } else {
+            setMyIp(data.ip);
+          }
+        }
         // 後端回傳 DNS 伺服器公網 IP，供 DnsSetupBanner 顯示
         if (data.dnsIp) { setDnsIp(data.dnsIp); }
         // 更新 localCountry 並快取

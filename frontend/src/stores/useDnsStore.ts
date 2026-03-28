@@ -47,6 +47,17 @@ interface DnsState {
 const MAX_RECORDS = 200;
 const MAX_RECORDS_FOR_SHARE = 50;
 
+// Theme 持久化：確保子頁面（TraceroutePage, ReportPage）和新分頁能保持一致的主題
+const THEME_KEY = 'srrt_theme';
+const getPersistedTheme = (): 'dark' | 'light' => {
+  const stored = localStorage.getItem(THEME_KEY);
+  if (stored === 'dark' || stored === 'light') return stored;
+  return 'dark'; // 預設深色
+};
+const persistTheme = (theme: 'dark' | 'light') => {
+  localStorage.setItem(THEME_KEY, theme);
+};
+
 // 實際執行 State 更新的邏輯 (Pure Function)
 const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boolean, monitoringIp: string | null, maxRecords: number) => {
   if (isPaused || newRecords.length === 0) return;
@@ -110,7 +121,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     monitoringIp: null,
     maxRecords: MAX_RECORDS,
     isSharedReport: false,
-    theme: 'dark',
+    theme: getPersistedTheme(),
     token: null,
     dnsIp: null,
     localCountry: null,
@@ -177,9 +188,16 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     setSharedReport: (isShared: boolean) => set({ isSharedReport: isShared }),
 
-    setTheme: (theme: 'dark' | 'light') => set({ theme }),
+    setTheme: (theme: 'dark' | 'light') => {
+      persistTheme(theme);
+      set({ theme });
+    },
 
-    toggleTheme: () => set((state) => ({ theme: state.theme === 'dark' ? 'light' : 'dark' })),
+    toggleTheme: () => set((state) => {
+      const next = state.theme === 'dark' ? 'light' : 'dark';
+      persistTheme(next);
+      return { theme: next };
+    }),
 
     clearRecords: () => set({ records: [], totalQueries: 0, foreignQueries: 0, isSharedReport: false }),
 

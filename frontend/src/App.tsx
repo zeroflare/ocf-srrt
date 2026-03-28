@@ -31,7 +31,7 @@ function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
   const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, isPaused, setPaused, totalQueries, foreignQueries, records } = useDnsStore();
   const { activeResult: traceActiveResult } = useTracerouteStore();
-  const { myIp } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
+  const { myIp, sendSubscribe } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
   const [reportData, setReportData] = useState<ReportData | null>(null);
@@ -116,6 +116,8 @@ function App() {
   const handleStartMonitoring = () => {
     if (ipInput) {
       setMonitoringIp(ipInput);
+      // 通知後端切換訂閱的目標 IP，解決跨裝置監控時 IP 不匹配的問題
+      sendSubscribe(ipInput);
     }
   };
 

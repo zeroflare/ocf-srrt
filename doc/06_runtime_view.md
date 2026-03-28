@@ -55,6 +55,27 @@ sequenceDiagram
     WS-->>FE: 歷史快照 + 即時串流
 ```
 
+## Cross-device Subscribe Flow
+當使用者從電腦 Dashboard 監控其他裝置（如手機）的 DNS 流量時，因 Dual-stack 網路環境可能導致電腦（HTTP）與手機（DNS）使用不同 IP 位址（如 IPv6 vs IPv4），WebSocket Hub 的 IP 過濾會不匹配。透過 `subscribe` 機制，前端可動態切換後端的監控目標 IP。
+
+```mermaid
+sequenceDiagram
+    participant PC as 電腦 (Dashboard)
+    participant FE as Frontend
+    participant WS as WebSocket Hub
+    participant B as Ring Buffer
+
+    Note over PC,FE: 電腦以 IPv6 取得 token，手機 DNS 走 IPv4
+    FE->>WS: Connect /ws?token=UUID (clientIP=IPv6)
+    WS-->>FE: Snapshot (空，因 IPv6 無 DNS 紀錄)
+    PC->>FE: 輸入手機 IPv4，點擊「開始監控」
+    FE->>WS: {"type":"subscribe","ip":"手機IPv4"}
+    WS->>WS: 更新 client.clientIP = 手機IPv4
+    WS->>B: buffer.Get(手機IPv4)
+    WS-->>FE: Snapshot (手機的歷史 DNS 紀錄)
+    Note over WS,FE: 後續 broadcast 也會比對新 IP，即時推送手機的 DNS 流量
+```
+
 ## MTR Path Tracing
 使用者在 LiveTable 點擊 IP 後觸發 MTR 路徑追蹤，後端執行 `mtr --report --json` 並回傳結果。
 

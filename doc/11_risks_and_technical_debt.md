@@ -21,3 +21,6 @@
 - ~~DNS server.go 分三次呼叫 `GetCountry`+`GetCoords`+`GetASN`~~ → 已合併為一次 `GetAll()` 呼叫，減少 MMDB I/O。
 - ~~同座標 Traceroute 跳點在地圖上重疊不可辨識~~ → 已實作 `spreadOverlappingHops` 散開邏輯，CyberMap 與 TraceMap 共用。
 - ~~IPv6 地址觸發 Traceroute 導致 HTTP 500~~ → 後端偵測 IPv6 並嘗試 rDNS→IPv4 轉換，失敗回傳 400；前端 IPv6 改用 Domain 發起追蹤。
+- ~~Dual-stack 網路下跨裝置監控無法顯示資料~~ → 原因是電腦（HTTP）走 IPv6、手機（DNS）走 IPv4，WebSocket Hub IP 過濾不匹配。已實作 `subscribe` 機制：前端開始監控時發送 `{"type":"subscribe","ip":"目標IP"}`，後端動態切換 `client.clientIP` 並重送 snapshot。
+- ~~Traceroute 跳點為 hostname 時缺少 IP 與 GeoIP 資訊~~ → mtr `--json` 的 `Host` 欄位有時回傳 hostname（如 `ec2-x-x-x-x.compute-1.amazonaws.com`）而非 IP，導致 GeoIP 查詢失敗、前端缺少國家/ASN/座標。已在 hop 迴圈中加入 `net.ParseIP` 檢測，非 IP 時先 `net.LookupHost` 解析再查詢 GeoIP。
+- ~~頁面閒置後 table 資料清空，暫停再繼續無效~~ → 兩個根因：(1) WebSocket 無 ping/pong 心跳，瀏覽器背景 tab 節流後連線靜默斷開；(2) 重連時後端建立新 Client 使用 token 原始 IP（可能是 IPv6），subscribe 狀態丟失，snapshot 送錯 IP 的資料（通常為空）覆蓋前端 records。修正：後端 `writePump` 每 30 秒發送 ping、`readPump` 設定 60 秒 pong 超時；前端 `useDnsStream` 在 `onopen` 時自動重新發送 subscribe，透過 `subscribedIpRef` 追蹤最新訂閱 IP。

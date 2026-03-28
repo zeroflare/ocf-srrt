@@ -9,7 +9,7 @@
 
 ### Backend (Golang)
 - **核心**: Go 1.24+, `miekg/dns`（DNS Proxy 模式，監聽 UDP/TCP :53）
-- **通訊**: `gorilla/websocket` 即時資料推送
+- **通訊**: `gorilla/websocket` 即時資料推送（支援跨裝置 Subscribe 切換監控目標）
 - **富化**: `geoip2-golang` (MaxMind) 地理位置（Country/City/Subdivision/Coords）與 ASN/ISP 標記
 - **識別引擎**: 三層識別邏輯（Exact Match → Regex → Heuristic）
 - **路徑追蹤**: MTR (`mtr --report --json`) 整合三階段地理修正（延遲啟發式 → rDNS PoP → ccTLD）
@@ -130,6 +130,7 @@ dig @<PUBLIC_IP> google.com
 ### 核心與隱私
 - **隱私優先**: 數據純 In-Memory（Ring Buffer），服務重啟即銷毀
 - **真實 IP 還原**: 生產環境 Docker host 模式，直接讀取 Layer 3 IP Header
+- **跨裝置監控**: 支援從電腦 Dashboard 監控手機等其他裝置的 DNS 流量（透過 WebSocket Subscribe 動態切換目標 IP，解決 Dual-stack 網路下 IPv4/IPv6 位址不匹配問題）
 - **智慧緩衝管理**: 單一 IP 限制 5000 筆紀錄，背景 GC 每分鐘清理閒置 10 分鐘的 Session
 - **三層快取**: DNS 回應（30s）、Probe 結果（10min）、Traceroute 結果（5min）
 
@@ -180,7 +181,7 @@ dig @<PUBLIC_IP> google.com
 
 | Endpoint | Method | Auth | 用途 |
 |----------|--------|------|------|
-| `/ws` | WebSocket | Token | 即時 DNS 記錄串流 |
+| `/ws` | WebSocket | Token | 即時 DNS 記錄串流（支援 `subscribe` 訊息切換監控 IP） |
 | `/api/token` | GET | None | 取得 session token |
 | `/api/traceroute` | GET | Token | 執行 MTR 路徑追蹤 |
 | `/health` | GET | None | 健康檢查 |

@@ -75,3 +75,10 @@ DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 gor
 - **動機**: DNS 查詢對延遲極為敏感，富化處理（尤其 ICMP Probe）耗時不可預測。
 - **優點**: DNS 回應延遲不受富化管線影響，使用者體驗與純 DNS forwarder 一致。
 - **取捨**: 前端可能在富化完成前就已顯示部分資訊；透過 WaitGroup + 5 秒 timeout 確保 graceful shutdown。
+
+## WebSocket Subscribe（跨裝置監控）
+新增 WebSocket 雙向通訊機制，允許前端透過 `{"type":"subscribe","ip":"x.x.x.x"}` 訊息動態切換後端的監控目標 IP。
+- **動機**: 原設計 WebSocket Hub 以 token 對應的 HTTP clientIP 過濾 broadcast。在 Dual-stack（IPv4+IPv6）網路環境下，電腦瀏覽器可能透過 IPv6 取得 token，而手機的 DNS 查詢走 IPv4，導致兩者 IP 不匹配，前端無法收到任何資料。此問題在 ISP 逐步開通 IPv6 後愈發常見。
+- **實作**: 後端新增 `readPump` goroutine 監聽前端訊息，收到 subscribe 後透過 mutex 安全更新 `client.clientIP` 並立即重送目標 IP 的歷史 snapshot。前端在使用者點擊「開始監控」時呼叫 `sendSubscribe(ip)`。
+- **優點**: 完全向後相容（不發 subscribe 則行為與原本一致）；解決所有跨裝置、跨 IP 版本的監控場景。
+- **取捨**: subscribe 不驗證目標 IP 的所有權，理論上可監控任意已知 IP 的 DNS 流量。在本專案的單一用戶/小規模部署場景中可接受；若需多租戶隔離，需加入權限驗證機制。

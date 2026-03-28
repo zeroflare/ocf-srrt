@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Link, useSearchParams } from 'react-router';
-import { Activity, Zap, Share2, Check, ExternalLink } from 'lucide-react';
+import { Activity, Zap, Share2, Check, ExternalLink, Sun, Moon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { TraceResult } from '../types';
 import { decodeTraceResult, buildTracerouteShareUrl } from '../utils/tracerouteShare';
@@ -17,8 +17,8 @@ import { TraceMap } from '../components/TraceMap';
  * 2. /traceroute?zdata=<compressed>         → 顯示分享結果（唯讀）
  */
 const TraceroutePage: React.FC = () => {
-  const { t } = useTranslation();
-  const { theme } = useDnsStore();
+  const { t, i18n } = useTranslation();
+  const { theme, toggleTheme } = useDnsStore();
   const [result, setResult] = useState<TraceResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -145,6 +145,19 @@ const TraceroutePage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={() => i18n.changeLanguage(i18n.language === 'en' ? 'zh' : 'en')}
+            className={`px-2 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider transition-all ${isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-cyan-400 hover:border-cyan-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-cyan-600 hover:border-cyan-300'}`}
+          >
+            {i18n.language === 'en' ? '中文' : 'EN'}
+          </button>
+          <button
+            onClick={toggleTheme}
+            className={`p-1.5 rounded-lg border text-xs transition-all ${isDark ? 'bg-slate-800 border-white/10 text-slate-400 hover:text-amber-400 hover:border-amber-500/40' : 'bg-white border-slate-200 text-slate-500 hover:text-indigo-600 hover:border-indigo-300'}`}
+            title={isDark ? 'Light mode' : 'Dark mode'}
+          >
+            {isDark ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+          </button>
           {result && (
             <button
               onClick={handleCopyShare}

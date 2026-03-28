@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"ocf-srrt/backend/internal/auth"
@@ -68,7 +69,10 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		cachedCopy := *cached
 		cachedCopy.Cached = true
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(cachedCopy)
+		err := json.NewEncoder(w).Encode(cachedCopy)
+		if err != nil {
+			return
+		}
 		return
 	}
 
@@ -92,7 +96,7 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	opts := traceroute.RunOptions{Mode: mode, Port: port}
 	result, err := traceroute.Run(ctx, target, h.LocalIP, opts)
 	if err != nil {
-		if err == traceroute.ErrIPv6NotSupported {
+		if errors.Is(err, traceroute.ErrIPv6NotSupported) {
 			http.Error(w, err.Error(), http.StatusBadRequest)
 			return
 		}
@@ -108,5 +112,8 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	traceroute.LogResult(result)
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	err = json.NewEncoder(w).Encode(result)
+	if err != nil {
+		return
+	}
 }

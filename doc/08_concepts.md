@@ -51,9 +51,16 @@ graph LR
 - **Dark Mode**: `.dark` class 切換，Tailwind v4 原生支援。
 - **i18n**: i18next 支援中文（zh）與英文（en），瀏覽器語言自動偵測。
 
+## Cross-device Monitoring
+- **問題背景**: Dual-stack（IPv4+IPv6）網路環境下，電腦瀏覽器（HTTP）可能透過 IPv6 取得 token，但手機 DNS 查詢走 IPv4，導致 WebSocket Hub 的 IP 過濾不匹配，前端收不到資料。
+- **解決方案**: WebSocket 雙向通訊（readPump + writePump）。前端透過 `{"type":"subscribe","ip":"目標IP"}` 訊息動態切換後端 client 的監控目標，後端更新 `client.clientIP` 後重送該 IP 的歷史 snapshot。
+- **IP 正規化**: 後端收到 subscribe 訊息後，透過 `CanonicalizeIP` 正規化 IP（IPv4-mapped IPv6 → IPv4），確保比對一致。
+
 ## Security and Privacy
 - 無持久化存儲，重啟後數據清空。
 - 最小化資訊擷取，僅關注 DNS 層級。
 - Token-based 認證：每個用戶端 IP 自動獲得 UUID token，用於 WebSocket 與 API 存取。
+- WebSocket subscribe 訊息使用 mutex 保護 clientIP 寫入，避免 race condition。
+- WebSocket 心跳機制：後端 `writePump` 每 30 秒發送 ping，`readPump` 設定 60 秒 pong 超時，確保連線存活偵測。前端重連時自動重新發送 subscribe，避免 clientIP 狀態丟失。
 - CORS 中間件：可透過 `ALLOWED_ORIGINS` 環境變數限制來源。
 - Production 容器安全強化：read-only FS、no new privileges、capability 最小化。

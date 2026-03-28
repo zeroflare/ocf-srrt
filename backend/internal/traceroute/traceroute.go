@@ -314,8 +314,31 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 			hop.StDev = 0
 		}
 
+		// mtr 有時回傳 hostname 而非 IP（例如 ec2-x-x-x-x.compute-1.amazonaws.com）
+		// 此時需先 DNS 解析取得 IP，才能正確查詢 GeoIP
+		if hop.IP != "*" && net.ParseIP(hop.IP) == nil {
+			// hub.Host 是 hostname，保留為 Host，解析 IP
+			resolved, err := net.LookupHost(hop.IP)
+			if err == nil && len(resolved) > 0 {
+				hop.IP = resolved[0]
+				slog.Debug("Resolved hostname to IP in traceroute hop",
+					"component", "traceroute",
+					"hostname", hop.Host,
+					"resolvedIP", hop.IP,
+					"hopIndex", i+1,
+				)
+			} else {
+				slog.Warn("Failed to resolve hostname in traceroute hop",
+					"component", "traceroute",
+					"hostname", hop.Host,
+					"hopIndex", i+1,
+					"error", err,
+				)
+			}
+		}
+
 		// 對有效 IP 執行 GeoIP 補全（合併查詢，一次 IP 解析）
-		if hop.IP != "*" {
+		if hop.IP != "*" && net.ParseIP(hop.IP) != nil {
 			geo, err := geoip.GetAll(hop.IP)
 			if err == nil {
 				hop.Country = geo.Country
@@ -341,6 +364,9 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 					hop.Host = strings.TrimSuffix(names[0], ".")
 				}
 			}
+		} else if hop.IP != "*" {
+			// IP 解析失敗但有 hostname，GeoConfidence 標記為 none
+			hop.GeoConfidence = "none"
 		} else {
 			hop.GeoConfidence = "none"
 		}

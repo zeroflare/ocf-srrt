@@ -9,8 +9,18 @@ import (
 	"os"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gorilla/websocket"
+)
+
+const (
+	// 心跳間隔：每 30 秒發一次 ping
+	pingInterval = 30 * time.Second
+	// 讀取超時：若超過 60 秒沒收到任何訊息（含 pong），視為斷線
+	pongWait = 60 * time.Second
+	// 寫入超時：單次 write 的最大等待時間
+	writeWait = 10 * time.Second
 )
 
 var allowedOrigins []string
@@ -47,12 +57,19 @@ type BroadcastMessage struct {
 	Data     []byte
 }
 
+// subscribeMsg 前端發送的訂閱訊息，用於切換監控目標 IP
+type subscribeMsg struct {
+	Type string `json:"type"`
+	IP   string `json:"ip"`
+}
+
 // Client 是 WebSocket 連線的抽象
 type Client struct {
 	hub      *Hub
 	conn     *websocket.Conn
 	send     chan []byte
-	clientIP string // token 對應的 IP
+	clientIP string // 目前訂閱的 IP（初始為 token 對應的 IP，可透過 subscribe 切換）
+	mu       sync.Mutex
 }
 
 // Hub 管理所有 WebSocket 連線
@@ -104,7 +121,10 @@ func (h *Hub) Run() {
 			var toRemove []*Client
 			h.mu.RLock()
 			for client := range h.clients {
-				if client.clientIP != msg.SourceIP {
+				client.mu.Lock()
+				subscribedIP := client.clientIP
+				client.mu.Unlock()
+				if subscribedIP != msg.SourceIP {
 					continue
 				}
 				select {
@@ -146,24 +166,100 @@ func (h *Hub) ClientCount() int {
 	return len(h.clients)
 }
 
-func (c *Client) writePump() {
+// sendSnapshot 從 Ring Buffer 撈取指定 IP 的歷史紀錄並發送 snapshot
+func (c *Client) sendSnapshot(ip string) {
+	history := buffer.Get(ip)
+	if len(history) == 0 {
+		// 即使沒有歷史紀錄，也發送空 snapshot 讓前端知道訂閱已生效
+		history = []interface{}{}
+	}
+
+	snapshotMsg := map[string]interface{}{
+		"type": "snapshot",
+		"data": history,
+	}
+
+	data, err := json.Marshal(snapshotMsg)
+	if err != nil {
+		slog.Error("Failed to marshal snapshot", "component", "ws", "error", err, "ip", ip)
+		return
+	}
+
+	select {
+	case c.send <- data:
+		slog.Info("Snapshot sent", "component", "ws", "ip", ip, "records", len(history))
+	default:
+		slog.Warn("Snapshot dropped, send channel full", "component", "ws", "ip", ip)
+	}
+}
+
+// readPump 監聽前端訊息（subscribe 切換監控 IP）
+// 同時負責 pong 超時偵測：若超過 pongWait 沒收到任何訊息，視為斷線
+func (c *Client) readPump() {
 	defer func() {
-		err := c.conn.Close()
-		if err != nil {
-			return
-		}
+		c.hub.unregister <- c
+		c.conn.Close()
 	}()
+
+	// 設定讀取超時：每次收到 pong 時重設
+	c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	c.conn.SetPongHandler(func(string) error {
+		c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		return nil
+	})
+
 	for {
-		message, ok := <-c.send
-		if !ok {
-			err := c.conn.WriteMessage(websocket.CloseMessage, []byte{})
-			if err != nil {
-				return
+		_, message, err := c.conn.ReadMessage()
+		if err != nil {
+			if websocket.IsUnexpectedCloseError(err, websocket.CloseGoingAway, websocket.CloseNormalClosure) {
+				slog.Warn("WebSocket read error", "component", "ws", "error", err)
 			}
 			return
 		}
-		if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
-			return
+
+		var msg subscribeMsg
+		if err := json.Unmarshal(message, &msg); err != nil {
+			continue
+		}
+
+		if msg.Type == "subscribe" && msg.IP != "" {
+			newIP := auth.CanonicalizeIP(msg.IP)
+			c.mu.Lock()
+			oldIP := c.clientIP
+			c.clientIP = newIP
+			c.mu.Unlock()
+
+			slog.Info("Client subscribed to new IP", "component", "ws", "oldIp", oldIP, "newIp", newIP)
+
+			// 切換後立即發送新 IP 的歷史 snapshot
+			c.sendSnapshot(newIP)
+		}
+	}
+}
+
+func (c *Client) writePump() {
+	ticker := time.NewTicker(pingInterval)
+	defer func() {
+		ticker.Stop()
+		c.conn.Close()
+	}()
+	for {
+		select {
+		case message, ok := <-c.send:
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if !ok {
+				c.conn.WriteMessage(websocket.CloseMessage, []byte{})
+				return
+			}
+			if err := c.conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				return
+			}
+		case <-ticker.C:
+			// 定時發送 ping，保持連線活躍並偵測斷線
+			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+			if err := c.conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+				return
+			}
 		}
 	}
 }
@@ -195,21 +291,8 @@ func ServeWs(hub *Hub, tokenStore *auth.TokenStore, w http.ResponseWriter, r *ht
 	slog.Info("New WebSocket connection", "component", "ws", "clientIp", clientIP)
 
 	// 從 Ring Buffer 撈取該 IP 的歷史紀錄
-	history := buffer.Get(clientIP)
-
-	if len(history) > 0 {
-		snapshotMsg := map[string]interface{}{
-			"type": "snapshot",
-			"data": history,
-		}
-
-		data, err := json.Marshal(snapshotMsg)
-		if err == nil {
-			client.send <- data
-		} else {
-			slog.Error("Failed to marshal snapshot", "component", "ws", "error", err)
-		}
-	}
+	client.sendSnapshot(clientIP)
 
 	go client.writePump()
+	go client.readPump() // 監聽前端 subscribe 訊息
 }

@@ -66,7 +66,7 @@ const setCachedLocalCountry = (country: string) => {
 };
 
 export const useDnsStream = (enabled: boolean = true) => {
-  const { addRecord, loadSnapshot, setToken, setDnsIp, setLocalCountry } = useDnsStore();
+  const { addRecord, loadSnapshot, setToken, setDnsIp, setLocalCountry, monitoringIp } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
@@ -76,6 +76,25 @@ export const useDnsStream = (enabled: boolean = true) => {
   const reconnectTimeout = useRef<number | undefined>(undefined);
   const attemptRef = useRef(0);
   const tokenRef = useRef<string | null>(null);
+  // 追蹤目前訂閱的 IP，供重連時自動重新 subscribe
+  const subscribedIpRef = useRef<string | null>(null);
+
+  // 發送 subscribe 訊息，切換後端監聽的目標 IP
+  const sendSubscribe = useRef((ip: string) => {
+    subscribedIpRef.current = ip; // 記住最新的訂閱 IP
+    if (ws.current && ws.current.readyState === WebSocket.OPEN) {
+      const msg = JSON.stringify({ type: 'subscribe', ip });
+      ws.current.send(msg);
+      console.log('[WS] Subscribe sent, ip:', ip);
+    }
+  });
+
+  // 同步 monitoringIp 到 subscribedIpRef，確保重連時使用最新的監控 IP
+  useEffect(() => {
+    if (monitoringIp) {
+      subscribedIpRef.current = monitoringIp;
+    }
+  }, [monitoringIp]);
 
   useEffect(() => {
     if (!enabled) {
@@ -98,6 +117,15 @@ export const useDnsStream = (enabled: boolean = true) => {
         if (reconnectTimeout.current) {
           clearTimeout(reconnectTimeout.current);
           reconnectTimeout.current = undefined;
+        }
+
+        // 重連後自動重新 subscribe，確保後端 clientIP 與前端 monitoringIp 一致
+        // 否則後端用 token 原始 IP（可能是 IPv6），snapshot 和推播都會對不上
+        const ipToSubscribe = subscribedIpRef.current;
+        if (ipToSubscribe && ws.current && ws.current.readyState === WebSocket.OPEN) {
+          const msg = JSON.stringify({ type: 'subscribe', ip: ipToSubscribe });
+          ws.current.send(msg);
+          console.log('[WS] Re-subscribe after reconnect, ip:', ipToSubscribe);
         }
       };
 
@@ -209,5 +237,5 @@ export const useDnsStream = (enabled: boolean = true) => {
     };
   }, [addRecord, loadSnapshot, enabled]);
 
-  return { isConnected, reconnectDelay, myIp };
+  return { isConnected, reconnectDelay, myIp, sendSubscribe: sendSubscribe.current };
 };

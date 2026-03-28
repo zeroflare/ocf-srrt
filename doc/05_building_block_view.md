@@ -60,7 +60,7 @@ graph TB
 | Package | 職責 |
 |---------|------|
 | `dns/` | DNS 代理伺服器（UDP/TCP :53），查詢轉發、回應快取、異步富化管線 |
-| `api/` | HTTP 路由（REST + WebSocket）、CORS 中間件、Traceroute handler |
+| `api/` | HTTP 路由（REST + WebSocket）、CORS 中間件、Traceroute handler。WebSocket Hub 支援 `readPump`/`writePump` 雙向通訊，前端可透過 `subscribe` 訊息動態切換監控 IP |
 | `auth/` | Token Store（UUID ↔ IP 雙向映射），自動產生 token |
 | `buffer/` | Per-IP Ring Buffer（5000 筆/session、2000 session 上限、10min 閒置清除） |
 | `geoip/` | MaxMind MMDB 查詢（Country、City、Subdivision、Coords、ASN/ISP），提供 `GetAll()` 合併查詢 |
@@ -91,7 +91,7 @@ graph LR
 
 | Endpoint | Method | Auth | 用途 |
 |----------|--------|------|------|
-| `/ws` | WebSocket | Token (query param) | 即時 DNS 記錄串流，連線時發送歷史快照 |
+| `/ws` | WebSocket | Token (query param) | 即時 DNS 記錄串流，連線時發送歷史快照。支援 `subscribe` 訊息動態切換監控目標 IP（跨裝置監控） |
 | `/api/token` | GET | None | 取得/建立 session token，回傳 token、client IP、localCountry、dnsPublicIP |
 | `/api/traceroute` | GET | Token (Bearer / query) | 執行 MTR，含快取檢查 + 速率限制 + 併發控制 |
 | `/health` | GET | None | 健康檢查（status、uptime、session count、client count） |
@@ -125,7 +125,7 @@ graph LR
 - **ErrorBoundary**: 錯誤邊界元件。
 
 ### Hooks
-- **useDnsStream**: WebSocket 連線管理，含 token 取得、自動重連（指數退避）、本地國家快取（7 天 TTL）。
+- **useDnsStream**: WebSocket 連線管理，含 token 取得、自動重連（指數退避）、本地國家快取（7 天 TTL）。提供 `sendSubscribe(ip)` 方法，當使用者開始監控時通知後端切換目標 IP。
 - **useMockDnsStream**: Mock 模式 DNS 串流（`VITE_USE_MOCK=true`）。
 - **useSharedReport**: 解壓 URL `?zdata=` 參數，載入共享的 DNS 記錄與追蹤結果。
 - **useTour**: react-joyride 引導式導覽管理。

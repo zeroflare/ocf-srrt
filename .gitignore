@@ -60,3 +60,17 @@ frontend/*.ntvs*
 frontend/*.njsproj
 frontend/*.sln
 frontend/*.sw?
+
+# ========================
+# AI / Editor configs
+# ========================
+CLAUDE.md
+.aiignore
+.air.toml
+*.http
+
+# ========================
+# Secrets (防止再次誤 commit)
+# ========================
+client_secret*.json
+**/client_secret*.json

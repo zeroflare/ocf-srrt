@@ -1,0 +1,16 @@
+{
+  "id": "faster",
+  "name": "FASTER",
+  "color": "#13FCFF",
+  "available_path": [
+    [
+      "TW",
+      "faster-seg-5+6",
+      "faster-seg-3",
+      "faster-seg-2",
+      "JP"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"faster-seg-2\",\n    hidden: !1,\n    coordinates: [[139.975184, 35.005529]"
+}

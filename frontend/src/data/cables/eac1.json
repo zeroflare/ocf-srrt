@@ -1,0 +1,17 @@
+{
+  "id": "eac1",
+  "name": "EAC/C2C EAC1",
+  "color": "#66A6FF",
+  "available_path": [
+    [
+      "TW",
+      "eac1-seg-b-Pali-Landing",
+      "eac1-seg-b",
+      "eac1-seg-a",
+      "eac1-seg-a-Shima-Landing",
+      "JP"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"eac1-seg-b-Pali-Landing\",\n    hidden: !1,\n    coordinates: [[121.36777, 25.216312]"
+}

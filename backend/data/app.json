@@ -1,0 +1,29 @@
+{
+  "apps": [
+    {
+      "name": "Google",
+      "category": "Service",
+      "patterns": ["google", "gstatic", "youtube", "ytimg"]
+    },
+    {
+      "name": "Apple",
+      "category": "Device",
+      "patterns": ["apple.com", "icloud", "mzstatic"]
+    },
+    {
+      "name": "Microsoft",
+      "category": "Business",
+      "patterns": ["microsoft", "azure", "windows", "office", "bing"]
+    },
+    {
+      "name": "GitHub",
+      "category": "Dev",
+      "patterns": ["github"]
+    },
+    {
+      "name": "JetBrains",
+      "category": "Dev",
+      "patterns": ["jetbrains", "intellij"]
+    }
+  ]
+}

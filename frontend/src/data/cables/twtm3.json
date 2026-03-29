@@ -1,0 +1,14 @@
+{
+  "id": "twtm3",
+  "name": "TWTM3",
+  "color": "#79BFFF",
+  "available_path": [
+    [
+      "TW",
+      "twtm3-seg-a",
+      "TW-MT"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"twtm3-seg-a\",\n    hidden: !1,\n    coordinates: [[121.12496666700008, 25.073050000000023]"
+}

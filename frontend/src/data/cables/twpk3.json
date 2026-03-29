@@ -1,0 +1,14 @@
+{
+  "id": "twpk3",
+  "name": "TWPK3",
+  "color": "#51CDFF",
+  "available_path": [
+    [
+      "TW-PH",
+      "twpk3-mk-km",
+      "TW-MK"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"twpk3-mk-km\",\n    hidden: !1,\n    coordinates: [[118.31584640000032, 24.413418899999478]"
+}

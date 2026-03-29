@@ -1,0 +1,86 @@
+services:
+  # =========================================
+  # Backend Service (Production)
+  # =========================================
+  backend:
+    build:
+      context: ./backend
+    container_name: srrt-backend
+
+    # Host 網路模式：必須，否則拿不到真實 Client IP
+    network_mode: "host"
+
+    # 權限設定 (DNS port 53 + Packet Sniffer 需要)
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BIND_SERVICE
+    # 移除所有其他預設 capabilities
+    cap_drop:
+      - ALL
+
+    # 安全強化：唯讀根檔案系統
+    read_only: true
+    # 提供必要的可寫暫存目錄
+    tmpfs:
+      - /tmp:noexec,nosuid,size=64m
+
+    # 記憶體限制：防止 OOM 吃光宿主機
+    mem_limit: 1g
+    memswap_limit: 1g
+
+    # 不允許提權
+    security_opt:
+      - no-new-privileges:true
+
+    volumes:
+      - ./backend/data/GeoLite2-ASN.mmdb:/home/dns-proxy/data/GeoLite2-ASN.mmdb:ro
+      - ./backend/data/GeoLite2-City.mmdb:/home/dns-proxy/data/GeoLite2-City.mmdb:ro
+      - ./backend/data/app.json:/home/dns-proxy/data/app.json:ro
+
+    environment:
+      - LOCAL_COUNTRY=TW
+      - NETWORK_INTERFACE=ens4 # GCP 預設網卡
+      - ASN_DB_PATH=data/GeoLite2-ASN.mmdb
+      - GEOIP_DB_PATH=data/GeoLite2-City.mmdb
+      - RULES_PATH=data/app.json
+      - TRUSTED_PROXIES=127.0.0.1 # Nginx 與後端同機，只信任 localhost
+      - DNS_PUBLIC_IP=${DNS_PUBLIC_IP:-} # VM 公網 IP，供前端顯示 DNS 設定指引
+    restart: unless-stopped
+
+  # =========================================
+  # Frontend Service (Nginx)
+  # =========================================
+  frontend:
+    build:
+      context: ./frontend
+    container_name: srrt-frontend
+
+    network_mode: "host"
+    # 安全強化：唯讀根檔案系統
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=32m
+      - /var/cache/nginx:noexec,nosuid,size=64m
+      - /var/run:noexec,nosuid,size=1m
+      - /var/log/nginx:size=10m
+      - /etc/nginx/conf.d:size=1m
+    # 記憶體限制
+    mem_limit: 1g
+    memswap_limit: 1g
+
+    # 不允許提權
+    security_opt:
+      - no-new-privileges:true
+
+    depends_on:
+      - backend
+
+    environment:
+      - NGINX_PORT=80
+      - NGINX_HOST=_
+      - BACKEND_ADDR=127.0.0.1:8080
+
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    restart: unless-stopped

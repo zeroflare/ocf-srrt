@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "composite": true,
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.node.tsbuildinfo",
+    "skipLibCheck": true,
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "allowSyntheticDefaultImports": true,
+    "strict": true,
+    "noEmit": false,                // 1. 允許輸出
+    "emitDeclarationOnly": true,    // 2. 但只輸出型別檔 (不產生 .js)
+    "declaration": true,            // 3. (保險起見) 確保開啟宣告檔輸出
+    "types": ["node"]
+  },
+  "include": ["vite.config.ts"]
+}

@@ -1,0 +1,92 @@
+services:
+  # =========================================
+  # Backend Service (Go + Air Hot Reload)
+  # =========================================
+  backend:
+    build:
+      context: ./backend
+      target: builder # 只構建到第一階段 (含有 Go 環境)，不跑 Runner 階段
+    container_name: srrt-backend
+
+    # 權限設定 (DNS port 53 + Packet Sniffer 需要)
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - NET_BIND_SERVICE
+    # 移除所有其他預設 capabilities（與 prod 一致）
+    cap_drop:
+      - ALL
+
+    # 記憶體限制：防止 OOM 吃光宿主機
+    mem_limit: 1g
+    memswap_limit: 1g
+
+    # 不允許提權（與 prod 一致）
+    security_opt:
+      - no-new-privileges:true
+
+    # 將本地程式碼掛載進去，這樣修改存檔時容器才看得到
+    volumes:
+      - ./backend:/app
+      # 確保 Go Module Cache 不會被覆蓋
+      - go_cache:/go/pkg/mod
+
+    # 1. 安裝 mtr + Air (Hot Reload 工具)
+    # 2. 啟動 Air
+    command: sh -c "apk add --no-cache mtr && go install github.com/air-verse/air@latest && air -c .air.toml"
+
+    ports:
+      - "1053:53/tcp"
+      - "1053:53/udp"
+      - "8080:8080"
+
+    environment:
+      - LOCAL_COUNTRY=TW
+      - NETWORK_INTERFACE=eth0
+      - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
+      - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
+      - RULES_PATH=/app/data/app.json
+      - CGO_ENABLED=1
+      - TRUSTED_PROXIES=
+    restart: unless-stopped
+
+  # =========================================
+  # Frontend Service (Vite HMR)
+  # =========================================
+  frontend:
+    build:
+      context: ./frontend
+      target: base # 開發模式只需要 Node + pnpm 依賴環境，不需要執行建置
+    container_name: srrt-frontend
+
+    # 記憶體限制
+    mem_limit: 1g
+    memswap_limit: 1g
+
+    # 不允許提權（與 prod 一致）
+    security_opt:
+      - no-new-privileges:true
+
+    # [關鍵] 掛載程式碼
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    # 啟動 Vite Dev Server
+    command: >
+      sh -c "pnpm config set symlink false &&
+                   pnpm install &&
+                   pnpm dev --host 0.0.0.0 --force"
+
+    ports:
+      - "80:5173" # 將本機的 80 對應到容器的 5173 (Vite 預設 Port)
+
+    depends_on:
+      - backend
+
+    environment:
+      - CHOKIDAR_USEPOLLING=true # 強制 Webpack/Vite 輪詢檔案變更
+      - VITE_USE_MOCK=false
+    restart: unless-stopped
+
+volumes:
+  go_cache: # 讓 Go 下載的依賴可以持久化，不用每次重開都下載

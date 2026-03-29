@@ -1,0 +1,15 @@
+{
+  "id": "eac2",
+  "name": "EAC/C2C EAC2",
+  "color": "#58DDFF",
+  "available_path": [
+    [
+      "TW",
+      "eac2-seg-Pali-Landing",
+      "eac2-seg-2b1",
+      "PH"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"eac2-seg-2b1\",\n    hidden: !1,\n    coordinates: [[120.79635, 14.31308]"
+}

@@ -1,0 +1,14 @@
+{
+  "id": "tse1",
+  "name": "TSE-1",
+  "color": "#388FFF",
+  "available_path": [
+    [
+      "TW",
+      "tse1-ts-fz",
+      "CN"
+    ]
+  ],
+  "equipments": [],
+  "segments": "[{\n    id: \"tse1-ts-fz\",\n    hidden: !1,\n    coordinates: [[121.41674804700006, 25.19116210900006]"
+}

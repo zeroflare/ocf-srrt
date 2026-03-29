@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SRRT — arc42 Architecture Documentation</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #0f172a;
+      --bg-card: #1e293b;
+      --bg-sidebar: #0b1120;
+      --text: #e2e8f0;
+      --text-muted: #94a3b8;
+      --text-dim: #64748b;
+      --accent: #22d3ee;
+      --accent-dim: rgba(34,211,238,0.15);
+      --border: rgba(255,255,255,0.06);
+      --code-bg: #0f172a;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      display: flex;
+      min-height: 100vh;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 280px;
+      flex-shrink: 0;
+      background: var(--bg-sidebar);
+      border-right: 1px solid var(--border);
+      padding: 24px 0;
+      position: fixed;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      overflow-y: auto;
+      z-index: 20;
+      transition: transform 0.3s;
+    }
+    .sidebar-header {
+      padding: 0 20px 20px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 12px;
+    }
+    .sidebar-header h1 {
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--accent);
+    }
+    .sidebar-header p {
+      font-size: 10px;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      letter-spacing: 0.15em;
+      margin-top: 4px;
+    }
+    .nav-item {
+      display: block;
+      padding: 9px 20px;
+      font-size: 13px;
+      color: var(--text-muted);
+      text-decoration: none;
+      cursor: pointer;
+      transition: all 0.15s;
+      border-left: 3px solid transparent;
+    }
+    .nav-item:hover {
+      color: var(--text);
+      background: var(--accent-dim);
+    }
+    .nav-item.active {
+      color: var(--accent);
+      border-left-color: var(--accent);
+      background: var(--accent-dim);
+      font-weight: 600;
+    }
+    .nav-item .num {
+      display: inline-block;
+      width: 26px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--text-dim);
+    }
+
+    /* Main */
+    .main {
+      margin-left: 280px;
+      flex: 1;
+      padding: 40px 60px;
+      max-width: 920px;
+    }
+
+    /* Markdown rendered content */
+    .content h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--accent);
+      margin-bottom: 24px;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--border);
+      letter-spacing: 0.02em;
+    }
+    .content h2 {
+      font-size: 18px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 36px 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .content h3 {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text);
+      margin: 24px 0 10px;
+    }
+    .content p {
+      margin-bottom: 14px;
+      color: var(--text-muted);
+    }
+    .content ul, .content ol {
+      margin: 0 0 16px 20px;
+      color: var(--text-muted);
+    }
+    .content li {
+      margin-bottom: 6px;
+    }
+    .content li strong {
+      color: var(--text);
+    }
+    .content code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+    .content pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      margin-bottom: 16px;
+    }
+    .content pre code {
+      border: none;
+      padding: 0;
+      background: none;
+      color: var(--text-muted);
+    }
+    .content del {
+      color: var(--text-dim);
+    }
+
+    /* Mermaid */
+    .mermaid {
+      margin: 20px 0;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 24px 16px;
+      text-align: center;
+      overflow-x: auto;
+    }
+
+    /* Loading */
+    .loading {
+      padding: 40px;
+      text-align: center;
+      color: var(--text-dim);
+      font-size: 13px;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+    }
+
+    /* Mobile hamburger */
+    .menu-toggle {
+      display: none;
+      position: fixed;
+      top: 12px;
+      left: 12px;
+      z-index: 30;
+      width: 40px;
+      height: 40px;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--accent);
+      font-size: 20px;
+      cursor: pointer;
+      align-items: center;
+      justify-content: center;
+    }
+
+    @media (max-width: 768px) {
+      .sidebar { transform: translateX(-100%); }
+      .sidebar.open { transform: translateX(0); }
+      .main { margin-left: 0; padding: 60px 20px 40px; }
+      .menu-toggle { display: flex; }
+    }
+  </style>
+</head>
+<body>
+
+<button class="menu-toggle" id="menuToggle">&#9776;</button>
+
+<nav class="sidebar" id="sidebar">
+  <div class="sidebar-header">
+    <h1>SRRT</h1>
+    <p>arc42 Architecture Doc</p>
+  </div>
+  <div id="nav"></div>
+</nav>
+
+<main class="main">
+  <div class="content" id="content">
+    <div class="loading">Loading documentation...</div>
+  </div>
+</main>
+
+<!-- Marked (Markdown parser) -->
+<script src="https://cdn.jsdelivr.net/npm/marked@15/marked.min.js"></script>
+<!-- Mermaid -->
+<script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+
+<script>
+const chapters = [
+  { file: '01_introduction_and_goals.md', label: 'Introduction & Goals' },
+  { file: '02_architecture_constraints.md', label: 'Constraints' },
+  { file: '03_system_scope_and_context.md', label: 'Scope & Context' },
+  { file: '04_solution_strategy.md', label: 'Solution Strategy' },
+  { file: '05_building_block_view.md', label: 'Building Block View' },
+  { file: '06_runtime_view.md', label: 'Runtime View' },
+  { file: '07_deployment_view.md', label: 'Deployment View' },
+  { file: '08_concepts.md', label: 'Concepts' },
+  { file: '09_design_decisions.md', label: 'Design Decisions' },
+  { file: '10_quality_requirements.md', label: 'Quality Requirements' },
+  { file: '11_risks_and_technical_debt.md', label: 'Risks & Tech Debt' },
+  { file: '12_glossary.md', label: 'Glossary' },
+];
+
+// Init mermaid
+mermaid.initialize({
+  startOnLoad: false,
+  theme: 'dark',
+  themeVariables: {
+    primaryColor: '#1e293b',
+    primaryTextColor: '#e2e8f0',
+    primaryBorderColor: '#22d3ee',
+    lineColor: '#22d3ee',
+    secondaryColor: '#0f172a',
+    tertiaryColor: '#1e293b',
+    fontFamily: 'Inter, sans-serif',
+    fontSize: '13px',
+  },
+});
+
+// Custom renderer: detect mermaid code blocks
+const renderer = new marked.Renderer();
+const originalCode = renderer.code;
+renderer.code = function({ text, lang }) {
+  if (lang === 'mermaid') {
+    return `<div class="mermaid">${text}</div>`;
+  }
+  return `<pre><code>${text}</code></pre>`;
+};
+
+marked.setOptions({ renderer, gfm: true, breaks: false });
+
+// Build nav
+const navEl = document.getElementById('nav');
+chapters.forEach((ch, i) => {
+  const a = document.createElement('a');
+  a.className = 'nav-item';
+  a.dataset.index = i;
+  a.innerHTML = `<span class="num">${String(i + 1).padStart(2, '0')}</span>${ch.label}`;
+  a.addEventListener('click', () => loadChapter(i));
+  navEl.appendChild(a);
+});
+
+let currentIndex = -1;
+
+async function loadChapter(index) {
+  if (index === currentIndex) return;
+  currentIndex = index;
+
+  // Update nav active state
+  document.querySelectorAll('.nav-item').forEach((el, i) => {
+    el.classList.toggle('active', i === index);
+  });
+
+  // Close mobile menu
+  document.getElementById('sidebar').classList.remove('open');
+
+  const contentEl = document.getElementById('content');
+  contentEl.innerHTML = '<div class="loading">Loading...</div>';
+
+  try {
+    const res = await fetch(chapters[index].file);
+    if (!res.ok) throw new Error(res.statusText);
+    const md = await res.text();
+    contentEl.innerHTML = marked.parse(md);
+
+    // Render mermaid diagrams
+    await mermaid.run({ nodes: contentEl.querySelectorAll('.mermaid') });
+  } catch (e) {
+    contentEl.innerHTML = `<p style="color:#ef4444">Failed to load: ${chapters[index].file}<br><small>${e.message}</small></p>`;
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Mobile toggle
+document.getElementById('menuToggle').addEventListener('click', () => {
+  document.getElementById('sidebar').classList.toggle('open');
+});
+
+// Load first chapter
+loadChapter(0);
+</script>
+</body>
+</html>

@@ -74,3 +74,6 @@ CLAUDE.md
 # ========================
 client_secret*.json
 **/client_secret*.json
+
+*.xlsx
+*.docx

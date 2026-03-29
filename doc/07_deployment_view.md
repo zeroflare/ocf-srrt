@@ -48,6 +48,60 @@ graph TB
 - **API proxy**: `/api` → `:8080/api`
 - **Static**: `/assets/` 1 年快取（immutable）、`/locales/` no-cache、`/` fallback to `/index.html`（SPA）
 
+## Deployment Steps
+
+### 步驟 1：準備 GeoIP 資料庫
+至 MaxMind 官網註冊並下載 GeoLite2-City.mmdb 與 GeoLite2-ASN.mmdb，放置於 VM 上的 `backend/data/` 目錄（後續透過 volume 掛載進容器）。
+
+### 步驟 2：Build & Push Image（CI/CD 或手動）
+在 CI 環境或本機執行：
+
+```bash
+docker build -t <REGISTRY>/srrt-backend:latest ./backend
+docker build -t <REGISTRY>/srrt-frontend:latest ./frontend
+docker push <REGISTRY>/srrt-backend:latest
+docker push <REGISTRY>/srrt-frontend:latest
+```
+
+`<REGISTRY>` 可為 Docker Hub、GCR、ECR 等 container registry。
+
+### 步驟 3：準備 VM 部署檔
+將 `docker-compose.prod.yml` 複製到 VM，並將其中的 `build:` 區塊替換為 `image:`：
+
+```yaml
+services:
+  backend:
+    image: <REGISTRY>/srrt-backend:latest
+    # ... 其餘設定不變
+
+  frontend:
+    image: <REGISTRY>/srrt-frontend:latest
+    # ... 其餘設定不變
+```
+
+### 步驟 4：設定環境變數
+於 `docker-compose.prod.yml` 或 `.env` 中設定：
+- `LOCAL_COUNTRY`：本地國碼（如 `TW`）
+- `DNS_PUBLIC_IP`：VM 公網 IP，供前端顯示 DNS 設定指引
+- `NETWORK_INTERFACE`：VM 網卡名稱（GCP 預設 `ens4`）
+
+### 步驟 5：設定 SSL 憑證
+使用 Certbot 或 Cloudflare 取得 HTTPS 憑證，放置於 VM 的 `/etc/letsencrypt` 目錄（容器以 read-only 掛載）。
+
+### 步驟 6：啟動服務
+
+```bash
+docker compose -f docker-compose.prod.yml pull   # 拉取最新 image
+docker compose -f docker-compose.prod.yml up -d   # 啟動服務
+```
+
+### 步驟 7：驗證服務
+- DNS 功能：`dig @<PUBLIC_IP> google.com`
+- 儀表板：瀏覽器開啟 `https://<DOMAIN>` 確認頁面正常
+- WebSocket：確認 `wss://<DOMAIN>/ws` 連線正常
+
+> **替代方案：** 若無 CI/CD 環境，可將 source code 放置於 VM 上，跳過步驟 2–3，直接執行 `docker compose -f docker-compose.prod.yml up -d --build` 在 VM 上建置並啟動。
+
 ## Infrastructure
 - 可部署於 GCP, AWS 等雲端平台。
 - 需要開啟 UDP/TCP 53（DNS）、TCP 80（HTTP redirect）、TCP 443（HTTPS）埠。

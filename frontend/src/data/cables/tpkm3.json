@@ -1,14 +1,48 @@
 {
   "id": "tpkm3",
   "name": "TPKM3",
-  "color": "#2087FF",
+  "color": "#44FFFF",
   "available_path": [
     [
       "TW-HX",
       "tpkm3-hx-mg",
       "TW-MG"
+    ],
+    [
+      "TW-MG",
+      "tpkm3-mg-xy",
+      "TW-XY"
     ]
   ],
   "equipments": [],
-  "segments": "[{\n    id: \"tpkm3-mg-xy\",\n    hidden: !1,\n    coordinates: [[119.51201957190797, 23.60192]"
+  "segments": [
+    {
+      "id": "tpkm3-mg-xy",
+      "hidden": false,
+      "coordinates": [
+        [
+          119.51201957190797,
+          23.60192
+        ],
+        [
+          119.57625399718488,
+          23.573729363608198
+        ]
+      ]
+    },
+    {
+      "id": "tpkm3-hx-mg",
+      "hidden": false,
+      "coordinates": [
+        [
+          119.57625399718488,
+          23.573729363608198
+        ],
+        [
+          119.65615957190879,
+          23.56154353030588
+        ]
+      ]
+    }
+  ]
 }

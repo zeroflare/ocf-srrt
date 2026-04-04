@@ -1,13 +1,19 @@
 {
   "id": "frnal-nacs",
   "name": "F/RNAL NACS",
-  "color": "#9079FF",
+  "color": "#0397FF",
   "available_path": [
     [
       "TW",
       "nacs-seg-1",
       "nacs-seg-hj-jp",
       "JP"
+    ],
+    [
+      "TW",
+      "nacs-seg-2",
+      "nacs-seg-hj-hk",
+      "HK"
     ]
   ],
   "equipments": [],
@@ -548,14 +554,7 @@
           125.48573,
           23.98623
         ]
-      ],
-      "original_point_count": 133,
-      "final_point_count": 133,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 9.205284824516012,
-      "complexity_ratio": 1.275353406644409,
-      "color": "#9079FF"
+      ]
     },
     {
       "id": "nacs-seg-2",
@@ -925,14 +924,7 @@
           125.43737,
           23.92322
         ]
-      ],
-      "original_point_count": 91,
-      "final_point_count": 91,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 10.419848202651517,
-      "complexity_ratio": 1.2045691595378576,
-      "color": "#9079FF"
+      ]
     },
     {
       "id": "nacs-seg-hj-hk",
@@ -1422,14 +1414,7 @@
           125.43765,
           23.92358
         ]
-      ],
-      "original_point_count": 121,
-      "final_point_count": 121,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 8.74066180853262,
-      "complexity_ratio": 1.1671263057584484,
-      "color": "#9079FF"
+      ]
     },
     {
       "id": "nacs-seg-hj-jp",
@@ -2103,14 +2088,7 @@
           139.98237,
           35.01622
         ]
-      ],
-      "original_point_count": 167,
-      "final_point_count": 167,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 12.464922990490154,
-      "complexity_ratio": 1.1330001537860706,
-      "color": "#9079FF"
+      ]
     }
   ]
 }

@@ -85,7 +85,6 @@ export const useDnsStream = (enabled: boolean = true) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
       const msg = JSON.stringify({ type: 'subscribe', ip });
       ws.current.send(msg);
-      console.log('[WS] Subscribe sent, ip:', ip);
     }
   });
 
@@ -109,7 +108,6 @@ export const useDnsStream = (enabled: boolean = true) => {
       ws.current = new WebSocket(url);
 
       ws.current.onopen = () => {
-        console.log('[WS] Connected, url:', url);
         setIsConnected(true);
         setReconnectDelay(null);
         attemptRef.current = 0;
@@ -125,7 +123,6 @@ export const useDnsStream = (enabled: boolean = true) => {
         if (ipToSubscribe && ws.current && ws.current.readyState === WebSocket.OPEN) {
           const msg = JSON.stringify({ type: 'subscribe', ip: ipToSubscribe });
           ws.current.send(msg);
-          console.log('[WS] Re-subscribe after reconnect, ip:', ipToSubscribe);
         }
       };
 
@@ -133,12 +130,9 @@ export const useDnsStream = (enabled: boolean = true) => {
         try {
           const rawData = JSON.parse(event.data) as WebSocketPayload;
           if ('data' in rawData && Array.isArray(rawData.data)) {
-            console.log('[WS] Snapshot received, records:', rawData.data.length,
-              'sample sourceIps:', rawData.data.slice(0, 3).map((r: any) => r.sourceIp));
             loadSnapshot(rawData.data as DnsRecord[]);
           } else {
             const rec = rawData as DnsRecord;
-            console.log('[WS] Record received, sourceIp:', rec.sourceIp, 'domain:', rec.domain);
             addRecord(rec);
           }
         } catch (error) {

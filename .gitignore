@@ -36,6 +36,13 @@ go.work
 go.work.sum
 
 # ========================
+# Scraper
+# ========================
+scraper/node_modules/
+scraper/dist/
+frontend/src/data/events/*.json
+
+# ========================
 # Frontend (Node/React)
 # ========================
 frontend/node_modules/

@@ -1,7 +1,7 @@
 {
   "id": "sjc2",
   "name": "SJC2",
-  "color": "#53A6FF",
+  "color": "#00BFFF",
   "available_path": [
     [
       "TW",
@@ -9,6 +9,20 @@
       "sjc2-seg-Unknown-BU4-BU7",
       "sjc2-seg-Unknown-BU7-Tokyo",
       "JP"
+    ],
+    [
+      "TW",
+      "sjc2-seg-5a",
+      "sjc2-seg-Unknown-BU4A-BU3",
+      "sjc2-seg-4",
+      "HK"
+    ],
+    [
+      "TW",
+      "sjc2-seg-5a",
+      "sjc2-seg-Unknown-BU3-BU1",
+      "sjc2-seg-Unknown-BU1-SG",
+      "SG"
     ]
   ],
   "equipments": [],
@@ -213,14 +227,7 @@
           120.651142,
           22.268783
         ]
-      ],
-      "original_point_count": 49,
-      "final_point_count": 49,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 10.98471815791092,
-      "complexity_ratio": 1.11037945195812,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-Unknown-BU7-Tokyo",
@@ -702,14 +709,7 @@
           137.33462,
           32.479903
         ]
-      ],
-      "original_point_count": 119,
-      "final_point_count": 119,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "moderate",
-      "curvature": 10.80870505152149,
-      "complexity_ratio": 1.4742124718151064,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-Unknown-BU4-BU7",
@@ -1671,14 +1671,7 @@
           137.33459,
           32.47989
         ]
-      ],
-      "original_point_count": 239,
-      "final_point_count": 239,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 12.441371006358914,
-      "complexity_ratio": 1.0922931282059458,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-5",
@@ -2148,14 +2141,7 @@
           123.37483,
           24.826942
         ]
-      ],
-      "original_point_count": 116,
-      "final_point_count": 116,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 13.401035451891348,
-      "complexity_ratio": 1.1998773631172837,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-4",
@@ -2425,14 +2411,7 @@
           116.5538151439786,
           18.25517277448149
         ]
-      ],
-      "original_point_count": 66,
-      "final_point_count": 66,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "moderate",
-      "curvature": 19.297022184374487,
-      "complexity_ratio": 1.26972098613071,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-Unknown-BU1-SG",
@@ -3046,14 +3025,7 @@
           108.04738,
           5.67492
         ]
-      ],
-      "original_point_count": 152,
-      "final_point_count": 152,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 13.597906015576639,
-      "complexity_ratio": 1.1100214205118382,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-Unknown-BU4A-BU3",
@@ -3439,14 +3411,7 @@
           116.554,
           18.25357
         ]
-      ],
-      "original_point_count": 95,
-      "final_point_count": 95,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 13.333741972460944,
-      "complexity_ratio": 1.0766258922065697,
-      "color": "#53A6FF"
+      ]
     },
     {
       "id": "sjc2-seg-Unknown-BU3-BU1",
@@ -3636,14 +3601,7 @@
           121.2985,
           20.61713
         ]
-      ],
-      "original_point_count": 46,
-      "final_point_count": 46,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 13.877152919000963,
-      "complexity_ratio": 1.1026505073939263,
-      "color": "#53A6FF"
+      ]
     }
   ]
 }

@@ -1,7 +1,7 @@
 {
   "id": "ncp",
   "name": "NCP",
-  "color": "#06FEFF",
+  "color": "#5796FF",
   "available_path": [
     [
       "TW",
@@ -1173,14 +1173,7 @@
           121.83069705963135,
           24.85376958244557
         ]
-      ],
-      "original_point_count": 289,
-      "final_point_count": 289,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 5.997060200057491,
-      "complexity_ratio": 1.2104378203586363,
-      "color": "#06FEFF"
+      ]
     },
     {
       "id": "ncp-seg-1.4",
@@ -1834,14 +1827,7 @@
           131.93971753120422,
           28.39342016799529
         ]
-      ],
-      "original_point_count": 162,
-      "final_point_count": 162,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 4.472321840899193,
-      "complexity_ratio": 1.0401323215228568,
-      "color": "#06FEFF"
+      ]
     },
     {
       "id": "ncp-seg-6",
@@ -2339,14 +2325,7 @@
           139.97463941574097,
           35.005534365043935
         ]
-      ],
-      "original_point_count": 123,
-      "final_point_count": 123,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 8.934323336913375,
-      "complexity_ratio": 1.1270907891789412,
-      "color": "#06FEFF"
+      ]
     }
   ]
 }

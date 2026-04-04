@@ -1,12 +1,17 @@
 {
   "id": "apcn2",
   "name": "APCN2",
-  "color": "#37A6FF",
+  "color": "#0777FF",
   "available_path": [
     [
       "TW",
       "apcn2-seg-6",
       "JP"
+    ],
+    [
+      "TW",
+      "apcn2-seg-7",
+      "CN"
     ]
   ],
   "equipments": [],
@@ -707,14 +712,7 @@
           121.41380000100003,
           25.18866666400004
         ]
-      ],
-      "original_point_count": 173,
-      "final_point_count": 173,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 14.87331500060385,
-      "complexity_ratio": 1.2465466326729688,
-      "color": "#37A6FF"
+      ]
     },
     {
       "id": "apcn2-seg-7",
@@ -1188,14 +1186,7 @@
           121.41380000100003,
           25.18866666400004
         ]
-      ],
-      "original_point_count": 117,
-      "final_point_count": 117,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "preserve_curves",
-      "curvature": 22.865674292939858,
-      "complexity_ratio": 2.4577714847767327,
-      "color": "#37A6FF"
+      ]
     }
   ]
 }

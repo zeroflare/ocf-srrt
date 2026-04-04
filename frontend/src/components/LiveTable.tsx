@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { useDnsStore } from '../stores/useDnsStore';
 import { DnsRecord } from '../types';
 import { useTranslation } from 'react-i18next';
-import { Trash2, Download, Search, Share2, SlidersHorizontal, Radio, Filter, FileText } from 'lucide-react';
+import { Trash2, Download, Search, Share2, SlidersHorizontal, Radio, Filter, FileText, Pin, X } from 'lucide-react';
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import { detectCloudProvider } from '../utils/cloudProvider';
@@ -91,11 +91,21 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     return result;
   }, [records, categoryFilter, enabledOs]);
 
+  // 分割為即時資料和釘選資料
+  const liveRecords = useMemo(() =>
+    filteredRecords.filter(r => !selectedRowIds.has(r._id)),
+    [filteredRecords, selectedRowIds],
+  );
+  const pinnedRecords = useMemo(() =>
+    filteredRecords.filter(r => selectedRowIds.has(r._id)),
+    [filteredRecords, selectedRowIds],
+  );
+
   const columns = useMemo(() => [
     columnHelper.display({
       id: 'select',
       header: () => {
-        const allIds = filteredRecords.map(r => r._id);
+        const allIds = liveRecords.map(r => r._id);
         const allSelected = allIds.length > 0 && allIds.every(id => selectedRowIds.has(id));
         return (
           <input
@@ -271,7 +281,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         );
       },
     }),
-  ], [t, selectedRowIds, toggleRowSelection, toggleAllSelection, filteredRecords]);
+  ], [t, selectedRowIds, toggleRowSelection, toggleAllSelection, liveRecords]);
 
   const allColumnIds = useMemo(() => columns.map(c => (c as any).id as string).filter(id => id !== 'select'), [columns]);
   const columnLabels: Record<string, string> = {
@@ -304,7 +314,7 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
   }, [records]);
 
   const table = useReactTable({
-    data: filteredRecords,
+    data: liveRecords,
     columns,
     state: {
       globalFilter,
@@ -312,6 +322,17 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
     },
     onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+  });
+
+  const pinnedTable = useReactTable({
+    data: pinnedRecords,
+    columns,
+    state: {
+      globalFilter,
+      columnVisibility,
+    },
     getCoreRowModel: getCoreRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
   });
@@ -537,51 +558,122 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         </div>
       )}
 
-      {/* Table Content */}
-      <div className="overflow-auto flex-1 custom-scrollbar">
-        <table className="min-w-full text-[11px]">
-          <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0 z-10 transition-colors">
-          {table.getHeaderGroups().map(headerGroup => (
-            <tr key={headerGroup.id}>
-              {headerGroup.headers.map(header => (
-                <th key={header.id} className="px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">
-                  {flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-          {table.getRowModel().rows.length > 0 ? (
-            table.getRowModel().rows.map((row, index) => (
-              <tr
-                key={row.id}
-                className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''} ${selectedRowIds.has(row.original._id) ? 'bg-cyan-500/10 dark:bg-cyan-500/5' : ''}`}
-              >
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="px-4 py-2 whitespace-nowrap">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+      {/* Table Content — 上下分區 */}
+      <div className="flex-1 flex flex-col overflow-hidden min-h-0">
+        {/* 上方：即時流動區 */}
+        <div className="overflow-auto flex-1 custom-scrollbar min-h-0">
+          <table className="min-w-full text-[11px]">
+            <thead className="bg-slate-50 dark:bg-slate-950 sticky top-0 z-10 transition-colors">
+            {table.getHeaderGroups().map(headerGroup => (
+              <tr key={headerGroup.id}>
+                {headerGroup.headers.map(header => (
+                  <th
+                    key={header.id}
+                    className={`px-4 py-3 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5${header.column.id === 'select' ? ' cursor-pointer select-none' : ''}`}
+                    onClick={header.column.id === 'select' ? (e) => {
+                      if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                        toggleAllSelection(liveRecords.map(r => r._id));
+                      }
+                    } : undefined}
+                  >
+                    {flexRender(header.column.columnDef.header, header.getContext())}
+                  </th>
                 ))}
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={visibleColumnCount} className="p-12 text-center text-slate-400 dark:text-slate-600 transition-colors">
-                <div className="flex flex-col items-center gap-3">
-                  <Radio className="h-8 w-8 opacity-20 animate-pulse" />
-                  <div>
-                    <p className="text-sm font-bold">{t('table_empty_title')}</p>
-                    <p className="text-xs mt-1 opacity-60">
-                      {!monitoringIp ? t('table_empty_hint_no_ip') : t('table_empty_hint_waiting')}
-                    </p>
+            ))}
+            </thead>
+            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+            {table.getRowModel().rows.length > 0 ? (
+              table.getRowModel().rows.map((row, index) => (
+                <tr
+                  key={row.id}
+                  className={`hover:bg-cyan-500/5 transition-colors group ${index < newRowCountRef.current ? 'animate-row-flash' : ''}`}
+                >
+                  {row.getVisibleCells().map(cell => (
+                    <td
+                      key={cell.id}
+                      className={`px-4 py-2 whitespace-nowrap${cell.column.id === 'select' ? ' cursor-pointer select-none' : ''}`}
+                      onClick={cell.column.id === 'select' ? (e) => {
+                        if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                          toggleRowSelection(row.original._id);
+                        }
+                      } : undefined}
+                    >
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={visibleColumnCount} className="p-12 text-center text-slate-400 dark:text-slate-600 transition-colors">
+                  <div className="flex flex-col items-center gap-3">
+                    <Radio className="h-8 w-8 opacity-20 animate-pulse" />
+                    <div>
+                      <p className="text-sm font-bold">{t('table_empty_title')}</p>
+                      <p className="text-xs mt-1 opacity-60">
+                        {!monitoringIp ? t('table_empty_hint_no_ip') : t('table_empty_hint_waiting')}
+                      </p>
+                    </div>
                   </div>
-                </div>
-              </td>
-            </tr>
-          )}
-          </tbody>
-        </table>
+                </td>
+              </tr>
+            )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* 下方：釘選靜態區 */}
+        {pinnedRecords.length > 0 && (
+          <div className="flex-shrink-0 border-t-2 border-cyan-400/40 dark:border-cyan-500/30 max-h-[40%] flex flex-col">
+            {/* 釘選區標題列 */}
+            <div className="flex items-center justify-between px-4 py-1.5 bg-cyan-50 dark:bg-cyan-950/50 border-b border-cyan-200/50 dark:border-cyan-500/10 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <Pin className="h-3 w-3 text-cyan-600 dark:text-cyan-400" />
+                <span className="text-[10px] font-bold uppercase tracking-widest text-cyan-700 dark:text-cyan-400">
+                  {t('pinned_section_title')}
+                </span>
+                <span className="text-[10px] font-bold tabular-nums bg-cyan-600 dark:bg-cyan-500 text-white rounded-full w-4 h-4 flex items-center justify-center leading-none">
+                  {pinnedRecords.length}
+                </span>
+              </div>
+              <button
+                onClick={() => useDnsStore.getState().clearSelection()}
+                className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-bold text-slate-400 dark:text-slate-500 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                title={t('clear')}
+              >
+                <X className="h-2.5 w-2.5" />
+              </button>
+            </div>
+            {/* 釘選記錄表格 */}
+            <div className="overflow-auto flex-1 min-h-0 custom-scrollbar">
+              <table className="min-w-full text-[11px]">
+                <tbody className="divide-y divide-cyan-100 dark:divide-cyan-500/10">
+                {pinnedTable.getRowModel().rows.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="bg-cyan-500/5 dark:bg-cyan-500/[0.03] hover:bg-cyan-500/10 transition-colors group"
+                  >
+                    {row.getVisibleCells().map(cell => (
+                      <td
+                        key={cell.id}
+                        className={`px-4 py-2 whitespace-nowrap${cell.column.id === 'select' ? ' cursor-pointer select-none' : ''}`}
+                        onClick={cell.column.id === 'select' ? (e) => {
+                          if ((e.target as HTMLElement).tagName !== 'INPUT') {
+                            toggleRowSelection(row.original._id);
+                          }
+                        } : undefined}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

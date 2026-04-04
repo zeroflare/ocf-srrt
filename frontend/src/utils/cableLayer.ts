@@ -22,6 +22,28 @@ export const addCableSources = (map: maplibregl.Map, geoJSON: GeoJSON.GeoJSON) =
 export const addCableLayers = (map: maplibregl.Map, theme: string = 'dark') => {
   const isDark = theme === 'dark';
 
+  // 0) 透明寬線 — 僅用於擴大 hover / click 判定範圍
+  map.addLayer({
+    id: 'cables-line-hit',
+    type: 'line',
+    source: 'cables',
+    layout: { 'line-join': 'round', 'line-cap': 'round' },
+    paint: {
+      'line-color': '#000000',
+      'line-width': 16,
+      'line-opacity': 0,
+    },
+    filter: ['==', ['get', 'hidden'], false],
+  });
+
+  // 依 brokenStatus 決定海纜顏色：斷線紅色、部分斷線琥珀色、正常用原色
+  const cableColorExpr: maplibregl.ExpressionSpecification = [
+    'case',
+    ['==', ['get', 'brokenStatus'], 'broken'], '#ef4444',
+    ['==', ['get', 'brokenStatus'], 'partial'], '#f59e0b',
+    ['get', 'color'],
+  ];
+
   // 1) 全部海纜（更淡）
   map.addLayer({
     id: 'cables-line',
@@ -29,7 +51,7 @@ export const addCableLayers = (map: maplibregl.Map, theme: string = 'dark') => {
     source: 'cables',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': ['get', 'color'],
+      'line-color': cableColorExpr,
       'line-width': [
         'case',
         ['boolean', ['feature-state', 'hover'], false],
@@ -53,7 +75,7 @@ export const addCableLayers = (map: maplibregl.Map, theme: string = 'dark') => {
     source: 'cables',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': ['get', 'color'],
+      'line-color': cableColorExpr,
       'line-width': [
         'case',
         ['boolean', ['feature-state', 'hover'], false],
@@ -80,7 +102,7 @@ export const addCableLayers = (map: maplibregl.Map, theme: string = 'dark') => {
     source: 'cables',
     layout: { 'line-join': 'round', 'line-cap': 'round' },
     paint: {
-      'line-color': ['get', 'color'],
+      'line-color': cableColorExpr,
       'line-width': 5,
       'line-opacity': 0.95,
     },
@@ -90,33 +112,7 @@ export const addCableLayers = (map: maplibregl.Map, theme: string = 'dark') => {
     ],
   });
 
-  // 4) 動畫流動層 (僅在選取時顯示)
-  map.addLayer({
-    id: 'cables-line-animation',
-    type: 'line',
-    source: 'cables',
-    layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: {
-      'line-color': isDark ? '#ffffff' : '#0e7490',
-      'line-width': 2,
-      'line-opacity': isDark ? 0.8 : 0.6,
-      'line-dasharray': [2, 4],
-    },
-    filter: ['all',
-      ['==', ['get', 'hidden'], false],
-      ['==', ['get', 'cableId'], '___none___'],
-    ],
-  });
-
-  // Traceroute dash animation
-  let tracerouteDashOffset = 0;
-  const animateTraceroute = () => {
-    if (!map.getLayer('trace-lines')) return;
-    tracerouteDashOffset = (tracerouteDashOffset + 0.1) % 6;
-    map.setPaintProperty('trace-lines', 'line-dasharray', [2, 4, tracerouteDashOffset, 0]);
-    requestAnimationFrame(animateTraceroute);
-  };
-  animateTraceroute();
+  // (流向動畫改由 CyberMap 的 flowing dot 處理，不再使用 line-animation 圖層)
 };
 
 /**
@@ -126,14 +122,13 @@ export const setupCableInteractions = (
   map: maplibregl.Map,
   popup: maplibregl.Popup,
   theme: string,
-  toggleCableSelection: (cableId: string) => void,
-  setSelectedCableId: (id: string | null) => void,
-  labels?: { availablePath?: string; clickToSelect?: string },
+  _toggleCableSelection?: (cableId: string) => void,
+  _setSelectedCableId?: (id: string | null) => void,
+  labels?: { availablePath?: string },
 ): (() => void) => {
   const availablePathLabel = labels?.availablePath ?? 'Taiwan Available Route';
-  const clickToSelectLabel = labels?.clickToSelect ?? 'Click to select cable';
   let hoveredFeatureId: string | number | null = null;
-  const activeLayers = ['cables-line', 'cables-line-available'];
+  const activeLayers = ['cables-line', 'cables-line-available', 'cables-line-hit'];
 
   const handleMouseMove = (e: maplibregl.MapMouseEvent) => {
     if (!map) return;
@@ -158,12 +153,18 @@ export const setupCableInteractions = (
       const cableName = String(props.cableName ?? props.name ?? 'Unknown');
       const segmentId = String(props.segmentId ?? '');
       const isAvailable = props.isAvailablePath === true;
+      const brokenStatus = String(props.brokenStatus ?? 'normal');
+      const statusBadge = brokenStatus === 'broken'
+        ? `<div class="text-xs mt-1 font-sans text-red-500 font-semibold">⚠ 斷線</div>`
+        : brokenStatus === 'partial'
+        ? `<div class="text-xs mt-1 font-sans text-amber-500 font-semibold">⚠ 部分斷線</div>`
+        : '';
       const content = `
         <div class="p-2 ${theme === 'dark' ? 'bg-gray-900/90 text-white border-gray-700' : 'bg-white/95 text-slate-800 border-slate-200'} rounded shadow-lg border">
           <div class="font-bold ${theme === 'dark' ? 'text-blue-300' : 'text-blue-600'} font-sans">${cableName}</div>
           <div class="text-xs mt-1 font-sans ${theme === 'dark' ? 'text-gray-300' : 'text-slate-500'}">Segment: ${segmentId}</div>
           ${isAvailable ? `<div class="text-xs mt-1 font-sans ${theme === 'dark' ? 'text-green-400' : 'text-green-600'} font-semibold">✓ ${availablePathLabel}</div>` : ''}
-          <div class="text-xs mt-1 font-sans ${theme === 'dark' ? 'text-gray-400' : 'text-slate-400'}">${clickToSelectLabel}</div>
+          ${statusBadge}
         </div>
       `;
       popup.setLngLat(e.lngLat).setHTML(content).addTo(map);
@@ -181,32 +182,17 @@ export const setupCableInteractions = (
     popup.remove();
   };
 
-  const handleClick = (e: any) => {
-    if (!e.features?.length) return;
-    const f = e.features[0];
-    const props = (f.properties ?? {}) as Record<string, unknown>;
-    const cableId = String(props.cableId ?? '');
-    toggleCableSelection(cableId);
-  };
-
-  const handleEmptyClick = (e: maplibregl.MapMouseEvent) => {
-    const features = map.queryRenderedFeatures(e.point, { layers: activeLayers });
-    if (features.length === 0) setSelectedCableId(null);
-  };
+  // 海纜點擊不再鎖定選取，高亮與動畫完全由 DNS 勾選驅動
 
   map.on('mousemove', handleMouseMove);
   map.on('mouseleave', 'cables-line', handleMouseLeave);
   map.on('mouseleave', 'cables-line-available', handleMouseLeave);
-  map.on('click', 'cables-line', handleClick);
-  map.on('click', 'cables-line-available', handleClick);
-  map.on('click', handleEmptyClick);
+  map.on('mouseleave', 'cables-line-hit', handleMouseLeave);
 
   return () => {
     map.off('mousemove', handleMouseMove);
     map.off('mouseleave', 'cables-line', handleMouseLeave);
     map.off('mouseleave', 'cables-line-available', handleMouseLeave);
-    map.off('click', 'cables-line', handleClick);
-    map.off('click', 'cables-line-available', handleClick);
-    map.off('click', handleEmptyClick);
+    map.off('mouseleave', 'cables-line-hit', handleMouseLeave);
   };
 };

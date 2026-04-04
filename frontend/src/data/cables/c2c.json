@@ -1,13 +1,24 @@
 {
   "id": "c2c",
   "name": "EAC/C2C C2C",
-  "color": "#726DFF",
+  "color": "#057CFF",
   "available_path": [
     [
       "TW",
       "c2c-seg-2b",
       "c2c-seg-2a",
       "HK"
+    ],
+    [
+      "TW",
+      "c2c-seg-2c",
+      "c2c-seg-2a",
+      "HK"
+    ],
+    [
+      "TW",
+      "c2c-seg-3a",
+      "CN"
     ]
   ],
   "equipments": [],
@@ -256,14 +267,7 @@
           119.89636230500003,
           21.71960449200003
         ]
-      ],
-      "original_point_count": 60,
-      "final_point_count": 60,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 12.143652638701871,
-      "complexity_ratio": 1.0380091973788035,
-      "color": "#726DFF"
+      ]
     },
     {
       "id": "c2c-seg-2b",
@@ -353,18 +357,10 @@
           119.89788818400007,
           21.71960449200003
         ]
-      ],
-      "original_point_count": 21,
-      "final_point_count": 21,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "aggressive",
-      "curvature": 11.124431763638547,
-      "complexity_ratio": 1.02065847291026,
-      "color": "#726DFF"
+      ]
     },
     {
       "id": "c2c-seg-2c",
-      "retired": true,
       "hidden": false,
       "coordinates": [
         [
@@ -679,14 +675,7 @@
           119.89636230500003,
           21.71960449200003
         ]
-      ],
-      "original_point_count": 78,
-      "final_point_count": 78,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "preserve_curves",
-      "curvature": 18.744318530530894,
-      "complexity_ratio": 2.4089577971251352,
-      "color": "#726DFF"
+      ]
     },
     {
       "id": "c2c-seg-3a",
@@ -1116,14 +1105,7 @@
           121.41741943400007,
           25.190551758000026
         ]
-      ],
-      "original_point_count": 106,
-      "final_point_count": 106,
-      "total_reduction_ratio": 1,
-      "smoothing_strategy": "preserve_curves",
-      "curvature": 12.65548127502861,
-      "complexity_ratio": 1.9894172111022557,
-      "color": "#726DFF"
+      ]
     }
   ]
 }

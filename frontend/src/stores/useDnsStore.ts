@@ -46,6 +46,7 @@ interface DnsState {
 
 const MAX_RECORDS = 200;
 const MAX_RECORDS_FOR_SHARE = 50;
+const MAX_PINNED_RECORDS = 50;
 
 // Theme 持久化：確保子頁面（TraceroutePage, ReportPage）和新分頁能保持一致的主題
 const THEME_KEY = 'srrt_theme';
@@ -67,13 +68,6 @@ const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boole
     ? newRecords.filter(r => r.sourceIp === monitoringIp)
     : [];
 
-  // DEBUG: 追蹤過濾結果
-  if (newRecords.length > 0) {
-    const sourceIps = [...new Set(newRecords.map(r => r.sourceIp))];
-    console.log('[Store] updateBatch:', newRecords.length, 'records, monitoringIp:', JSON.stringify(monitoringIp),
-      'sourceIps in batch:', sourceIps, 'filtered:', filteredRecords.length);
-  }
-
   if (filteredRecords.length === 0 && monitoringIp !== null) return;
 
   // 如果 monitoringIp 為 null，則表示不監控任何封包 (預設關閉)
@@ -87,8 +81,26 @@ const updateStateWithBatch = (newRecords: DnsRecord[], set: any, isPaused: boole
     );
 
     // 2. 合併列表 (最新的放在最上面)
-    // SRE 優化：限制只留指定筆數，避免長時間掛著導致瀏覽器記憶體洩漏
-    const combinedRecords = [...filteredRecords, ...state.records].slice(0, maxRecords);
+    // 釘選保護：已勾選的紀錄不受 maxRecords 上限淘汰
+    const merged = [...filteredRecords, ...state.records];
+    const pinnedIds = state.selectedRowIds;
+    const pinned: DnsRecord[] = [];
+    const unpinned: DnsRecord[] = [];
+    for (const r of merged) {
+      if (pinnedIds.has(r._id)) {
+        pinned.push(r);
+      } else {
+        unpinned.push(r);
+      }
+    }
+    // 未釘選的部分受 maxRecords 上限限制
+    const unpinnedSliced = unpinned.slice(0, maxRecords);
+    // 合併後維持原始順序（merged 順序 = 新的在前）
+    const keepIds = new Set([
+      ...pinned.map(r => r._id),
+      ...unpinnedSliced.map(r => r._id),
+    ]);
+    const combinedRecords = merged.filter(r => keepIds.has(r._id));
 
     return {
       records: combinedRecords,
@@ -176,11 +188,13 @@ export const useDnsStore = create<DnsState>((set, get) => {
           isSharedReport: state.isSharedReport && ip === state.monitoringIp,
         }));
       } else {
+        // 停止監控或無快照時，同步清空選取狀態
         set((state) => ({
           monitoringIp: ip,
           records: [],
           totalQueries: 0,
           foreignQueries: 0,
+          selectedRowIds: new Set<string>(),
           isSharedReport: state.isSharedReport && ip === state.monitoringIp,
         }));
       }
@@ -209,13 +223,28 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     toggleRowSelection: (id: string) => set((state) => {
       const next = new Set(state.selectedRowIds);
-      if (next.has(id)) next.delete(id); else next.add(id);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        // 釘選上限保護
+        if (next.size >= MAX_PINNED_RECORDS) return {};
+        next.add(id);
+      }
       return { selectedRowIds: next };
     }),
 
     toggleAllSelection: (ids: string[]) => set((state) => {
       const allSelected = ids.every(id => state.selectedRowIds.has(id));
-      return { selectedRowIds: allSelected ? new Set<string>() : new Set(ids) };
+      if (allSelected) {
+        return { selectedRowIds: new Set<string>() };
+      }
+      // 釘選上限保護：只加到上限為止
+      const next = new Set(state.selectedRowIds);
+      for (const id of ids) {
+        if (next.size >= MAX_PINNED_RECORDS) break;
+        next.add(id);
+      }
+      return { selectedRowIds: next };
     }),
 
     clearSelection: () => set({ selectedRowIds: new Set<string>() }),

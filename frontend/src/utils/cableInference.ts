@@ -15,9 +15,24 @@
  *   - 排除斷線 (斷線/部分斷線) 的海纜，優先選擇正常運作的
  *   - 使用 available_path 的 segment 順序建構有方向性的路徑座標
  */
-import { CableData, CableSegment } from '../stores/useCableStore';
 import { DnsRecord } from '../types';
 import { calculateDistance } from './geo';
+
+export type CableSegment = {
+  id: string;
+  hidden?: boolean;
+  coordinates: [number, number][];
+  color?: string;
+};
+
+export type CableData = {
+  id: string;
+  name: string;
+  color?: string;
+  available_path?: Array<Array<string>>;
+  equipments?: unknown[];
+  segments?: CableSegment[] | string;
+};
 
 /** 海纜事件狀態 */
 export interface CableEvent {

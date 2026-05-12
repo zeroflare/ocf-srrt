@@ -13,11 +13,6 @@
 初期使用 React Simple Maps 進行地理視覺化，後期 CyberMap 與 TraceMap 均遷移至 **MapLibre GL** 以提供更好的向量性能與大型地理資料集支援。
 - react-simple-maps 仍作為依賴保留，但主要地圖功能已使用 MapLibre GL。
 
-## Submarine Cable Highlighting
-決定在 CyberMap 中將 `available_path` (台灣出發可用路徑) 獨立圖層化，並大幅降低非可用路徑的透明度。
-- **優點**: 視覺焦點明確，快速識別台灣連外關鍵路徑。
-- **缺點**: 若單一海纜有多段可用路徑，視覺上會比一般路徑複雜，已透過 Hover Popup 文字標註補足。
-
 ## DNS Target Display（動態 hostname）
 `DnsSetupBanner` 使用 `window.location.hostname` 顯示 DNS 目標，而非 hardcoded IP。
 - **動機**: 應用程式可能部署於不同主機（開發、測試、正式環境），hardcoded IP 會導致說明資訊錯誤。
@@ -75,6 +70,20 @@ DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 gor
 - **動機**: DNS 查詢對延遲極為敏感，富化處理（尤其 ICMP Probe）耗時不可預測。
 - **優點**: DNS 回應延遲不受富化管線影響，使用者體驗與純 DNS forwarder 一致。
 - **取捨**: 前端可能在富化完成前就已顯示部分資訊；透過 WaitGroup + 5 秒 timeout 確保 graceful shutdown。
+
+## 海纜地圖功能：完整移除（畫面層）
+歷經「單一 flag → 三個 build-time ENV → runtime UI toggle」三輪迭代後，最終決定**將海纜畫面完全從前端移除**：CyberMap 不再渲染海纜線條 / flow 動畫，Cable Monitor 資訊面板、海纜事件面板、HopTable 海纜推測徽章、Cable Settings popover、相關 i18n 與 ENV / build args 全部清除。
+- **動機**: 三個 flag 維護成本高且 demo 場景使用率低；長期作為「保留但關閉」也讓 codebase 帶著大量 dead path（layer setup / 動畫迴圈 / store / 事件解析），未來重啟前還需重新驗證。
+- **保留項目**: `data/cables/*.json`、`data/events/*.json` 與 `utils/cableInference.ts` 維持原狀，scraper 服務也繼續運行。未來 traceroute 若要做海纜推測，可直接以 `cableInference` 為 utility 起點。
+- **移除清單**:
+  - 元件：`CableEventPanel.tsx`
+  - Store：`useCableStore.ts`、`useDnsStore.cableFlags` + `setCableFlag`
+  - Util：`cableLayer.ts`、`featureFlags.ts`、`geo.ts` 的 `isLikelySubmarine`
+  - CyberMap：cable source/layer/interactions、flow dot 動畫迴圈（`requestAnimationFrame`）、Cable Settings popover、Cable Monitor 面板
+  - HopTable：海纜推測徽章列
+  - i18n：`cable_*` / `event_*` / `confidence_high|medium` / `traceroute_submarine`
+  - 部署：`VITE_CABLE_*` build args + compose env、Dockerfile ARG/ENV
+- **後續若要恢復**: 從 git history 撈即可；資料層與 inference utility 都還在原處，前端只需重接 UI。
 
 ## GeoIP 位置來源：MaxMind 為主、RIPE IPmap 可切換
 位置查詢由 `GEOIP_PROVIDER` 選擇主來源，預設 `maxmind`（MaxMind GeoLite2 City）；設為 `ripe` 則改走 [RIPE IPmap](https://ipmap.ripe.net/) `GET https://ipmap-api.ripe.net/v1/locate/{ip}/best`。主來源失敗且另一邊仍 enabled 時自動 fallback。ASN/ISP 一律由 MaxMind ASN DB 提供（RIPE 不提供）。詳見 [`ripe-ipmap-integration.md`](ripe-ipmap-integration.md)。

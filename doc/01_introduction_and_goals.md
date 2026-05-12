@@ -10,7 +10,7 @@ SRRT (Real-time DNS Traffic Analyzer) 是一個專為資安分析設計的即時
 - **OS 指紋辨識**: 根據 DNS 查詢模式識別裝置作業系統（Android/iOS/Windows）。
 - **境外流量偵測**: 比對結果 IP 國家與本機國家，非本地 IP 觸發 ICMP ping 測量延遲。
 - **前端視覺化戰情室**: 含即時流量圖表、統計儀表板。
-- **海纜地圖 (CyberMap)**: 整合全球海纜資料，並標註「台灣出發可用路徑」。
+- **CyberMap 地圖**: MapLibre GL 世界地圖，整合 DNS 查詢點（境內綠 / 境外紅）與 Traceroute 起終點視覺化。
 - **MTR 路徑追蹤工具**: 使用 MTR (My Traceroute) 提供即時網路路徑追蹤，含丟包率、延遲統計（Avg/Best/Worst/StDev）與 MapLibre GL 地圖視覺化。支援三階段地理修正（延遲啟發式、rDNS PoP 解析、ccTLD 輔助）、同座標跳點自動散開（fan-out）、城市級地理顯示，以及 IPv6 自動轉換 IPv4。
 - **報告產生與分享**: 支援產生分析報告（ReportModal），並透過 URL 壓縮編碼（pako deflate）分享 DNS 記錄與追蹤結果。
 - **引導式導覽 (Guided Tour)**: 使用 react-joyride 提供首次使用者互動式功能導覽。
@@ -23,7 +23,7 @@ graph TB
     OS --> Probe["境外流量偵測<br/>ICMP Ping"]
     Probe --> Stream["WebSocket 即時推送"]
     Stream --> Dashboard["Dashboard<br/>流量圖表 + 統計"]
-    Stream --> CyberMap["CyberMap<br/>海纜地圖"]
+    Stream --> CyberMap["CyberMap<br/>世界地圖"]
     Stream --> LiveTable["LiveTable<br/>DNS 查詢列表"]
     LiveTable -->|"點擊 IP"| MTR["MTR 路徑追蹤"]
     MTR --> TraceMap["TraceMap<br/>路徑地圖"]

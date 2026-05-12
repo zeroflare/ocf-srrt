@@ -12,14 +12,6 @@ export const calculateDistance = (p1: [number, number], p2: [number, number]): n
 };
 
 /**
- * Returns true if two hops are likely connected via submarine cable (>1000km apart).
- */
-export const isLikelySubmarine = (hopA: { coords?: [number, number] }, hopB: { coords?: [number, number] }): boolean => {
-  if (!hopA.coords || !hopB.coords) return false;
-  return calculateDistance(hopA.coords, hopB.coords) > 1000;
-};
-
-/**
  * 同座標 hop 散開：將重疊的 hop 以原座標為圓心等角散開，避免地圖上疊成一團。
  * 只調整渲染座標，不修改原始資料。
  * @param radius 散開半徑（經緯度，約 0.08 度 ≈ 8km）

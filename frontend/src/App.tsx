@@ -10,8 +10,6 @@ import { useDnsStream } from './hooks/useDnsStream';
 import { useMockDnsStream } from './hooks/useMockDnsStream';
 import { useSharedReport } from './hooks/useSharedReport';
 import { useTour } from './hooks/useTour';
-import { useTracerouteStore } from './stores/useTracerouteStore';
-import { useCableStore } from './stores/useCableStore';
 import { LiveTable } from './components/LiveTable';
 // TrafficDashboard 已內聯至監控控制區塊
 import { CyberMap } from './components/CyberMap';
@@ -30,7 +28,6 @@ import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
   const { monitoringIp, setMonitoringIp, isSharedReport, theme, toggleTheme, isPaused, setPaused, totalQueries, foreignQueries, records } = useDnsStore();
-  const { activeResult: traceActiveResult } = useTracerouteStore();
   const { myIp, sendSubscribe } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [showReportModal, setShowReportModal] = useState(false);
@@ -100,11 +97,6 @@ function App() {
       setRunTour(false);
     }
   }, []);
-
-  // Traceroute → Cable store 連動
-  useEffect(() => {
-    useCableStore.getState().selectCableByTraceResult(traceActiveResult);
-  }, [traceActiveResult]);
 
   const { t, i18n } = useTranslation();
   const { tourSteps, joyrideStyles, joyrideLocale } = useTour(theme);

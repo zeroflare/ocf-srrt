@@ -19,7 +19,7 @@
 ### Frontend (React Ecosystem)
 - **核心**: React 19, TypeScript 5.9+, Vite 7
 - **樣式**: Tailwind CSS v4, Lucide Icons
-- **狀態**: Zustand 5（3 個 Store：DNS、Traceroute、Cable）
+- **狀態**: Zustand 5（2 個 Store：DNS、Traceroute）
 - **視覺化**: MapLibre GL 5（CyberMap + TraceMap），Recharts 3（流量圖表），TanStack Table 8（資料表格）
 - **多國語言**: i18next（中/英切換）
 - **導覽**: react-joyride 引導式導覽
@@ -141,7 +141,7 @@ dig @<PUBLIC_IP> google.com
 - **境外流量偵測**: GeoIP 國家比對 + ICMP Ping 延遲驗證
 
 ### 視覺化戰情室
-- **CyberMap**: MapLibre GL 海纜地圖，台灣可用路徑高亮，整合 DNS 查詢點與 Traceroute 路徑視覺化，節點 Hover 顯示 IP/城市/ISP/延遲
+- **CyberMap**: MapLibre GL 世界地圖，整合 DNS 查詢點與 Traceroute 路徑視覺化，節點 Hover 顯示 IP/城市/ISP/延遲
 - **LiveTable**: 即時 DNS 查詢列表，Cloud Provider badge，Country · City 顯示，點擊觸發 MTR 追蹤（IPv6 自動改用 Domain）
 - **MTR 路徑追蹤**:
   - 支援 TCP/ICMP 模式切換

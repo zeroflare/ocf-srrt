@@ -3,7 +3,7 @@
 ## Technology Decisions
 - 使用 Go 的 `miekg/dns` 實作 DNS 代理伺服器，直接接收與轉發 DNS 查詢，同時異步富化回應資料。
 - 使用 WebSocket（gorilla/websocket）確保低延遲的即時資料推送。
-- 前端採用 Zustand 管理全域狀態（3 個 Store：DNS、Traceroute、Cable），並使用 MapLibre GL 進行地理視覺化。
+- 前端採用 Zustand 管理全域狀態（2 個 Store：DNS、Traceroute），並使用 MapLibre GL 進行地理視覺化。
 - **Interactive Debugging**: 整合 MTR (My Traceroute) 到 DNS 列表點擊，一次取得完整路徑統計（Loss%、Avg、Best、Worst、StDev），簡化診斷流程。
 - **Multi-stage Traceroute Enrichment**: MTR 結果經三階段地理修正：延遲啟發式（CDN 偵測）→ rDNS PoP 解析（IATA 機場代碼）→ ccTLD 輔助。
 - **Context-aware Onboarding**: 提供浮動的 DNS 設定說明（DnsSetupBanner）以及 react-joyride 引導式導覽。

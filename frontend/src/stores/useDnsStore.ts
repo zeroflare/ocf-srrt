@@ -25,6 +25,10 @@ interface DnsState {
   localCountry: string | null;
   selectedRowIds: Set<string>;
 
+  // LiveTable 合併重複列開關
+  // 開啟後 (domain, resultIp) 相同的列在表上摺成一列
+  mergeRecords: boolean;
+
   // Actions
   addRecord: (record: DnsRecord) => void;
   loadSnapshot: (records: DnsRecord[]) => void;
@@ -42,11 +46,14 @@ interface DnsState {
   toggleAllSelection: (ids: string[]) => void;
   clearSelection: () => void;
   getSelectedRecords: () => DnsRecord[];
+  toggleMergeRecords: () => void;
 }
 
 const MAX_RECORDS = 200;
 const MAX_RECORDS_FOR_SHARE = 50;
-const MAX_PINNED_RECORDS = 50;
+// 釘選上限：原本 50；放寬至 maxRecords 同步，因為合併群組常常 100+ 筆，
+// 太低的上限會讓合併群組勾選變成「半勾」（部分被丟掉），UX 困惑。
+const MAX_PINNED_RECORDS = 200;
 
 // Theme 持久化：確保子頁面（TraceroutePage, ReportPage）和新分頁能保持一致的主題
 const THEME_KEY = 'srrt_theme';
@@ -138,6 +145,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     dnsIp: null,
     localCountry: null,
     selectedRowIds: new Set<string>(),
+    mergeRecords: false,
 
     addRecord: (record: DnsRecord) => {
       // 只要不暫停且不是分享報告模式，就推入緩衝區
@@ -233,26 +241,41 @@ export const useDnsStore = create<DnsState>((set, get) => {
       return { selectedRowIds: next };
     }),
 
+    // 對一組 ids 做「全選 or 全消」。新版做兩件事：
+    //   1. 用法升級：合併模式下，傳入合併群組所有 children 的 raw IDs，
+    //      讓「勾合併群組」 = 「同時釘選底下所有 raw 紀錄」。
+    //   2. Bug 修：原版「全部已選 → 整個 selectedRowIds 清空」會誤刪
+    //      不在當前 view 中的釘選；改為「只刪 ids 內的 IDs」。
     toggleAllSelection: (ids: string[]) => set((state) => {
-      const allSelected = ids.every(id => state.selectedRowIds.has(id));
-      if (allSelected) {
-        return { selectedRowIds: new Set<string>() };
-      }
-      // 釘選上限保護：只加到上限為止
+      if (ids.length === 0) return {};
       const next = new Set(state.selectedRowIds);
-      for (const id of ids) {
-        if (next.size >= MAX_PINNED_RECORDS) break;
-        next.add(id);
+      const allSelected = ids.every(id => next.has(id));
+      if (allSelected) {
+        ids.forEach(id => next.delete(id));
+      } else {
+        for (const id of ids) {
+          if (next.size >= MAX_PINNED_RECORDS) break;
+          next.add(id);
+        }
       }
       return { selectedRowIds: next };
     }),
 
     clearSelection: () => set({ selectedRowIds: new Set<string>() }),
 
+    // selectedRowIds 永遠存 raw record IDs（合併模式下合併 row 的 checkbox
+    // 會展開成 children 的 raw IDs），所以這裡單純 raw ID 比對即可。
     getSelectedRecords: () => {
       const { records, selectedRowIds } = get();
+      if (selectedRowIds.size === 0) return [];
       return records.filter(r => selectedRowIds.has(r._id));
     },
+
+    // 切換「合併重複列」顯示模式。selectedRowIds 跨 mode 都是 raw IDs，
+    // 切換時保留釘選不清空。
+    toggleMergeRecords: () => set((state) => ({
+      mergeRecords: !state.mergeRecords,
+    })),
 
     exportToUrl: () => {
       const { records } = get();

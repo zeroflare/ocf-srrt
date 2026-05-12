@@ -142,11 +142,11 @@ dig @<PUBLIC_IP> google.com
 
 ### 視覺化戰情室
 - **CyberMap**: MapLibre GL 世界地圖，整合 DNS 查詢點與 Traceroute 路徑視覺化，節點 Hover 顯示 IP/城市/ISP/延遲
-- **LiveTable**: 即時 DNS 查詢列表，Cloud Provider badge，Country · City 顯示，點擊觸發 MTR 追蹤（IPv6 自動改用 Domain）
+- **LiveTable**: 即時 DNS 查詢列表，Cloud Provider badge，Country · City 顯示，點擊觸發 MTR 追蹤（IPv6 自動改用 Domain）。**合併重複** toggle（預設關）：開啟後同 `appName` 的紀錄全部折成一列（識別失敗則回退到 `domain`），並顯示出現次數 badge `× N`
 - **MTR 路徑追蹤**:
   - 支援 TCP/ICMP 模式切換
-  - **TraceMap**: 延遲漸變色路徑，同座標跳點自動散開（fan-out），流向動畫
-  - **HopTable**: Loss%/Avg/Best/Worst/StDev 統計，Country · City 顯示
+  - **TraceMap / CyberMap 路徑**: **只渲染「起點→終點」兩節點 + 一條連線**（中間 hop 因 CDN/anycast 地理常失真，故不在地圖上呈現；完整 hop 仍由 HopTable 顯示）。延遲漸變色 + 流向動畫
+  - **HopTable**: Loss%/Avg/Best/Worst/StDev 統計，Country · City 顯示，所有 hop 完整可見
   - 三階段地理修正（延遲啟發式 → rDNS PoP → ccTLD）
   - 支援 URL 壓縮分享
 

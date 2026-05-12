@@ -63,6 +63,25 @@ export interface DnsRecord {
     geoInferred?: boolean;
 }
 
+/**
+ * LiveTable「合併重複列」模式下，給 React Table 用的展示型別。
+ * 設計決策（doc/09）：以 (domain, resultIp) 為合併鍵，
+ * 額外提供出現次數與首尾時間。一般 raw 模式下三個欄位為 undefined。
+ */
+export interface DisplayDnsRecord extends DnsRecord {
+  /** 合併群組內的紀錄數；未合併時為 undefined */
+  _count?: number;
+  /** 合併群組內最早的 timestamp */
+  _firstSeenAt?: string;
+  /** 合併群組內最晚的 timestamp（也是 row 上顯示的 timestamp）*/
+  _lastSeenAt?: string;
+  /**
+   * 合併群組內的原始紀錄（最新→最舊），供 LiveTable 展開檢視。
+   * TanStack Table 透過 getSubRows: row => row._children 渲染為子列。
+   */
+  _children?: DnsRecord[];
+}
+
 export interface Hop {
   index: number;
   ip: string;

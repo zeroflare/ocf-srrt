@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Hop } from '../types';
-import { calculateDistance, createCurve, spreadOverlappingHops } from '../utils/geo';
+import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHops } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
 
 interface TraceMapProps {
@@ -81,8 +81,14 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         !(h.coords[0] === 0 && h.coords[1] === 0)
       );
 
-      // 同座標 hop 散開（fan-out），避免地圖上疊成一團
-      const validHops = spreadOverlappingHops(rawValidHops);
+      // 設計決策（doc/09）：地圖只渲染「起點→終點」兩個節點。
+      // 中間 hop 因 CDN/anycast 常有地理失真，造成路徑線忽南忽北、跨洲反折，
+      // 反而比簡化過後的直連更難解讀。完整 hop 資訊在 HopTable 仍可見。
+      const endpointHops = pickPathEndpoints(rawValidHops);
+
+      // 仍保留 fan-out 處理：理論上起點 / 終點不會同座標，
+      // 但若極端情況（如 traceroute 對自己 LAN gateway）仍能避免疊圖。
+      const validHops = spreadOverlappingHops(endpointHops);
 
       // 建立 traceroute source
       const features: GeoJSON.Feature[] = [];

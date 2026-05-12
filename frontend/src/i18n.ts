@@ -23,7 +23,11 @@ i18n
 
       // Backend 設定
       backend: {
-        loadPath: '/locales/{{lng}}/{{ns}}.json',
+        // Dev 模式加 cache-bust query，避免 vite / 瀏覽器 cache 舊翻譯導致
+        // 新增 i18n key 顯示為 raw 字串。Prod build 時間固定，正常 cache 即可。
+        loadPath: import.meta.env.DEV
+          ? `/locales/{{lng}}/{{ns}}.json?v=${Date.now()}`
+          : '/locales/{{lng}}/{{ns}}.json',
       },
 
       react: {

@@ -84,3 +84,9 @@ client_secret*.json
 
 *.xlsx
 *.docx
+
+# ========================
+# SBOM / 設計草稿（不納入版控）
+# ========================
+sbom*.cdx.json
+cable-inference-algorithm.md

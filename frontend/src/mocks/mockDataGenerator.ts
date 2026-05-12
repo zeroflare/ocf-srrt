@@ -148,6 +148,25 @@ for (const s of TEST_SCENARIOS) {
   }
 }
 
+// 每個 domain 對應到 1~3 個固定 IP（模擬 CDN 多 IP 解析）。
+// 第一次某 domain 出現時隨機產生 IP 池並 cache，之後該 domain 永遠從池裡選。
+//
+// 這個設計讓 LiveTable「合併重複」toggle 在 mock 模式下能看到效果：
+// 同 (domain, resultIp) 會被反覆查詢，合併後會出現 ×N 計數 badge。
+const _domainIpPool = new Map<string, string[]>();
+const _randIp = () =>
+  `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`;
+
+const pickIpForDomain = (domain: string): string => {
+  let pool = _domainIpPool.get(domain);
+  if (!pool) {
+    const size = 1 + Math.floor(Math.random() * 3); // 1~3 個 IP
+    pool = Array.from({ length: size }, _randIp);
+    _domainIpPool.set(domain, pool);
+  }
+  return pool[Math.floor(Math.random() * pool.length)];
+};
+
 let _mockIdCounter = 0;
 
 export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
@@ -171,7 +190,7 @@ export const generateRandomDnsRecord = (sourceIp?: string): DnsRecord => {
     timestamp: new Date().toISOString(),
     domain: app.domain,
     type: Math.random() > 0.8 ? 'AAAA' : 'A',
-    resultIp: `${Math.floor(Math.random() * 223) + 1}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}.${Math.floor(Math.random() * 256)}`,
+    resultIp: pickIpForDomain(app.domain),
     isForeign,
     foreignConfidence: isForeign ? (Math.random() > 0.3 ? 'high' : 'low') : '',
     latency,

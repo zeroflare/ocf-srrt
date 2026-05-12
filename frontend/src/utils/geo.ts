@@ -46,6 +46,18 @@ export function spreadOverlappingHops<T extends { coords: [number, number] }>(
 }
 
 /**
+ * 取陣列首尾兩元素，其餘忽略；長度 ≤ 1 時原樣回傳。
+ *
+ * 用途：地圖上 traceroute 路徑只顯示起點→終點兩點，
+ * 中間 hop 因 CDN/anycast 常有地理失真，設計上不在地圖上顯示，
+ * 但 HopTable 仍保留完整資訊（見 doc/09_design_decisions.md）。
+ */
+export function pickPathEndpoints<T>(items: T[]): T[] {
+  if (items.length <= 1) return items;
+  return [items[0], items[items.length - 1]];
+}
+
+/**
  * Create a curved line (arc) between two [lon, lat] points.
  */
 export const createCurve = (start: [number, number], end: [number, number]): [number, number][] => {

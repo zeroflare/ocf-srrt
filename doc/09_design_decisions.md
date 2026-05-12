@@ -71,6 +71,26 @@ DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 gor
 - **優點**: DNS 回應延遲不受富化管線影響，使用者體驗與純 DNS forwarder 一致。
 - **取捨**: 前端可能在富化完成前就已顯示部分資訊；透過 WaitGroup + 5 秒 timeout 確保 graceful shutdown。
 
+## LiveTable 合併重複列（Toggle，預設關）
+LiveTable 提供「合併重複」開關（toolbar 中 `Layers` icon 按鈕），開啟後相同 `(domain, resultIp)` 的列折成單一列，顯示出現次數 badge `× N` 與「最後一次時間」（hover 看完整 first→last 範圍）。
+- **動機**: 實測反映表格雜訊太高 — 同一 domain 在短時間內被瀏覽器、App 反覆查詢，原本一筆紀錄一列導致重要資訊被淹沒。
+- **合併鍵選擇**:
+  - 主鍵：`appName`（二次調整：放寬到應用層級，例如所有 Google 系列 domain + 多 IP 全部摺成一列）
+  - Fallback：`domain`（後端應用識別失敗、`appName` 為空時，仍按 domain 折）
+  - 不再用 `(domain, resultIp)` 與 type — 雜訊在這個粒度仍太多
+  - 顯示用的 `domain` / `resultIp` / `country` 等欄位仍取「最後一次」值，搭配 `×N` badge 提示這是合併代表，使用者可關閉 toggle 看原貌
+- **預設行為**: 預設關閉，避免初次使用者看不到原始資料時序。Toggle 切換 mergeRecords 不影響 `selectedRowIds`（後者永遠是 raw record IDs，跨 mode 都有效）。
+- **合併規則**:
+  - 顯示欄位（country / city / asn / isp / appName / os / latency …）取「最後一次」的值，**不取平均**，避免被早期峰值拖偏。
+  - `_count` 為合併群組的紀錄數；`_firstSeenAt` / `_lastSeenAt` 提供時間範圍。
+  - 合併群組的 `_id` 用穩定鍵 `merged::${domain}::${resultIp}`，新紀錄到來時 id 不漂移，pin 狀態能保留。
+- **實作**: `utils/mergeDnsRecords.ts` 純函式 + `useDnsStore.mergeRecords` boolean state + `LiveTable` 在 filteredRecords 計算後條件套用。`types.ts` 新增 `DisplayDnsRecord = DnsRecord & { _count?, _firstSeenAt?, _lastSeenAt?, _children? }`。
+- **釘選與合併的整合**:
+  - 點合併群組 row 的 checkbox 等於把其 `_children` 所有 raw `_id` 一次加入 / 移除釘選（atomic toggle）
+  - Checkbox 三態：`all children pinned` / `some children pinned` (indeterminate) / `none pinned`；`some` 狀態通常出現在跨 mode 切換、或 pinned table 中個別 unpin 之後
+  - 釘選區（pinned section）**直接以 raw records 平鋪呈現**，不做合併。這讓「釘選筆數 = 真實紀錄數」並且 mergeRecords toggle 切換不會讓釘選消失
+  - Live 區只把「全 children 都已釘選」的群組移到釘選區；部分釘選的群組仍留在 live（顯示 indeterminate checkbox）
+
 ## 海纜地圖功能：完整移除（畫面層）
 歷經「單一 flag → 三個 build-time ENV → runtime UI toggle」三輪迭代後，最終決定**將海纜畫面完全從前端移除**：CyberMap 不再渲染海纜線條 / flow 動畫，Cable Monitor 資訊面板、海纜事件面板、HopTable 海纜推測徽章、Cable Settings popover、相關 i18n 與 ENV / build args 全部清除。
 - **動機**: 三個 flag 維護成本高且 demo 場景使用率低；長期作為「保留但關閉」也讓 codebase 帶著大量 dead path（layer setup / 動畫迴圈 / store / 事件解析），未來重啟前還需重新驗證。
@@ -84,6 +104,15 @@ DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 gor
   - i18n：`cable_*` / `event_*` / `confidence_high|medium` / `traceroute_submarine`
   - 部署：`VITE_CABLE_*` build args + compose env、Dockerfile ARG/ENV
 - **後續若要恢復**: 從 git history 撈即可；資料層與 inference utility 都還在原處，前端只需重接 UI。
+
+## TraceMap / CyberMap 路徑簡化為「起點→終點」直連
+Traceroute 視覺化（`TraceMap` 與 `CyberMap` 的 trace overlay）改為**只在地圖上渲染起點與終點兩個節點與一條連線**，中間 hop 不再以節點 / 線段呈現。
+- **動機**: 中間 hop 經常是 CDN edge、anycast 入口、跨 ISP transit router，GeoIP 對這類 IP 精度差，導致地圖路徑出現「忽南忽北、跨洲反折」的詭異折線，反而誤導觀察者。
+- **取捨**:
+  - 失去「視覺上看得出走哪幾跳」的能力（但這個資訊本來就常常是錯的）。
+  - HopTable 仍然顯示完整 hop 列（IP / ASN / Loss% / Avg / Best / Worst / StDev），所有原始資訊保留供分析。
+- **實作**: 新增 `utils/geo.ts` 的 `pickPathEndpoints()`，TraceMap / CyberMap 的 hop filter 之後套用。下游 marker / line / 流向動畫 / fitBounds 邏輯不需大改，自動適應 0/1/2 點輸入。
+- **後續可選**: 若日後想恢復「中間 hop 也顯示」的選項，可加 ENV 或 UI toggle，目前未做。
 
 ## GeoIP 位置來源：MaxMind 為主、RIPE IPmap 可切換
 位置查詢由 `GEOIP_PROVIDER` 選擇主來源，預設 `maxmind`（MaxMind GeoLite2 City）；設為 `ripe` 則改走 [RIPE IPmap](https://ipmap.ripe.net/) `GET https://ipmap-api.ripe.net/v1/locate/{ip}/best`。主來源失敗且另一邊仍 enabled 時自動 fallback。ASN/ISP 一律由 MaxMind ASN DB 提供（RIPE 不提供）。詳見 [`ripe-ipmap-integration.md`](ripe-ipmap-integration.md)。

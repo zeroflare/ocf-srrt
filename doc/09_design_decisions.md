@@ -76,6 +76,20 @@ DNS 回應立即回覆用戶端，富化（GeoIP、Recognition、Probe）在 gor
 - **優點**: DNS 回應延遲不受富化管線影響，使用者體驗與純 DNS forwarder 一致。
 - **取捨**: 前端可能在富化完成前就已顯示部分資訊；透過 WaitGroup + 5 秒 timeout 確保 graceful shutdown。
 
+## GeoIP 位置來源：MaxMind 為主、RIPE IPmap 可切換
+位置查詢由 `GEOIP_PROVIDER` 選擇主來源，預設 `maxmind`（MaxMind GeoLite2 City）；設為 `ripe` 則改走 [RIPE IPmap](https://ipmap.ripe.net/) `GET https://ipmap-api.ripe.net/v1/locate/{ip}/best`。主來源失敗且另一邊仍 enabled 時自動 fallback。ASN/ISP 一律由 MaxMind ASN DB 提供（RIPE 不提供）。詳見 [`ripe-ipmap-integration.md`](ripe-ipmap-integration.md)。
+- **演進**:
+  1. 早期僅 MaxMind GeoLite2 City。
+  2. 中期改為 pure RIPE（`MAXMIND_LOCATION_ENABLED=false`），觀察 RIPE 對基礎建設 IP（核心路由器、IXP、跨國 PoP）精度的提升幅度。
+  3. 實測回饋：RIPE 對住家寬頻 IP 覆蓋率不及 MaxMind，且 RIPE active engines 第一次查詢常處 `queued`，DNS 列表上「位置欄空白」的比例變高，使用者體感變差。改回 **MaxMind 為主、RIPE 保留可切換**。
+- **架構**: `geoip.resolver` 依 `cfg.Provider` 計算 `(primary, secondary)`，呼叫 `tryProvider()` 兩次。MaxMind 走套件層 `countryDB`，RIPE 走 `ripeClient` HTTP；任一邊未 enabled 時對應 `tryProvider` 靜默回 false。對外 API（`GetAll` / `GetCountry` / `GetCoords` / `GetASN`）不變。
+- **快取策略**: in-memory TTL，成功 24h、失敗 1m。失敗 TTL 故意設短以容忍 RIPE active engines lazy 觸發。
+- **取捨**:
+  - MaxMind primary 時無網路依賴，延遲穩定；RIPE primary 時引入 800ms timeout，DNS enrichment 是 async pipeline 不影響主流程。
+  - 兩來源同時 enabled 會多出一次「primary miss → secondary 查詢」的開銷；可透過關閉其中一邊規避。
+  - RIPE 沒公布明確 rate limit；以 24h cache + UA 標識緩解。
+- **後續優化**: RIPE response 直接給 `iataCode`，未來可考慮取代 `traceroute/rdns.go` 的 80+ 筆手刻 IATA 表。
+
 ## WebSocket Subscribe（跨裝置監控）
 新增 WebSocket 雙向通訊機制，允許前端透過 `{"type":"subscribe","ip":"x.x.x.x"}` 訊息動態切換後端的監控目標 IP。
 - **動機**: 原設計 WebSocket Hub 以 token 對應的 HTTP clientIP 過濾 broadcast。在 Dual-stack（IPv4+IPv6）網路環境下，電腦瀏覽器可能透過 IPv6 取得 token，而手機的 DNS 查詢走 IPv4，導致兩者 IP 不匹配，前端無法收到任何資料。此問題在 ISP 逐步開通 IPv6 後愈發常見。

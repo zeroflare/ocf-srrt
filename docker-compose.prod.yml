@@ -46,6 +46,18 @@ services:
       - RULES_PATH=data/app.json
       - TRUSTED_PROXIES=127.0.0.1 # Nginx 與後端同機，只信任 localhost
       - DNS_PUBLIC_IP=${DNS_PUBLIC_IP:-} # VM 公網 IP，供前端顯示 DNS 設定指引
+      # ----- GeoIP 來源設定（預設 MaxMind 為主，RIPE IPmap 保留為可切換來源）-----
+      # 切到 RIPE：GEOIP_PROVIDER=ripe；主來源失敗會自動 fallback 到另一邊
+      # 詳見 doc/ripe-ipmap-integration.md
+      - GEOIP_PROVIDER=${GEOIP_PROVIDER:-maxmind}
+      - RIPE_IPMAP_ENABLED=${RIPE_IPMAP_ENABLED:-true}
+      - RIPE_IPMAP_BASE_URL=${RIPE_IPMAP_BASE_URL:-https://ipmap-api.ripe.net}
+      - RIPE_IPMAP_TIMEOUT_MS=${RIPE_IPMAP_TIMEOUT_MS:-800}
+      - RIPE_IPMAP_CACHE_TTL_OK=${RIPE_IPMAP_CACHE_TTL_OK:-24h}
+      - RIPE_IPMAP_CACHE_TTL_MISS=${RIPE_IPMAP_CACHE_TTL_MISS:-1m}
+      - RIPE_IPMAP_USER_AGENT=${RIPE_IPMAP_USER_AGENT:-srrt-dns-analyzer/1.0}
+      - MAXMIND_LOCATION_ENABLED=${MAXMIND_LOCATION_ENABLED:-true}
+      - MAXMIND_ASN_ENABLED=${MAXMIND_ASN_ENABLED:-true}
     restart: unless-stopped
 
   # =========================================

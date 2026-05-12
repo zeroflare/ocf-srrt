@@ -164,11 +164,27 @@ dig @<PUBLIC_IP> google.com
 | `LOCAL_COUNTRY` | 本地國碼（境外流量偵測） | — |
 | `NETWORK_INTERFACE` | 網路介面 | `eth0` |
 | `ASN_DB_PATH` | ASN MMDB 路徑 | `data/GeoLite2-ASN.mmdb` |
-| `GEOIP_DB_PATH` | GeoIP MMDB 路徑 | `data/GeoLite2-City.mmdb` |
+| `GEOIP_DB_PATH` | GeoIP City/Country MMDB 路徑 | `data/GeoLite2-City.mmdb` |
 | `RULES_PATH` | 應用識別規則路徑 | `data/app.json` |
 | `DNS_UPSTREAMS` | 上游 DNS（逗號分隔） | `1.1.1.1:53,8.8.8.8:53,...` |
 | `TRUSTED_PROXIES` | 信任的代理 IP | — |
 | `ALLOWED_ORIGINS` | WebSocket 允許來源 | — |
+
+#### Backend / GeoIP 來源（MaxMind 為主、RIPE IPmap 可切換）
+
+位置查詢預設走 **MaxMind GeoLite2**；RIPE IPmap 作為可切換的替代來源保留下來。主來源失敗且另一邊仍 enabled 時會自動 fallback。MaxMind ASN DB 一律負責 ASN/ISP 標籤（RIPE 不提供）。詳見 [`doc/ripe-ipmap-integration.md`](doc/ripe-ipmap-integration.md)。
+
+| 變數 | 說明 | 預設值 |
+|------|------|--------|
+| `GEOIP_PROVIDER` | 位置主來源：`maxmind` 或 `ripe` | `maxmind` |
+| `MAXMIND_LOCATION_ENABLED` | 是否載入 MaxMind City/Country DB（即使非 primary 也可作 fallback）| `true` |
+| `MAXMIND_ASN_ENABLED` | 是否載入 MaxMind ASN DB 補 ASN/ISP | `true` |
+| `RIPE_IPMAP_ENABLED` | 是否啟用 RIPE IPmap（可作主或 fallback）| `true` |
+| `RIPE_IPMAP_BASE_URL` | RIPE API base URL（測試 / 私有 mirror 可改）| `https://ipmap-api.ripe.net` |
+| `RIPE_IPMAP_TIMEOUT_MS` | 單次查詢上限（ms）| `800` |
+| `RIPE_IPMAP_CACHE_TTL_OK` | 成功結果快取 TTL | `24h` |
+| `RIPE_IPMAP_CACHE_TTL_MISS` | 失敗 / location=null 快取 TTL（短，因應 RIPE active engines lazy 觸發）| `1m` |
+| `RIPE_IPMAP_USER_AGENT` | 出口 User-Agent | `srrt-dns-analyzer/1.0` |
 
 ### Frontend
 | 變數 | 說明 | 預設值 |

@@ -33,12 +33,22 @@ services:
     security_opt:
       - no-new-privileges:true
 
+    # Log rotation：避免 docker container log 無上限成長吃爆磁碟
+    # 預設 json-file driver 不會 rotate，DNS proxy 高頻 log 幾天就能塞滿 boot disk
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
     volumes:
       - ./backend/data/GeoLite2-ASN.mmdb:/home/dns-proxy/data/GeoLite2-ASN.mmdb:ro
       - ./backend/data/GeoLite2-City.mmdb:/home/dns-proxy/data/GeoLite2-City.mmdb:ro
       - ./backend/data/app.json:/home/dns-proxy/data/app.json:ro
 
     environment:
+      # Log level：prod 預設 warn，降低 log 量；除錯時可改 info 或 debug
+      - LOG_LEVEL=${LOG_LEVEL:-warn}
       - LOCAL_COUNTRY=TW
       - NETWORK_INTERFACE=ens4 # GCP 預設網卡
       - ASN_DB_PATH=data/GeoLite2-ASN.mmdb
@@ -76,6 +86,13 @@ services:
     memswap_limit: 2g
     security_opt:
       - no-new-privileges:true
+
+    # Log rotation（與 backend 一致）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
     volumes:
       - ./frontend/src/data/cables:/output/cables
@@ -115,6 +132,13 @@ services:
     # 不允許提權
     security_opt:
       - no-new-privileges:true
+
+    # Log rotation（與 backend 一致；nginx access log 也走 docker stdout）
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
 
     depends_on:
       - backend

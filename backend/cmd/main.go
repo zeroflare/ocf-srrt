@@ -94,8 +94,21 @@ func detectPublicIP() string {
 }
 
 func main() {
+	// Log level 可由 LOG_LEVEL 環境變數調整（debug / info / warn / error）。
+	// prod 建議 warn 以避免每筆 DNS 都產生 log 把 disk 灌爆。
+	logLevel := slog.LevelInfo
+	switch strings.ToLower(os.Getenv("LOG_LEVEL")) {
+	case "debug":
+		logLevel = slog.LevelDebug
+	case "info":
+		logLevel = slog.LevelInfo
+	case "warn", "warning":
+		logLevel = slog.LevelWarn
+	case "error":
+		logLevel = slog.LevelError
+	}
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
+		Level: logLevel,
 	})))
 
 	rulesPath := os.Getenv("RULES_PATH")

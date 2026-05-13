@@ -400,7 +400,8 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			record.Latitude = geoResult.Coords[1]
 		}
 
-		slog.Info("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)
+		// per-request log 用 Debug，避免在 prod 把 disk 灌爆；需要時 LOG_LEVEL=debug 即可開啟
+		slog.Debug("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)
 
 		// 存入 Ring Buffer
 		buffer.Add(sourceIp, record)

@@ -11,12 +11,12 @@ import (
 // resolver 負責將「位置查詢」與「ASN 查詢」串接成一致的 GeoResult。
 //
 // 流程：
-//   1. 私有 / loopback / multicast → 跳過外部查詢，僅補 ASN
-//   2. cache 命中 → 直接回
-//   3. 主來源（cfg.Provider）查 → 成功則採用
-//   4. 主來源失敗且另一邊 enabled → fallback
-//   5. ASN 永遠由 MaxMind ASN DB 補（與位置查詢正交）
-//   6. cache 結果（成功用長 TTL，失敗用短 TTL）
+//  1. 私有 / loopback / multicast → 跳過外部查詢，僅補 ASN
+//  2. cache 命中 → 直接回
+//  3. 主來源（cfg.Provider）查 → 成功則採用
+//  4. 主來源失敗且另一邊 enabled → fallback
+//  5. ASN 永遠由 MaxMind ASN DB 補（與位置查詢正交）
+//  6. cache 結果（成功用長 TTL，失敗用短 TTL）
 //
 // 設計考量：
 //   - resolver 不直接持有 MaxMind reader；透過 geoip.go 暴露的
@@ -152,6 +152,9 @@ func (r *resolver) tryProvider(ctx context.Context, p Provider, result *GeoResul
 }
 
 // applyASN 在 GeoResult 上補 ASN 與 ISP；設定關閉或查詢失敗皆視為靜默 no-op。
+//
+// 順帶判定 IsAnycast：ASN 命中 anycastASNs 表示此 IP 屬於已知 anycast CDN，
+// 用於下游 UI 區分「GeoIP 沒資料」與「天生就是 anycast，沒有具體國家」。
 func (r *resolver) applyASN(result *GeoResult, ipStr string) {
 	if !r.cfg.MaxMindASNEnabled {
 		return
@@ -162,6 +165,9 @@ func (r *resolver) applyASN(result *GeoResult, ipStr string) {
 	}
 	result.ASN = asn
 	result.ISP = isp
+	if IsAnycastASN(asn) {
+		result.IsAnycast = true
+	}
 }
 
 // ripeToGeoResult 將 RIPE 回應映射成 GeoResult。

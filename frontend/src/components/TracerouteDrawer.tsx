@@ -5,10 +5,11 @@ import { useDnsStore } from '../stores/useDnsStore';
 import { Activity, Zap, ExternalLink, Share2, Check, Clock, Trash2 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { buildTracerouteShareUrl } from '../utils/tracerouteShare';
+import { formatTime } from '../utils/formatTime';
 import { HopTable } from './HopTable';
 
 export const TracerouteDrawer: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const { activeResult, isLoading, error, history, selectHistory, clearHistory } = useTracerouteStore();
   const { theme, token } = useDnsStore();
@@ -131,7 +132,7 @@ export const TracerouteDrawer: React.FC = () => {
                 <div className={`flex items-center gap-2 mt-1 text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
                   <span>{item.hops.length} hops</span>
                   <span>{item.status}</span>
-                  <span className="ml-auto">{new Date(item.time).toLocaleTimeString()}</span>
+                  <span className="ml-auto">{formatTime(item.time, i18n.language)}</span>
                 </div>
               </button>
             ))}

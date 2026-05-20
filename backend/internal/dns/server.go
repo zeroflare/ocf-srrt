@@ -394,6 +394,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			AppMatchMethod:    string(appResult.MatchMethod),
 			OsInferred:        detectedOS != "",
 			GeoInferred:       resultCountry != "",
+			IsAnycast:         geoResult.IsAnycast,
 		}
 		if geoResult.Coords != nil && len(geoResult.Coords) == 2 {
 			record.Longitude = geoResult.Coords[0]

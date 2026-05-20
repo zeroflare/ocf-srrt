@@ -27,4 +27,9 @@ type DNSQueryRecord struct {
 	AppMatchMethod string `json:"appMatchMethod,omitempty"` // "exact" / "regex" / "heuristic" / ""
 	OsInferred     bool   `json:"osInferred,omitempty"`     // OS 一律為推測
 	GeoInferred    bool   `json:"geoInferred,omitempty"`    // GeoIP 資料庫推估
+
+	// IsAnycast 標示此 IP 屬於已知 CDN/Anycast 服務商（依 ASN 判定）。
+	// 此類 IP 在 MaxMind/RIPE 通常拿不到具體國家（同一 IP 由全球多個資料中心對外宣告），
+	// 因此 GeoIP 解析失敗時前端可依此旗標決定顯示「Anycast」而非「未知」。
+	IsAnycast bool `json:"isAnycast,omitempty"`
 }

@@ -45,6 +45,12 @@ interface DnsState {
   toggleRowSelection: (id: string) => void;
   toggleAllSelection: (ids: string[]) => void;
   clearSelection: () => void;
+  /**
+   * 全選目前已載入的紀錄（受 MAX_PINNED_RECORDS 上限保護）。
+   * 主要用於 ReportView：分享出去的快照通常代表「使用者勾選後產生的報告」，
+   * 開啟時預設整桌勾選，符合 wireframe 共享報告的視覺預期。
+   */
+  selectAllLoaded: () => void;
   getSelectedRecords: () => DnsRecord[];
   toggleMergeRecords: () => void;
 }
@@ -58,12 +64,20 @@ const MAX_PINNED_RECORDS = 200;
 // Theme 持久化：確保子頁面（TraceroutePage, ReportPage）和新分頁能保持一致的主題
 const THEME_KEY = 'srrt_theme';
 const getPersistedTheme = (): 'dark' | 'light' => {
-  const stored = localStorage.getItem(THEME_KEY);
-  if (stored === 'dark' || stored === 'light') return stored;
-  return 'dark'; // 預設深色
+  try {
+    const stored = globalThis.localStorage?.getItem(THEME_KEY);
+    if (stored === 'dark' || stored === 'light') return stored;
+  } catch {
+    // localStorage 不存在（SSR / vitest node env）時退回預設
+  }
+  return 'light';
 };
 const persistTheme = (theme: 'dark' | 'light') => {
-  localStorage.setItem(THEME_KEY, theme);
+  try {
+    globalThis.localStorage?.setItem(THEME_KEY, theme);
+  } catch {
+    // localStorage 不存在時不寫入
+  }
 };
 
 // 實際執行 State 更新的邏輯 (Pure Function)
@@ -262,6 +276,15 @@ export const useDnsStore = create<DnsState>((set, get) => {
     }),
 
     clearSelection: () => set({ selectedRowIds: new Set<string>() }),
+
+    selectAllLoaded: () => set((state) => {
+      const next = new Set<string>();
+      for (const r of state.records) {
+        if (next.size >= MAX_PINNED_RECORDS) break;
+        next.add(r._id);
+      }
+      return { selectedRowIds: next };
+    }),
 
     // selectedRowIds 永遠存 raw record IDs（合併模式下合併 row 的 checkbox
     // 會展開成 children 的 raw IDs），所以這裡單純 raw ID 比對即可。

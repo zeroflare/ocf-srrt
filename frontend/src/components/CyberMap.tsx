@@ -5,21 +5,72 @@ import { Feature, Point } from 'geojson';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
 import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHops } from '../utils/geo';
+import { countryFlag } from '../utils/countryFlag';
 import { useTranslation } from 'react-i18next';
 import { Radio, Search } from 'lucide-react';
 
+// Spokes 原點：使用者的本地國家（預設台灣中心）
 const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
-const ZOOM_LEVEL = 6.5;
+// 預設地圖視野：以台灣為中心，台灣 zoom 等級
+const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
+const DEFAULT_ZOOM = 6.2;
+// 縮到最小 = 全世界視野（同 wireframe）
+const MIN_ZOOM = 0.8158546915390924;
+
+/**
+ * 與 wireframe 相同：line-gradient + line-progress 表達式，
+ * 以 highlight 區段沿線移動形成「流動」動畫。
+ *
+ * 回傳 maplibre `line-gradient` 可接受的 expression（unknown[]）。
+ * MapLibre 對 setPaintProperty 的 value 型別為 any，故不需特別 cast。
+ */
+function buildSpokesFlowGradient(dark: boolean, center: number): unknown[] {
+  const dim = dark ? '#065f46' : '#047857';
+  const hi = dark ? '#a7f3d0' : '#6ee7b7';
+  const hw = 0.11;
+  const c = Math.min(0.998, Math.max(0.002, center));
+  const p0 = 0;
+  let p1 = Math.max(p0 + 1e-5, c - hw);
+  const p2 = c;
+  let p3 = Math.min(1 - 1e-5, c + hw);
+  const p4 = 1;
+  if (p1 >= p2) p1 = p2 - 2e-5;
+  if (p3 <= p2) p3 = p2 + 2e-5;
+  if (p1 <= p0) p1 = p0 + 1e-5;
+  if (p3 >= p4) p3 = p4 - 1e-5;
+  const pairs: Array<[number, string]> = [
+    [p0, dim],
+    [p1, dim],
+    [p2, hi],
+    [p3, dim],
+    [p4, dim],
+  ];
+  const merged: Array<[number, string]> = [];
+  for (const [p, col] of pairs) {
+    if (merged.length && p <= merged[merged.length - 1][0]) {
+      merged[merged.length - 1][1] = col;
+    } else {
+      merged.push([p, col]);
+    }
+  }
+  const expr: unknown[] = ['interpolate', ['linear'], ['line-progress']];
+  for (const [p, col] of merged) {
+    expr.push(p, col);
+  }
+  return expr;
+}
 
 export const CyberMap: React.FC = () => {
   const { t } = useTranslation();
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
   const popup = useRef<maplibregl.Popup | null>(null);
+  const flowRafRef = useRef<number | null>(null);
   const [mapReady, setMapReady] = useState(false);
 
   const { activeResult } = useTracerouteStore();
-  const { records, monitoringIp, theme, selectedRowIds } = useDnsStore();
+  const { records, monitoringIp, theme } = useDnsStore();
 
   useEffect(() => {
     if (!mapContainer.current) return;
@@ -74,8 +125,9 @@ export const CyberMap: React.FC = () => {
           },
         ],
       },
-      center: TAIWAN_CENTER,
-      zoom: ZOOM_LEVEL,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      minZoom: MIN_ZOOM,
       dragRotate: false,
       touchZoomRotate: false,
       pitchWithRotate: false,
@@ -132,109 +184,40 @@ export const CyberMap: React.FC = () => {
         popup.current.remove();
       });
 
-      if (!thisMap.getSource('dns-points')) {
-        thisMap.addSource('dns-points', {
+      // 從監測點到目的地的弧線（DNS connection spokes）
+      // 與 wireframe 相同：底層 dim emerald + 上層 emerald 流動 gradient
+      if (!thisMap.getSource('dns-spokes')) {
+        thisMap.addSource('dns-spokes', {
           type: 'geojson',
+          lineMetrics: true,
           data: { type: 'FeatureCollection', features: [] },
         });
       }
-
+      const dark = useDnsStore.getState().theme === 'dark';
+      const dimStroke = dark ? 'rgba(52,211,153,0.22)' : 'rgba(15,118,110,0.28)';
       thisMap.addLayer({
-        id: 'dns-points-hit',
-        type: 'circle',
-        source: 'dns-points',
+        id: 'dns-spokes-bg',
+        type: 'line',
+        source: 'dns-spokes',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'circle-radius': 18,
-          'circle-color': '#000000',
-          'circle-opacity': 0,
+          'line-color': dimStroke,
+          'line-width': 2.8,
+          'line-opacity': 1,
         },
       });
-
       thisMap.addLayer({
-        id: 'dns-points-pulse',
-        type: 'circle',
-        source: 'dns-points',
+        id: 'dns-spokes',
+        type: 'line',
+        source: 'dns-spokes',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 18, 12],
-          'circle-color': ['get', 'color'],
-          'circle-opacity': ['case', ['==', ['get', 'selected'], 1], 0.35, 0.15],
-          'circle-blur': 1,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          'line-gradient': buildSpokesFlowGradient(dark, 0.5) as any,
+          'line-width': 1.35,
+          'line-opacity': 0.92,
         },
       });
-
-      thisMap.addLayer({
-        id: 'dns-points-core',
-        type: 'circle',
-        source: 'dns-points',
-        paint: {
-          'circle-radius': ['case', ['==', ['get', 'selected'], 1], 7, 4],
-          'circle-color': ['get', 'color'],
-          'circle-opacity': ['case', ['==', ['get', 'selected'], 1], 1.0, 0.9],
-          'circle-stroke-width': ['case', ['==', ['get', 'selected'], 1], 2, 1],
-          'circle-stroke-color': '#ffffff',
-          'circle-stroke-opacity': ['case', ['==', ['get', 'selected'], 1], 0.8, 0.4],
-        },
-      });
-
-      // DNS node hover popup — use mousemove + queryRenderedFeatures to avoid
-      // flicker caused by mouseenter/mouseleave fighting between overlapping layers
-      const dnsHitLayers = ['dns-points-hit', 'dns-points-pulse', 'dns-points-core'];
-      let dnsPopupVisible = false;
-
-      const handleDnsMouseMove = (e: maplibregl.MapMouseEvent) => {
-        if (!map.current || !popup.current) return;
-        const features = map.current.queryRenderedFeatures(e.point, {
-          layers: dnsHitLayers,
-        });
-        if (features.length > 0) {
-          const feat = features[0];
-          if (!feat.properties) return;
-          map.current.getCanvas().style.cursor = 'pointer';
-          const coords = (feat.geometry as Point).coordinates.slice() as [number, number];
-          const { ip, domain, country, city } = feat.properties;
-          const isForeign = feat.properties.color === '#ef4444';
-          const isDk = useDnsStore.getState().theme === 'dark';
-          const bg = isDk ? 'rgba(15,23,42,0.92)' : 'rgba(255,255,255,0.95)';
-          const text = isDk ? '#e2e8f0' : '#1e293b';
-          const sub = isDk ? '#94a3b8' : '#64748b';
-          const tag = isForeign
-            ? `<span style="color:#ef4444;font-weight:700;font-size:9px;letter-spacing:0.05em">${t('dns_foreign')}</span>`
-            : `<span style="color:#10b981;font-weight:700;font-size:9px;letter-spacing:0.05em">${t('dns_local')}</span>`;
-          const location = [country, city].filter(Boolean).join(' · ');
-          popup.current
-            .setLngLat(coords)
-            .setHTML(`<div style="background:${bg};color:${text};padding:8px 12px;border-radius:10px;border:1px solid ${isDk ? 'rgba(255,255,255,0.1)' : 'rgba(0,0,0,0.1)'};font-size:11px;font-family:ui-monospace,monospace;line-height:1.6;min-width:140px;box-shadow:0 4px 20px rgba(0,0,0,0.3)">
-              <div style="font-weight:700;margin-bottom:2px">${domain || '—'}</div>
-              <div style="color:${sub}">${ip}</div>
-              ${location ? `<div style="color:${sub};font-size:10px">${location}</div>` : ''}
-              <div style="margin-top:4px">${tag}</div>
-            </div>`)
-            .addTo(map.current);
-          dnsPopupVisible = true;
-        } else if (dnsPopupVisible) {
-          map.current.getCanvas().style.cursor = '';
-          popup.current.remove();
-          dnsPopupVisible = false;
-        }
-      };
-      thisMap.on('mousemove', handleDnsMouseMove);
-
-      const handleDnsClick = (e: maplibregl.MapMouseEvent) => {
-        if (!map.current) return;
-        const features = map.current.queryRenderedFeatures(e.point, {
-          layers: dnsHitLayers,
-        });
-        if (features.length > 0) {
-          const feat = features[0];
-          const recordId = feat.properties?.recordId;
-          if (recordId) {
-            useDnsStore.getState().toggleRowSelection(recordId);
-          }
-        }
-      };
-      thisMap.on('click', 'dns-points-hit', handleDnsClick);
-      thisMap.on('click', 'dns-points-pulse', handleDnsClick);
-      thisMap.on('click', 'dns-points-core', handleDnsClick);
     });
 
     return () => {
@@ -255,14 +238,6 @@ export const CyberMap: React.FC = () => {
     map.current.setPaintProperty('county', 'fill-color', landColor);
     map.current.setPaintProperty('county-outline', 'line-color', borderColor);
     map.current.setPaintProperty('global', 'fill-color', landColor);
-
-    if (map.current.getLayer('dns-points-pulse')) {
-      map.current.setPaintProperty('dns-points-pulse', 'circle-opacity', isDark ? 0.15 : 0.25);
-    }
-    if (map.current.getLayer('dns-points-core')) {
-      map.current.setPaintProperty('dns-points-core', 'circle-opacity', isDark ? 0.9 : 1.0);
-      map.current.setPaintProperty('dns-points-core', 'circle-stroke-opacity', isDark ? 0.4 : 0.6);
-    }
 
     if (map.current.getLayer('trace-nodes')) {
       map.current.setPaintProperty('trace-nodes', 'circle-stroke-color', isDark ? '#0f172a' : '#ffffff');
@@ -400,34 +375,136 @@ export const CyberMap: React.FC = () => {
     }
   }, [activeResult, mapReady]);
 
-  const dnsPointFeatures = useMemo(() => {
-    const seen = new Map<string, typeof records[0]>();
+  // 依 country 去重的目的地清單（一個國家一個 marker）
+  const destinations = useMemo(() => {
+    const byCountry = new Map<string, { coords: [number, number]; country: string; foreign: boolean }>();
     for (const r of records) {
-      if (r.longitude && r.latitude && !seen.has(r.resultIp)) {
-        seen.set(r.resultIp, r);
-      }
+      if (!r.longitude || !r.latitude || !r.country) continue;
+      if (byCountry.has(r.country)) continue;
+      byCountry.set(r.country, {
+        coords: [r.longitude, r.latitude],
+        country: r.country,
+        foreign: !!r.isForeign,
+      });
     }
-    return Array.from(seen.values()).map(r => ({
-      type: 'Feature' as const,
-      geometry: { type: 'Point' as const, coordinates: [r.longitude!, r.latitude!] },
-      properties: {
-        color: r.isForeign ? '#ef4444' : '#10b981',
-        ip: r.resultIp,
-        recordId: r._id,
-        domain: r.domain,
-        country: r.country || '',
-        city: r.city || '',
-        selected: selectedRowIds.has(r._id) ? 1 : 0,
-      },
-    }));
-  }, [records, selectedRowIds]);
+    return byCountry;
+  }, [records]);
+
+  // 連線：監測起點 → 各目的地（與 wireframe 相同採直線，跨換日線 unwrap 經度避免繞地球反方向）
+  const dnsSpokeFeatures = useMemo(() => {
+    const features: Feature[] = [];
+    const [oLon, oLat] = TAIWAN_CENTER;
+    for (const dest of destinations.values()) {
+      if (dest.country === 'TW') continue; // 不畫從原點到自己的線
+      const [dLon, dLat] = dest.coords;
+      const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: [
+            [oLon, oLat],
+            [endLon, dLat],
+          ],
+        },
+        properties: { country: dest.country },
+      });
+    }
+    return features;
+  }, [destinations]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
-    const source = map.current.getSource('dns-points') as maplibregl.GeoJSONSource;
+    const source = map.current.getSource('dns-spokes') as maplibregl.GeoJSONSource;
     if (!source) return;
-    source.setData({ type: 'FeatureCollection', features: dnsPointFeatures });
-  }, [dnsPointFeatures, mapReady]);
+    source.setData({ type: 'FeatureCollection', features: dnsSpokeFeatures });
+  }, [dnsSpokeFeatures, mapReady]);
+
+  // 與 wireframe 相同：以 line-gradient 中央位置隨時間移動的方式做流動動畫
+  useEffect(() => {
+    if (!mapReady || !map.current) return;
+    const stop = () => {
+      if (flowRafRef.current != null) {
+        cancelAnimationFrame(flowRafRef.current);
+        flowRafRef.current = null;
+      }
+    };
+    const dark = theme === 'dark';
+    const dimStroke = dark ? 'rgba(52,211,153,0.22)' : 'rgba(15,118,110,0.28)';
+    if (map.current.getLayer('dns-spokes-bg')) {
+      map.current.setPaintProperty('dns-spokes-bg', 'line-color', dimStroke);
+    }
+    const loop = () => {
+      const m = map.current;
+      if (!m || !m.getLayer('dns-spokes')) {
+        flowRafRef.current = null;
+        return;
+      }
+      const c = (Date.now() / 2200) % 1;
+      try {
+        m.setPaintProperty('dns-spokes', 'line-gradient', buildSpokesFlowGradient(dark, c));
+      } catch {
+        flowRafRef.current = null;
+        return;
+      }
+      flowRafRef.current = requestAnimationFrame(loop);
+    };
+    stop();
+    flowRafRef.current = requestAnimationFrame(loop);
+    return stop;
+  }, [mapReady, theme]);
+
+  // 圓形國旗 marker：每個國家一個（含原點台灣較大）
+  useEffect(() => {
+    if (!mapReady || !map.current) return;
+    // 移除舊 markers
+    for (const m of markersRef.current) m.remove();
+    markersRef.current = [];
+
+    // 整合：所有目的地 + 強制加入原點台灣（即使沒紀錄）
+    type MarkerInfo = { coords: [number, number]; country: string; isOrigin: boolean };
+    const items: MarkerInfo[] = [];
+    let hasTW = false;
+    for (const dest of destinations.values()) {
+      const isOrigin = dest.country === 'TW';
+      if (isOrigin) hasTW = true;
+      items.push({ coords: dest.coords, country: dest.country, isOrigin });
+    }
+    if (!hasTW && destinations.size > 0) {
+      items.unshift({ coords: TAIWAN_CENTER, country: 'TW', isOrigin: true });
+    }
+
+    const dark = theme === 'dark';
+    for (const it of items) {
+      const w = it.isOrigin ? 36 : 30;
+      const fs = it.isOrigin ? 22 : 18;
+      const el = document.createElement('div');
+      el.style.cssText = [
+        `width:${w}px`,
+        `height:${w}px`,
+        'border-radius:9999px',
+        'display:flex',
+        'align-items:center',
+        'justify-content:center',
+        `font-size:${fs}px`,
+        'line-height:1',
+        'box-sizing:border-box',
+        'cursor:default',
+        'user-select:none',
+        'font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif',
+        dark
+          ? 'background:#1e293b;border:1.5px solid #334155;box-shadow:0 0 0 1px rgba(15,23,42,0.35)'
+          : 'background:#ffffff;border:1.5px solid #cbd5e1;box-shadow:0 1px 3px rgba(15,23,42,0.08)',
+      ].join(';');
+      el.textContent = countryFlag(it.country) || it.country;
+      el.title = it.country;
+
+      const marker = new maplibregl.Marker({ element: el, anchor: 'center' })
+        .setLngLat(it.coords)
+        .addTo(map.current);
+      markersRef.current.push(marker);
+    }
+  }, [destinations, mapReady, theme]);
 
   return (
       <div className="w-full h-full relative overflow-hidden tour-map">

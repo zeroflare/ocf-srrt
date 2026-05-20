@@ -73,6 +73,10 @@ type GeoResult struct {
 	Coords      []float64 // [lon, lat]，nil 表示無有效座標
 	ASN         uint
 	ISP         string
+	// IsAnycast 表示此 IP 隸屬已知 anycast CDN（依 ASN 判定）。
+	// 設定後若 GeoIP 無法解析國家（Country=="XX"），呼叫端可依此旗標
+	// 區分「資料庫沒資料」與「天生就是全球 anycast、不該強解一個國家」。
+	IsAnycast bool
 }
 
 // GetAll 解析 IP 的位置 + ASN。位置優先走 RIPE IPmap（若啟用），ASN 由 MaxMind 補。

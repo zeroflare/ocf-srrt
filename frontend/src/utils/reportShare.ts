@@ -1,6 +1,7 @@
 import pako from 'pako';
 import { DnsRecord } from '../types';
-import { AppInfo, ReportData } from '../components/ReportModal';
+import { AppInfo, ReportData } from '../types/report';
+import { PhoneBrand } from './phoneBrand';
 
 /**
  * 將 ReportData 壓縮編碼成 URL-safe base64 字串
@@ -15,6 +16,7 @@ export function encodeReportData(data: ReportData): string {
       w: data.appInfo.websiteUrl,
     },
     at: data.generatedAt,
+    pb: data.phoneBrand,
     r: data.records.map(r => ({
       t: r.timestamp,
       d: r.domain,
@@ -30,6 +32,8 @@ export function encodeReportData(data: ReportData): string {
       asn: r.asn,
       os: r.os || '',
       ty: r.type,
+      // ay: isAnycast 旗標。新版後端會帶；舊報告快照沒有此欄位，decode 時為 undefined
+      ay: r.isAnycast ? 1 : undefined,
     })),
   };
 
@@ -94,12 +98,14 @@ export function decodeReportData(zdata: string): ReportData | null {
       asn: r.asn || 0,
       os: r.os || '',
       type: r.ty || 'A',
+      isAnycast: r.ay === 1,
     }));
 
     return {
       records,
       appInfo,
       generatedAt: data.at || new Date().toISOString(),
+      phoneBrand: data.pb as PhoneBrand | undefined,
     };
   } catch {
     return null;

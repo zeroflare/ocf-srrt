@@ -1,21 +1,105 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { Feature } from 'geojson';
 import { Hop } from '../types';
-import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHops } from '../utils/geo';
+import { pickPathEndpoints } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
+import { countryFlag } from '../utils/countryFlag';
 
 interface TraceMapProps {
   hops: Hop[];
 }
 
+// 與首頁 CyberMap 一致的原點：台灣中心
+const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
+const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
+const DEFAULT_ZOOM = 6.2;
+const MIN_ZOOM = 0.8158546915390924;
+
+/**
+ * 與 CyberMap 完全相同的 line-gradient 流動動畫 expression。
+ * 以 highlight 區段沿線移動形成綠色流動效果。
+ */
+function buildFlowGradient(dark: boolean, center: number): unknown[] {
+  const dim = dark ? '#065f46' : '#047857';
+  const hi = dark ? '#a7f3d0' : '#6ee7b7';
+  const hw = 0.11;
+  const c = Math.min(0.998, Math.max(0.002, center));
+  const p0 = 0;
+  let p1 = Math.max(p0 + 1e-5, c - hw);
+  const p2 = c;
+  let p3 = Math.min(1 - 1e-5, c + hw);
+  const p4 = 1;
+  if (p1 >= p2) p1 = p2 - 2e-5;
+  if (p3 <= p2) p3 = p2 + 2e-5;
+  if (p1 <= p0) p1 = p0 + 1e-5;
+  if (p3 >= p4) p3 = p4 - 1e-5;
+  const pairs: Array<[number, string]> = [
+    [p0, dim],
+    [p1, dim],
+    [p2, hi],
+    [p3, dim],
+    [p4, dim],
+  ];
+  const merged: Array<[number, string]> = [];
+  for (const [p, col] of pairs) {
+    if (merged.length && p <= merged[merged.length - 1][0]) {
+      merged[merged.length - 1][1] = col;
+    } else {
+      merged.push([p, col]);
+    }
+  }
+  const expr: unknown[] = ['interpolate', ['linear'], ['line-progress']];
+  for (const [p, col] of merged) {
+    expr.push(p, col);
+  }
+  return expr;
+}
+
+/**
+ * 跨換日線 unwrap：東半球起點（lon > 50）連到西經 < -30 的目的地時，
+ * 把終點 lon 加 360 讓直線走太平洋，而非繞歐亞 + 大西洋的長路。
+ * 與 wireframe `_traceLineCoords` 同邏輯。
+ */
+function spokeLine(origin: [number, number], dest: [number, number]): [number, number][] {
+  const [oLon, oLat] = origin;
+  const [dLon, dLat] = dest;
+  const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
+  return [
+    [oLon, oLat],
+    [endLon, dLat],
+  ];
+}
+
+/**
+ * TraceMap — traceroute 地圖
+ *
+ * 與首頁 CyberMap 一致的視覺呈現：
+ *   1. 雙層 emerald 線（dim 底層 + 流動 gradient 上層）
+ *   2. 圓形國旗 emoji marker（原點台灣較大）
+ *   3. 不顯示中間 hop 節點 / 序號 / popup
+ *   4. 不做「逐跳展開」「光點沿路徑移動」等舊有動畫；只保留與首頁相同的 line-gradient 流動動畫
+ *
+ * Hop 細節（IP、ASN、城市、loss、stdev）仍由 HopTable 展示；地圖只負責「起點 → 終點」的地理概念。
+ */
 export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
+  const flowRafRef = useRef<number | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
   const { theme } = useDnsStore();
-
   const isDark = theme === 'dark';
 
+  // 起點 + 終點（過濾掉沒有座標的 hop）
+  const endpoints = useMemo(() => {
+    const valid = hops.filter(
+      (h) => h.ip !== '*' && h.coords && h.coords.length === 2 && !(h.coords[0] === 0 && h.coords[1] === 0),
+    );
+    return pickPathEndpoints(valid);
+  }, [hops]);
+
+  // 初始化地圖（只跑一次）
   useEffect(() => {
     if (!mapContainer.current) return;
 
@@ -59,8 +143,9 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
           },
         ],
       },
-      center: [121.5, 24.5],
-      zoom: 3,
+      center: DEFAULT_CENTER,
+      zoom: DEFAULT_ZOOM,
+      minZoom: MIN_ZOOM,
       dragRotate: false,
       touchZoomRotate: false,
       pitchWithRotate: false,
@@ -69,357 +154,188 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
 
     m.dragRotate.disable();
     m.touchZoomRotate.disable();
-
     map.current = m;
-    let cleanupAnimation: (() => void) | null = null;
 
     m.on('load', () => {
-      const rawValidHops = hops.filter(h =>
-        h.ip !== '*' &&
-        h.coords &&
-        h.coords.length === 2 &&
-        !(h.coords[0] === 0 && h.coords[1] === 0)
-      );
-
-      // 設計決策（doc/09）：地圖只渲染「起點→終點」兩個節點。
-      // 中間 hop 因 CDN/anycast 常有地理失真，造成路徑線忽南忽北、跨洲反折，
-      // 反而比簡化過後的直連更難解讀。完整 hop 資訊在 HopTable 仍可見。
-      const endpointHops = pickPathEndpoints(rawValidHops);
-
-      // 仍保留 fan-out 處理：理論上起點 / 終點不會同座標，
-      // 但若極端情況（如 traceroute 對自己 LAN gateway）仍能避免疊圖。
-      const validHops = spreadOverlappingHops(endpointHops);
-
-      // 建立 traceroute source
-      const features: GeoJSON.Feature[] = [];
-
-      // 跳點標記（使用散開後的 displayCoords）
-      validHops.forEach(hop => {
-        const latencyColor = hop.latency < 50 ? '#10b981' : hop.latency < 150 ? '#f59e0b' : '#ef4444';
-        features.push({
-          type: 'Feature',
-          geometry: { type: 'Point', coordinates: hop.displayCoords },
-          properties: {
-            index: hop.index,
-            ip: hop.ip,
-            asn: hop.asn || 0,
-            isp: hop.isp || '',
-            city: hop.city || '',
-            country: hop.country || '',
-            latency: hop.latency,
-            color: latencyColor,
-          },
-        });
-      });
-
-      // 連線（使用散開後的 displayCoords，距離判斷仍用原始 coords）
-      for (let i = 0; i < validHops.length - 1; i++) {
-        const start = validHops[i];
-        const end = validHops[i + 1];
-        const dist = calculateDistance(start.coords, end.coords);
-        const isSubmarine = dist > 1000;
-        const segLatency = end.latency;
-        const segColor = segLatency < 50 ? '#22d3ee' : segLatency < 150 ? '#f59e0b' : '#ef4444';
-
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: isSubmarine ? createCurve(start.displayCoords, end.displayCoords) : [start.displayCoords, end.displayCoords],
-          },
-          properties: { type: isSubmarine ? 'submarine' : 'normal', color: segColor },
-        });
-      }
-
-      m.addSource('trace', {
+      if (m.getSource('trace-path')) return;
+      m.addSource('trace-path', {
         type: 'geojson',
-        data: { type: 'FeatureCollection', features },
+        lineMetrics: true,
+        data: { type: 'FeatureCollection', features: [] },
       });
-
-      // 連線 layer
+      const dark = useDnsStore.getState().theme === 'dark';
+      const dimStroke = dark ? 'rgba(52,211,153,0.22)' : 'rgba(15,118,110,0.28)';
       m.addLayer({
-        id: 'trace-lines',
+        id: 'trace-path-bg',
         type: 'line',
-        source: 'trace',
-        filter: ['==', ['geometry-type'], 'LineString'],
+        source: 'trace-path',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'line-color': ['get', 'color'],
-          'line-width': ['case', ['==', ['get', 'type'], 'submarine'], 2.5, 2],
-          'line-dasharray': [2, 3],
-          'line-blur': ['case', ['==', ['get', 'type'], 'submarine'], 1.5, 0],
+          'line-color': dimStroke,
+          'line-width': 2.8,
+          'line-opacity': 1,
         },
       });
-
-      // 跳點 layer
       m.addLayer({
-        id: 'trace-nodes',
-        type: 'circle',
-        source: 'trace',
-        filter: ['==', ['geometry-type'], 'Point'],
+        id: 'trace-path',
+        type: 'line',
+        source: 'trace-path',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
         paint: {
-          'circle-radius': 6,
-          'circle-color': ['get', 'color'],
-          'circle-stroke-width': 2,
-          'circle-stroke-color': isDark ? '#0f172a' : '#ffffff',
-          'circle-opacity': 0.9,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          'line-gradient': buildFlowGradient(dark, 0.5) as any,
+          'line-width': 1.35,
+          'line-opacity': 0.92,
         },
       });
-
-      // 序號 label
-      m.addLayer({
-        id: 'trace-labels',
-        type: 'symbol',
-        source: 'trace',
-        filter: ['==', ['geometry-type'], 'Point'],
-        layout: {
-          'text-field': ['to-string', ['get', 'index']],
-          'text-size': 12,
-          'text-font': ['Open Sans Bold'],
-          'text-offset': [0, -1.4],
-          'text-allow-overlap': true,
-        },
-        paint: {
-          'text-color': isDark ? '#e2e8f0' : '#334155',
-          'text-halo-color': isDark ? '#0f172a' : '#ffffff',
-          'text-halo-width': 2,
-        },
-      });
-
-      // Popup（使用 DOM API 避免 XSS）
-      const popup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, className: 'trace-popup' });
-      m.on('mouseenter', 'trace-nodes', (e) => {
-        m.getCanvas().style.cursor = 'pointer';
-        const f = e.features?.[0];
-        if (!f || f.geometry.type !== 'Point') return;
-        const props = f.properties;
-
-        const container = document.createElement('div');
-        container.className = `${isDark ? 'bg-slate-900 text-slate-200 border-white/10' : 'bg-white text-slate-700 border-slate-200'} border rounded-lg px-3 py-2 text-[11px] shadow-lg font-mono`;
-
-        const ipDiv = document.createElement('div');
-        ipDiv.className = 'font-bold';
-        ipDiv.textContent = String(props.ip);
-        container.appendChild(ipDiv);
-
-        // 地理位置：country · city
-        const location = [props.country, props.city].filter(Boolean).join(' · ');
-        if (location) {
-          const locDiv = document.createElement('div');
-          locDiv.className = 'text-[10px] opacity-70';
-          locDiv.textContent = location;
-          container.appendChild(locDiv);
-        }
-
-        if (props.isp) {
-          const ispDiv = document.createElement('div');
-          ispDiv.className = 'text-[10px] opacity-60';
-          ispDiv.textContent = props.asn ? `AS${props.asn} · ${props.isp}` : String(props.isp);
-          container.appendChild(ispDiv);
-        } else if (props.asn) {
-          const asnDiv = document.createElement('div');
-          asnDiv.className = 'text-[10px] opacity-60';
-          asnDiv.textContent = `AS${props.asn}`;
-          container.appendChild(asnDiv);
-        }
-
-        const latencyDiv = document.createElement('div');
-        latencyDiv.className = 'mt-1';
-        latencyDiv.textContent = `${Number(props.latency).toFixed(1)} ms`;
-        container.appendChild(latencyDiv);
-
-        popup
-          .setLngLat(f.geometry.coordinates as [number, number])
-          .setDOMContent(container)
-          .addTo(m);
-      });
-      m.on('mouseleave', 'trace-nodes', () => {
-        m.getCanvas().style.cursor = '';
-        popup.remove();
-      });
-
-      // fitBounds
-      if (validHops.length > 0) {
-        const bounds = new maplibregl.LngLatBounds();
-        validHops.forEach(h => bounds.extend(h.displayCoords));
-        m.fitBounds(bounds, { padding: 60, maxZoom: 10 });
-      }
-
-      // 流向動畫：移動光點沿路徑行進（含延遲感知速度）
-      const prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-      if (!prefersReducedMotion && validHops.length >= 2) {
-        // ── 逐跳展開動畫：連線和節點由 Hop 0 逐步「生長」──
-        // 初始隱藏所有元素
-        m.setPaintProperty('trace-lines', 'line-opacity', 0);
-        m.setPaintProperty('trace-nodes', 'circle-opacity', 0);
-        m.setPaintProperty('trace-nodes', 'circle-stroke-opacity', 0);
-        m.setPaintProperty('trace-labels', 'text-opacity', 0);
-
-        // 逐跳顯示（每跳 200ms 間隔）
-        const revealDelay = 200;
-        const revealTimers: ReturnType<typeof setTimeout>[] = [];
-        validHops.forEach((_, idx) => {
-          const timer = setTimeout(() => {
-            // 用 filter 讓第 0~idx 跳的節點和前 idx 段連線可見
-            // 由於 MapLibre 不支援動態逐筆 filter，改用漸入 opacity
-            if (idx === validHops.length - 1) {
-              // 最後一跳：全部顯示
-              m.setPaintProperty('trace-lines', 'line-opacity', 1);
-              m.setPaintProperty('trace-nodes', 'circle-opacity', 0.9);
-              m.setPaintProperty('trace-nodes', 'circle-stroke-opacity', 1);
-              m.setPaintProperty('trace-labels', 'text-opacity', 1);
-            }
-          }, revealDelay * (idx + 1));
-          revealTimers.push(timer);
-        });
-        // 若只有 1 跳，立即顯示
-        if (validHops.length === 1) {
-          m.setPaintProperty('trace-lines', 'line-opacity', 1);
-          m.setPaintProperty('trace-nodes', 'circle-opacity', 0.9);
-          m.setPaintProperty('trace-nodes', 'circle-stroke-opacity', 1);
-          m.setPaintProperty('trace-labels', 'text-opacity', 1);
-        }
-
-        // ── 建立路徑座標序列 ──
-        const pathCoords: [number, number][] = [];
-        // 每個 hop 間段的延遲（用於速度調整）
-        const segLatencies: number[] = [];
-        for (let i = 0; i < validHops.length - 1; i++) {
-          const start = validHops[i].displayCoords;
-          const end = validHops[i + 1].displayCoords;
-          const dist = calculateDistance(start, end);
-          const segCoords = dist > 1000 ? createCurve(start, end) : [start, end];
-          const latency = Math.max(validHops[i + 1].latency - validHops[i].latency, 1);
-          if (i === 0) pathCoords.push(segCoords[0] as [number, number]);
-          for (let j = 1; j < segCoords.length; j++) {
-            pathCoords.push(segCoords[j] as [number, number]);
-            segLatencies.push(latency);
-          }
-        }
-
-        // 計算每段累積「加權距離」（延遲高的路段時間長 → 光點慢）
-        const segDists: number[] = [0];
-        for (let i = 1; i < pathCoords.length; i++) {
-          const dx = pathCoords[i][0] - pathCoords[i - 1][0];
-          const dy = pathCoords[i][1] - pathCoords[i - 1][1];
-          const geoDist = Math.sqrt(dx * dx + dy * dy);
-          // 延遲越高權重越大 → 光點經過時間越長（移動越慢）
-          const latencyWeight = Math.sqrt(segLatencies[i - 1] || 1);
-          segDists.push(segDists[i - 1] + geoDist * latencyWeight);
-        }
-        const totalDist = segDists[segDists.length - 1];
-
-        // 沿路徑插值取座標
-        const interpolate = (t: number): [number, number] => {
-          const d = t * totalDist;
-          for (let i = 1; i < segDists.length; i++) {
-            if (d <= segDists[i]) {
-              const segLen = segDists[i] - segDists[i - 1];
-              const frac = segLen > 0 ? (d - segDists[i - 1]) / segLen : 0;
-              return [
-                pathCoords[i - 1][0] + (pathCoords[i][0] - pathCoords[i - 1][0]) * frac,
-                pathCoords[i - 1][1] + (pathCoords[i][1] - pathCoords[i - 1][1]) * frac,
-              ];
-            }
-          }
-          return pathCoords[pathCoords.length - 1] as [number, number];
-        };
-
-        // 建立光點 source + layer
-        const dotData: GeoJSON.FeatureCollection = {
-          type: 'FeatureCollection',
-          features: [{
-            type: 'Feature',
-            geometry: { type: 'Point', coordinates: pathCoords[0] },
-            properties: {},
-          }],
-        };
-
-        m.addSource('trace-dot', { type: 'geojson', data: dotData });
-
-        // 外圈光暈
-        m.addLayer({
-          id: 'trace-dot-glow',
-          type: 'circle',
-          source: 'trace-dot',
-          paint: {
-            'circle-radius': 14,
-            'circle-color': '#22d3ee',
-            'circle-opacity': 0.15,
-            'circle-blur': 1,
-          },
-        });
-
-        // 內圈實心光點
-        m.addLayer({
-          id: 'trace-dot-core',
-          type: 'circle',
-          source: 'trace-dot',
-          paint: {
-            'circle-radius': 5,
-            'circle-color': '#22d3ee',
-            'circle-opacity': 0.9,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': isDark ? '#0f172a' : '#ffffff',
-          },
-        });
-
-        // 動畫迴圈（約 4 秒走完一趟，延遲感知速度）
-        const duration = 4000;
-        // 逐跳展開完成後才啟動光點
-        const dotStartDelay = revealDelay * validHops.length;
-        let startTime: number | null = null;
-        let animationFrameId: number;
-
-        const animateFlow = (timestamp: number) => {
-          if (!startTime) startTime = timestamp;
-          const elapsed = (timestamp - startTime) % duration;
-          const t = elapsed / duration;
-          const pos = interpolate(t);
-
-          (m.getSource('trace-dot') as maplibregl.GeoJSONSource)?.setData({
-            type: 'FeatureCollection',
-            features: [{
-              type: 'Feature',
-              geometry: { type: 'Point', coordinates: pos },
-              properties: {},
-            }],
-          });
-
-          animationFrameId = requestAnimationFrame(animateFlow);
-        };
-
-        const dotTimer = setTimeout(() => {
-          animationFrameId = requestAnimationFrame(animateFlow);
-        }, dotStartDelay);
-
-        // 儲存 cleanup 函式
-        cleanupAnimation = () => {
-          revealTimers.forEach(clearTimeout);
-          clearTimeout(dotTimer);
-          if (animationFrameId) cancelAnimationFrame(animationFrameId);
-        };
-      }
     });
 
     return () => {
-      cleanupAnimation?.();
+      for (const marker of markersRef.current) marker.remove();
+      markersRef.current = [];
       m.remove();
+      map.current = null;
     };
-  }, [hops, isDark]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 主題變色（背景 / 陸地 / 邊界 / 線段底色）
+  useEffect(() => {
+    const m = map.current;
+    if (!m || !m.isStyleLoaded()) return;
+    m.setPaintProperty('background', 'background-color', isDark ? '#020617' : '#f8fafc');
+    m.setPaintProperty('global', 'fill-color', isDark ? '#0f172a' : '#e2e8f0');
+    m.setPaintProperty('county', 'fill-color', isDark ? '#0f172a' : '#e2e8f0');
+    m.setPaintProperty('county-outline', 'line-color', isDark ? '#1e293b' : '#cbd5e1');
+    const dimStroke = isDark ? 'rgba(52,211,153,0.22)' : 'rgba(15,118,110,0.28)';
+    if (m.getLayer('trace-path-bg')) {
+      m.setPaintProperty('trace-path-bg', 'line-color', dimStroke);
+    }
+  }, [isDark]);
+
+  // 寫入 endpoints 線段 + 國旗 marker
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const apply = () => {
+      const source = m.getSource('trace-path') as maplibregl.GeoJSONSource | undefined;
+      if (!source) return;
+
+      // 清掉舊 markers
+      for (const marker of markersRef.current) marker.remove();
+      markersRef.current = [];
+
+      if (endpoints.length === 0) {
+        source.setData({ type: 'FeatureCollection', features: [] });
+        return;
+      }
+
+      // 取最後一個 hop 當目的地；若起點 hop 跟台灣同國家，仍以台灣中心當原點顯示
+      const lastHop = endpoints[endpoints.length - 1];
+      const destCoords = lastHop.coords;
+      const sameAsOrigin =
+        Math.abs(destCoords[0] - TAIWAN_CENTER[0]) < 1 && Math.abs(destCoords[1] - TAIWAN_CENTER[1]) < 1;
+
+      const features: Feature[] = [];
+      if (!sameAsOrigin) {
+        features.push({
+          type: 'Feature',
+          geometry: { type: 'LineString', coordinates: spokeLine(TAIWAN_CENTER, destCoords) },
+          properties: { country: lastHop.country || '' },
+        });
+      }
+      source.setData({ type: 'FeatureCollection', features });
+
+      // marker：origin TW + 終點國家
+      type MarkerInfo = { coords: [number, number]; country: string; isOrigin: boolean };
+      const items: MarkerInfo[] = [{ coords: TAIWAN_CENTER, country: 'TW', isOrigin: true }];
+      if (!sameAsOrigin) {
+        items.push({ coords: destCoords, country: lastHop.country || '', isOrigin: false });
+      }
+
+      for (const it of items) {
+        const w = it.isOrigin ? 36 : 30;
+        const fs = it.isOrigin ? 22 : 18;
+        const el = document.createElement('div');
+        el.style.cssText = [
+          `width:${w}px`,
+          `height:${w}px`,
+          'border-radius:9999px',
+          'display:flex',
+          'align-items:center',
+          'justify-content:center',
+          `font-size:${fs}px`,
+          'line-height:1',
+          'box-sizing:border-box',
+          'cursor:default',
+          'user-select:none',
+          'font-family:"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",system-ui,sans-serif',
+          isDark
+            ? 'background:#1e293b;border:1.5px solid #334155;box-shadow:0 0 0 1px rgba(15,23,42,0.35)'
+            : 'background:#ffffff;border:1.5px solid #cbd5e1;box-shadow:0 1px 3px rgba(15,23,42,0.08)',
+        ].join(';');
+        el.textContent = countryFlag(it.country) || it.country || '';
+        if (it.country) el.title = it.country;
+        const marker = new maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat(it.coords).addTo(m);
+        markersRef.current.push(marker);
+      }
+
+      // fitBounds：包住起點與終點，跨換日線時走太平洋
+      if (!sameAsOrigin) {
+        const [oLon, oLat] = TAIWAN_CENTER;
+        const [dLon, dLat] = destCoords;
+        const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
+        const lons = [oLon, endLon];
+        const lats = [oLat, dLat];
+        const bounds = new maplibregl.LngLatBounds(
+          [Math.min(...lons), Math.min(...lats)],
+          [Math.max(...lons), Math.max(...lats)],
+        );
+        m.fitBounds(bounds, { padding: 80, maxZoom: 5, duration: 600 });
+      } else {
+        m.flyTo({ center: destCoords, zoom: 6, duration: 600 });
+      }
+    };
+
+    if (m.isStyleLoaded()) {
+      apply();
+    } else {
+      m.once('load', apply);
+    }
+  }, [endpoints, isDark]);
+
+  // 流動動畫（與 CyberMap 同款）
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    const stop = () => {
+      if (flowRafRef.current != null) {
+        cancelAnimationFrame(flowRafRef.current);
+        flowRafRef.current = null;
+      }
+    };
+    const loop = () => {
+      if (!map.current || !map.current.getLayer('trace-path')) {
+        flowRafRef.current = null;
+        return;
+      }
+      const c = (Date.now() / 2200) % 1;
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        map.current.setPaintProperty('trace-path', 'line-gradient', buildFlowGradient(isDark, c) as any);
+      } catch {
+        flowRafRef.current = null;
+        return;
+      }
+      flowRafRef.current = requestAnimationFrame(loop);
+    };
+    stop();
+    flowRafRef.current = requestAnimationFrame(loop);
+    return stop;
+  }, [isDark]);
 
   return (
     <div className="w-full h-full relative">
-      <style>{`
-        .trace-popup .maplibregl-popup-content {
-          background: transparent;
-          padding: 0;
-          box-shadow: none;
-          border: none;
-        }
-        .trace-popup .maplibregl-popup-tip {
-          display: none;
-        }
-      `}</style>
       <div ref={mapContainer} className="w-full h-full rounded-xl overflow-hidden" />
     </div>
   );

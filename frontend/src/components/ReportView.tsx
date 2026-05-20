@@ -1,161 +1,158 @@
-import React from 'react';
-import { X, Pencil, Share2, Globe } from 'lucide-react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Printer, Link as LinkIcon, X, Check, Pencil, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { ReportData } from './ReportModal';
-import { detectCloudProvider } from '../utils/cloudProvider';
+import { ReportData } from '../types/report';
+import { SiteHeader, Hero, SectionHeading, SiteFooter } from './SiteHeader';
+import { MapSection } from './MapSection';
+import { TopCards } from './TopCards';
+import { LiveTable } from './LiveTable';
+import { useDnsStore } from '../stores/useDnsStore';
+import { formatDateTime } from '../utils/formatTime';
 
 interface ReportViewProps {
   data: ReportData;
   onClose: () => void;
   onEdit: () => void;
-  /** standalone=true 時為獨立分頁，隱藏 Edit 按鈕並調整容器樣式 */
   standalone?: boolean;
 }
 
+const BRAND_LABELS: Record<string, string> = {
+  apple: 'Apple',
+  google: 'Google',
+  motorola: 'Motorola',
+  samsung: 'Samsung',
+  xiaomi: '小米',
+  huawei: '華為',
+  oppo: 'OPPO',
+  vivo: 'vivo',
+  other: '其他',
+};
+
+/**
+ * ReportView — 分享報告快照頁面
+ *
+ * 與 wireframe `report.html` 相同：完全沿用主 dashboard 的版面
+ * （地圖 + 統計卡 + Top 5 + 即時 DNS 查詢表格），不另起一套版型。
+ * 透過 useEffect 把 snapshot records 灌進 useDnsStore，
+ * 讓底下三個元件 (MapSection / TopCards / LiveTable) 直接以「shared report」模式運作。
+ */
 export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit, standalone = false }) => {
-  const { t } = useTranslation();
-  const { records, appInfo, generatedAt } = data;
+  const { t, i18n } = useTranslation();
+  const { records, appInfo, generatedAt, phoneBrand } = data;
+  const [copied, setCopied] = useState(false);
 
-  const domesticCount = records.filter(r => !r.isForeign).length;
-  const foreignCount = records.filter(r => r.isForeign).length;
-  const domesticPct = records.length > 0 ? ((domesticCount / records.length) * 100).toFixed(1) : '0';
+  const loadSnapshot = useDnsStore((s) => s.loadSnapshot);
+  const setSharedReport = useDnsStore((s) => s.setSharedReport);
+  const setMonitoringIp = useDnsStore((s) => s.setMonitoringIp);
+  const selectAllLoaded = useDnsStore((s) => s.selectAllLoaded);
+  const clearSelection = useDnsStore((s) => s.clearSelection);
 
-  const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href);
+  // 進入頁面即把 snapshot records 寫進 store，並切換到「shared report」模式
+  // 注意：setMonitoringIp 必須先於 loadSnapshot，loadSnapshot 內會檢查 monitoringIp 才會 commit records
+  useEffect(() => {
+    setSharedReport(true);
+    if (records.length > 0) {
+      setMonitoringIp(records[0].sourceIp || null);
+    }
+    loadSnapshot(records);
+    // 分享報告預設所有紀錄都已勾選（符合 wireframe「報告 = 已勾選紀錄」的預期）
+    selectAllLoaded();
+    return () => {
+      setSharedReport(false);
+      clearSelection();
+    };
+  }, [records, loadSnapshot, setSharedReport, setMonitoringIp, selectAllLoaded, clearSelection]);
+
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
   };
 
+  const heroTitle = appInfo.appName ? `${appInfo.appName} — ${t('report_heading')}` : t('report_heading');
+  const heroSubtitle = useMemo(
+    () => [
+      t('report_generated_at', { time: formatDateTime(generatedAt, i18n.language) }),
+      phoneBrand ? t('report_observed_on', { brand: BRAND_LABELS[phoneBrand] || phoneBrand }) : null,
+    ].filter(Boolean).join(' · '),
+    [generatedAt, phoneBrand, i18n.language, t],
+  );
+
   return (
-    <div className={standalone ? "min-h-screen bg-white dark:bg-slate-950 overflow-y-auto transition-colors" : "fixed inset-0 z-[9998] bg-white dark:bg-slate-950 overflow-y-auto transition-colors"}>
-      {/* Header */}
-      <div className="sticky top-0 z-10 bg-white/95 dark:bg-slate-950/95 backdrop-blur-sm border-b border-slate-200 dark:border-white/10 px-6 py-4">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            {appInfo.appLogoUrl && (
-              <img
-                src={appInfo.appLogoUrl}
-                alt={appInfo.appName}
-                className="w-10 h-10 rounded-xl object-cover border border-slate-200 dark:border-white/10"
-                onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
-              />
-            )}
-            <div>
-              <h1 className="text-lg font-bold text-slate-800 dark:text-slate-100">{appInfo.appName}</h1>
-              <p className="text-[10px] text-slate-500 uppercase tracking-widest font-mono">{t('report_title')}</p>
+    <div className={`${standalone ? 'min-h-screen' : 'fixed inset-0 z-[9998] overflow-y-auto'} w-full bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100 font-sans antialiased flex flex-col`}>
+      <SiteHeader />
+
+      {/* 報告快照 banner（與 wireframe 同款 amber 提示列） */}
+      <div className="border-b border-amber-200/90 bg-amber-50/95 text-amber-950 dark:border-amber-500/35 dark:bg-amber-950/50 dark:text-amber-50">
+        <div className="max-w-7xl mx-auto px-5 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs sm:text-sm">
+          <div className="flex items-start gap-2 min-w-0">
+            <FileText className="h-4 w-4 shrink-0 mt-0.5 text-amber-700 dark:text-amber-400" />
+            <div className="min-w-0">
+              <p className="font-bold text-amber-900 dark:text-amber-100">{t('report_snapshot_title')}</p>
+              <p className="mt-0.5 text-xs sm:text-sm text-amber-900/85 dark:text-amber-100/90">
+                {t('report_snapshot_generated')}: {formatDateTime(generatedAt, i18n.language)} · {records.length} {t('report_snapshot_rows')}
+              </p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {(appInfo.websiteUrl || appInfo.appleStoreUrl || appInfo.googlePlayUrl) && (
-              <div className="flex items-center gap-1.5 mr-2">
-                {appInfo.websiteUrl && (
-                  <a href={appInfo.websiteUrl} target="_blank" rel="noopener noreferrer" className="p-1.5 text-slate-400 hover:text-cyan-500 transition-colors" title="Website">
-                    <Globe className="h-4 w-4" />
-                  </a>
-                )}
-              </div>
-            )}
-            <button onClick={handleShare} className="p-2 text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg border border-slate-200 dark:border-white/10" title={t('share_data')}>
-              <Share2 className="h-4 w-4" />
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleCopyLink}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-300/80 dark:border-amber-600/50 text-amber-950 dark:text-amber-100 font-bold uppercase hover:bg-amber-100/90 dark:hover:bg-slate-800"
+            >
+              {copied ? <Check className="h-3.5 w-3.5" /> : <LinkIcon className="h-3.5 w-3.5" />}
+              {copied ? t('dns_setup_copied') : t('report_copy_link')}
+            </button>
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-bold uppercase"
+            >
+              <Printer className="h-3.5 w-3.5" />
+              {t('report_print')}
             </button>
             {!standalone && (
-              <button onClick={onEdit} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 dark:text-slate-300 hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors rounded-lg border border-slate-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={onEdit}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white dark:bg-slate-900 border border-amber-300/80 dark:border-amber-600/50 text-amber-950 dark:text-amber-100 font-bold uppercase hover:bg-amber-100/90"
+              >
                 <Pencil className="h-3.5 w-3.5" />
                 {t('report_edit')}
               </button>
             )}
-            <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white transition-colors rounded-lg border border-slate-200 dark:border-white/10">
-              <X className="h-4 w-4" />
-            </button>
+            <a href="/" className="text-xs sm:text-sm font-bold uppercase text-amber-900 dark:text-amber-300 hover:underline px-1">
+              {t('report_open_wireframe')}
+            </a>
+            {!standalone && (
+              <button onClick={onClose} className="p-1 rounded hover:bg-amber-200/40 dark:hover:bg-amber-700/30" title="Close">
+                <X className="h-4 w-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
 
-      <div className="max-w-5xl mx-auto px-6 py-8">
-        {/* 統計卡片 */}
-        <div className="grid grid-cols-4 gap-4 mb-8">
-          <StatCard label={t('report_total')} value={records.length} color="slate" />
-          <StatCard label={t('report_domestic')} value={domesticCount} color="emerald" />
-          <StatCard label={t('report_foreign')} value={foreignCount} color="red" />
-          <StatCard label={t('report_domestic_pct')} value={`${domesticPct}%`} color="blue" />
-        </div>
+      <Hero variant="subtitle" title={heroTitle} subtitle={heroSubtitle} />
 
-        {/* DNS 查詢記錄表格 */}
-        <div className="rounded-xl border border-slate-200 dark:border-white/10 overflow-hidden">
-          <table className="w-full text-[11px]">
-            <thead className="bg-slate-50 dark:bg-slate-900">
-              <tr>
-                {[t('time'), t('domain'), 'IP', 'ASN', 'ISP', t('country'), 'TYPE', t('report_cloud'), t('app'), t('report_status')].map(h => (
-                  <th key={h} className="px-3 py-2.5 text-left font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest border-b border-slate-100 dark:border-white/5">{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-              {records.map((r, i) => {
-                const provider = detectCloudProvider(r.isp);
-                return (
-                  <tr key={i} className="hover:bg-cyan-500/5 transition-colors">
-                    <td className="px-3 py-2 text-slate-400 font-mono whitespace-nowrap">{new Date(r.timestamp).toLocaleTimeString()}</td>
-                    <td className="px-3 py-2 text-cyan-600 dark:text-cyan-400 max-w-[200px] truncate">{r.domain}</td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 font-mono">{r.resultIp}</td>
-                    <td className="px-3 py-2 text-slate-400 dark:text-slate-500 font-mono">{r.asn}</td>
-                    <td className="px-3 py-2 text-slate-500 dark:text-slate-400 max-w-[120px] truncate">{r.isp}</td>
-                    <td className="px-3 py-2">
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded ${r.isForeign ? 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-400' : 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'}`}>
-                        {r.country}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${r.type === 'A' ? 'bg-blue-500/20 text-blue-600 dark:text-blue-400' : 'bg-purple-500/20 text-purple-600 dark:text-purple-400'}`}>
-                        {r.type}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2">
-                      {provider ? (
-                        <span className={`text-[9px] font-bold px-1 rounded uppercase ${provider.colorClass}`}>{provider.name}</span>
-                      ) : <span className="text-slate-400">—</span>}
-                    </td>
-                    <td className="px-3 py-2 text-slate-600 dark:text-slate-300 max-w-[100px] truncate">{r.appName}</td>
-                    <td className="px-3 py-2">
-                      {r.isForeign ? (
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-                          <span className="text-red-600 dark:text-red-400 text-[10px] font-bold uppercase">{t('report_foreign')}</span>
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                          <span className="text-emerald-600 dark:text-emerald-400 text-[10px] font-bold uppercase">{t('report_domestic')}</span>
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+      <main className="flex-1 w-full">
+        <div className="max-w-7xl mx-auto flex flex-col gap-[60px] px-5 py-6 sm:py-8">
+          {/* 檢視 DNS 分佈：地圖 + 統計 + Top 5（與主頁同一組元件） */}
+          <div className="flex flex-col gap-[16px]">
+            <SectionHeading variant="inline">{t('section_view_dns_distribution')}</SectionHeading>
+            <div className="flex flex-col gap-4">
+              <MapSection />
+              <TopCards />
+            </div>
+          </div>
 
-        {/* Footer */}
-        <div className="mt-8 pt-4 border-t border-slate-200 dark:border-white/10 text-center text-[10px] text-slate-400 dark:text-slate-600 font-mono uppercase tracking-widest">
-          {t('report_generated_at', { time: new Date(generatedAt).toLocaleString() })}
-          <span className="mx-2">·</span>
-          &copy; {new Date().getFullYear()} OCF (Open Culture Foundation)
+          {/* 即時 DNS 查詢表格（report 模式下無 onOpenReport，按鈕會 disabled） */}
+          <LiveTable />
         </div>
-      </div>
-    </div>
-  );
-};
+      </main>
 
-const StatCard: React.FC<{ label: string; value: number | string; color: string }> = ({ label, value, color }) => {
-  const colors: Record<string, string> = {
-    slate: 'bg-slate-50 dark:bg-slate-800/50 text-slate-800 dark:text-slate-100',
-    emerald: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400',
-    red: 'bg-red-50 dark:bg-red-500/10 text-red-600 dark:text-red-400',
-    blue: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400',
-  };
-  return (
-    <div className={`${colors[color]} rounded-xl p-4 text-center border border-slate-100 dark:border-white/5`}>
-      <div className="text-2xl font-bold font-mono">{value}</div>
-      <div className="text-[10px] text-slate-500 uppercase tracking-wider mt-1">{label}</div>
+      <SiteFooter />
     </div>
   );
 };

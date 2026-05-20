@@ -61,6 +61,13 @@ export interface DnsRecord {
     osInferred?: boolean;
     // 對應 Go: GeoInferred bool — GeoIP 資料庫推估
     geoInferred?: boolean;
+
+    /**
+     * 對應 Go: IsAnycast bool
+     * 後端依 ASN 判定此 IP 屬於已知 anycast CDN（Cloudflare、Akamai、Fastly…）。
+     * 為真時即使 country=='XX' 也應在 UI 顯示為 "Anycast" 而非 "未知"。
+     */
+    isAnycast?: boolean;
 }
 
 /**

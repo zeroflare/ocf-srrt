@@ -59,14 +59,24 @@ export function pickPathEndpoints<T>(items: T[]): T[] {
 
 /**
  * Create a curved line (arc) between two [lon, lat] points.
+ *
+ * 跨經線：當兩點經度差超過 180°（如台灣 121° → 美西 -122°），
+ * 直接 lerp 會繞地球反方向（穿越歐亞與大西洋）。改用 ±360 調整
+ * 終點，讓線走最短路徑（台灣 → 美國 走太平洋）。MapLibre 對於
+ * 超出 [-180, 180] 的經度會自動跨換日線渲染。
  */
 export const createCurve = (start: [number, number], end: [number, number]): [number, number][] => {
+  let endLng = end[0];
+  const lngDiff = endLng - start[0];
+  if (lngDiff > 180) endLng -= 360;
+  else if (lngDiff < -180) endLng += 360;
+
   const points: [number, number][] = [];
   const steps = 50;
   const dist = calculateDistance(start, end);
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
-    const lng = start[0] + (end[0] - start[0]) * t;
+    const lng = start[0] + (endLng - start[0]) * t;
     const lat = start[1] + (end[1] - start[1]) * t;
     const offset = Math.sin(t * Math.PI) * (dist / 5000) * 10;
     points.push([lng, lat + offset]);

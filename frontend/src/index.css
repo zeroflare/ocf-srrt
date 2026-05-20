@@ -2,76 +2,148 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+@theme {
+  --color-brand-navy: #17233a;
+  --color-brand-navy2: #17233b;
+  --color-brand-border: #202f4a;
+  --color-brand-accent: #17d4a7;
+  --color-brand-accent2: #0fc196;
+}
+
 @layer base {
-  body {
-    @apply bg-slate-50 text-slate-900 dark:bg-gray-900 dark:text-white overflow-hidden;
+  html, body {
+    @apply bg-white text-slate-900 dark:bg-slate-950 dark:text-slate-100;
     margin: 0;
-    width: 100vw;
-    height: 100vh;
+    min-height: 100vh;
+    font-family:
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      Roboto,
+      "Noto Sans TC",
+      "PingFang TC",
+      sans-serif;
+    transition: background-color 250ms ease, color 250ms ease;
   }
 }
 
-.custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+.custom-scrollbar::-webkit-scrollbar,
+.overflow-auto::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
 }
-
-.custom-scrollbar::-webkit-scrollbar-track {
+.custom-scrollbar::-webkit-scrollbar-track,
+.overflow-auto::-webkit-scrollbar-track {
   background: transparent;
 }
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.1);
-  border-radius: 2px;
+.custom-scrollbar::-webkit-scrollbar-thumb,
+.overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.25);
+  border-radius: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.4);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb,
+.dark .overflow-auto::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.2);
+}
+.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover,
+.dark .overflow-auto::-webkit-scrollbar-thumb:hover {
+  background: rgba(148, 163, 184, 0.35);
 }
 
-.dark .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.2);
-}
-
-.dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-/* Row flash animation for new DNS records */
 @keyframes row-flash {
-  0% { background-color: rgba(6, 182, 212, 0.15); }
+  0% { background-color: rgba(16, 185, 129, 0.18); }
   100% { background-color: transparent; }
 }
-.animate-row-flash { animation: row-flash 1.5s ease-out; }
+.animate-row-flash { animation: row-flash 1.6s ease-out; }
 
-/* Tooltip fade-in */
 @keyframes fade-in {
   from { opacity: 0; transform: translate(-50%, -100%) scale(0.95); }
   to { opacity: 1; transform: translate(-50%, -100%) scale(1); }
 }
-
-/* Popup scale-in */
 @keyframes popup-in {
   from { opacity: 0; transform: scale(0.9) translateY(12px); }
   to { opacity: 1; transform: scale(1) translateY(0); }
 }
-
 @keyframes backdrop-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
 
-/* MapLibre GL JS Popup 樣式自訂 */
 .maplibregl-popup-content {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
 }
-
 .maplibregl-popup-tip {
   border-top-color: #ffffff !important;
 }
-
 .dark .maplibregl-popup-tip {
   border-top-color: #0f172a !important;
+}
+
+/* ========= SRRT 全站字級（與 wireframe 對齊） ========= */
+
+/* 按鈕：16px */
+button,
+[type="button"],
+[type="submit"],
+[role="button"] {
+  font-size: 16px !important;
+  line-height: normal !important;
+}
+
+/* 頂部列：外觀為按鈕／pill 的連結也採 16px */
+header a.rounded-lg {
+  font-size: 16px !important;
+  line-height: normal !important;
+}
+
+/* 表單輸入元件：16px（避免 iOS 自動放大） */
+input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]),
+select,
+textarea {
+  font-size: 16px !important;
+}
+
+/* 表單標籤：14px */
+label {
+  font-size: 14px !important;
+  line-height: normal !important;
+}
+
+/* 卡片標題（地圖／統計／Top 卡／表格區標題等）：16px */
+.wf-card-title {
+  font-size: 16px !important;
+  line-height: normal !important;
+}
+
+/* 資料表格：14px */
+table.wf-data-table th,
+table.wf-data-table td {
+  font-size: 14px !important;
+  line-height: normal !important;
+}
+table.wf-data-table th *:not(button),
+table.wf-data-table td *:not(button) {
+  font-size: 14px !important;
+  line-height: normal !important;
+}
+
+/* 頁尾：12px */
+footer {
+  font-size: 12px !important;
+  line-height: normal !important;
+}
+
+/* 任意字級小於 12px 的 Tailwind class 抬到 12px（資料表格已由 wf-data-table 覆蓋為 14px） */
+body [class*="text-[8px]"],
+body [class*="text-[9px]"],
+body [class*="text-[10px]"],
+body [class*="text-[11px]"] {
+  font-size: 12px !important;
 }

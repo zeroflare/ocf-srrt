@@ -6,13 +6,30 @@ import { Hop } from '../types';
 import { pickPathEndpoints } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
 import { countryFlag } from '../utils/countryFlag';
+import countryHubsData from '../data/countries-hubs.json';
 
 interface TraceMapProps {
   hops: Hop[];
 }
 
-// 與首頁 CyberMap 一致的原點：台灣中心
-const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
+// 與 CyberMap 共用同一份 countries-hubs.json，確保線端 / 旗幟 marker 永遠對齊
+interface CountryHub {
+  code: string;
+  nameZh: string;
+  nameEn?: string;
+  flag: string;
+  coordinates: [number, number];
+}
+const HUB_BY_CODE: Map<string, CountryHub> = new Map(
+  (countryHubsData.countries as CountryHub[]).map((c) => [c.code, c]),
+);
+
+// 原點：本地國家（與 CyberMap、wireframe 一致使用 TW hub 座標 [121.5654, 25.033]）
+const ORIGIN_CODE = 'TW';
+const ORIGIN_HUB = HUB_BY_CODE.get(ORIGIN_CODE);
+const TAIWAN_CENTER: [number, number] = ORIGIN_HUB
+  ? (ORIGIN_HUB.coordinates as [number, number])
+  : [121.5654, 25.033];
 const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
 const DEFAULT_ZOOM = 6.2;
 const MIN_ZOOM = 0.8158546915390924;
@@ -230,14 +247,17 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         return;
       }
 
-      // 取最後一個 hop 當目的地；若起點 hop 跟台灣同國家，仍以台灣中心當原點顯示
+      // 取最後一個 hop 當目的地：
+      //  - 線段端點 / marker 位置一律以「國家 hub 中心點」為準（與 wireframe `_traceHubLineGeoJson` 一致）
+      //  - 同國家或 hub 表查不到時，不畫線只放原點 marker，避免線端落在不確定位置
+      //  - lastHop.coords（GeoIP 經緯度）不再用於繪圖，只保留在 HopTable 顯示細節
       const lastHop = endpoints[endpoints.length - 1];
-      const destCoords = lastHop.coords;
-      const sameAsOrigin =
-        Math.abs(destCoords[0] - TAIWAN_CENTER[0]) < 1 && Math.abs(destCoords[1] - TAIWAN_CENTER[1]) < 1;
+      const destHub = lastHop.country ? HUB_BY_CODE.get(lastHop.country) : undefined;
+      const destCoords: [number, number] | null =
+        destHub && destHub.code !== ORIGIN_CODE ? (destHub.coordinates as [number, number]) : null;
 
       const features: Feature[] = [];
-      if (!sameAsOrigin) {
+      if (destCoords) {
         features.push({
           type: 'Feature',
           geometry: { type: 'LineString', coordinates: spokeLine(TAIWAN_CENTER, destCoords) },
@@ -246,11 +266,11 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
       }
       source.setData({ type: 'FeatureCollection', features });
 
-      // marker：origin TW + 終點國家
+      // marker：origin TW + 終點國家（座標都來自 hub 表，與線端永遠對齊）
       type MarkerInfo = { coords: [number, number]; country: string; isOrigin: boolean };
       const items: MarkerInfo[] = [{ coords: TAIWAN_CENTER, country: 'TW', isOrigin: true }];
-      if (!sameAsOrigin) {
-        items.push({ coords: destCoords, country: lastHop.country || '', isOrigin: false });
+      if (destCoords && destHub) {
+        items.push({ coords: destCoords, country: destHub.code, isOrigin: false });
       }
 
       for (const it of items) {
@@ -280,8 +300,8 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         markersRef.current.push(marker);
       }
 
-      // fitBounds：包住起點與終點，跨換日線時走太平洋
-      if (!sameAsOrigin) {
+      // fitBounds：包住起點與終點，跨換日線時走太平洋；同國 / 查不到 hub 時拉回台灣中心
+      if (destCoords) {
         const [oLon, oLat] = TAIWAN_CENTER;
         const [dLon, dLat] = destCoords;
         const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
@@ -293,7 +313,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         );
         m.fitBounds(bounds, { padding: 80, maxZoom: 5, duration: 600 });
       } else {
-        m.flyTo({ center: destCoords, zoom: 6, duration: 600 });
+        m.flyTo({ center: TAIWAN_CENTER, zoom: 6, duration: 600 });
       }
     };
 

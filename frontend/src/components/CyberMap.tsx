@@ -8,9 +8,27 @@ import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHop
 import { countryFlag } from '../utils/countryFlag';
 import { useTranslation } from 'react-i18next';
 import { Radio, Search } from 'lucide-react';
+import countryHubsData from '../data/countries-hubs.json';
 
-// Spokes 原點：使用者的本地國家（預設台灣中心）
-const TAIWAN_CENTER: [number, number] = [121.5, 24.5];
+// Country hub 座標表（與 wireframe 共用同一份 data/countries-hubs.json）
+// 設計：spokes 端點與圓形旗幟 marker 都讀同一張表，保證「線」與「icon」永遠對齊。
+interface CountryHub {
+  code: string;
+  nameZh: string;
+  nameEn?: string;
+  flag: string;
+  coordinates: [number, number];
+}
+const HUB_BY_CODE: Map<string, CountryHub> = new Map(
+  (countryHubsData.countries as CountryHub[]).map((c) => [c.code, c]),
+);
+
+// Spokes 原點：本地國家（與 wireframe 一致使用 TW hub 座標 [121.5654, 25.033]）
+const ORIGIN_CODE = 'TW';
+const ORIGIN_HUB = HUB_BY_CODE.get(ORIGIN_CODE);
+const TAIWAN_CENTER: [number, number] = ORIGIN_HUB
+  ? (ORIGIN_HUB.coordinates as [number, number])
+  : [121.5654, 25.033];
 // 預設地圖視野：以台灣為中心，台灣 zoom 等級
 const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
 const DEFAULT_ZOOM = 6.2;
@@ -375,14 +393,21 @@ export const CyberMap: React.FC = () => {
     }
   }, [activeResult, mapReady]);
 
-  // 依 country 去重的目的地清單（一個國家一個 marker）
+  // 依 country 去重的目的地清單（一個國家一個 marker）。
+  //
+  // 設計：座標一律改用 countries-hubs.json 的「國家中心點」，與 wireframe 行為一致：
+  //  - 同國家不同 IP 的 r.longitude/r.latitude 會略有差異，導致線段端點與旗幟 marker 對不準
+  //  - 改用 hub 座標後，線端與 marker 永遠在同一座標，icon 與線視覺上不會偏移
+  //  - country code 不在 hub 表（罕見）→ 直接跳過該紀錄，避免畫到奇怪的位置
   const destinations = useMemo(() => {
     const byCountry = new Map<string, { coords: [number, number]; country: string; foreign: boolean }>();
     for (const r of records) {
-      if (!r.longitude || !r.latitude || !r.country) continue;
+      if (!r.country) continue;
+      const hub = HUB_BY_CODE.get(r.country);
+      if (!hub) continue;
       if (byCountry.has(r.country)) continue;
       byCountry.set(r.country, {
-        coords: [r.longitude, r.latitude],
+        coords: hub.coordinates,
         country: r.country,
         foreign: !!r.isForeign,
       });

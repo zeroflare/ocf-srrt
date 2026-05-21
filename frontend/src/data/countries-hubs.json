@@ -1,0 +1,2504 @@
+{
+  "countries": [
+    {
+      "code": "TW",
+      "nameZh": "臺灣",
+      "nameEn": "Taiwan",
+      "flag": "🇹🇼",
+      "coordinates": [
+        121.5654,
+        25.033
+      ]
+    },
+    {
+      "code": "AD",
+      "nameZh": "安道爾",
+      "nameEn": "Andorra",
+      "flag": "🇦🇩",
+      "coordinates": [
+        1.5,
+        42.5
+      ]
+    },
+    {
+      "code": "AE",
+      "nameZh": "阿拉伯聯合大公國",
+      "nameEn": "United Arab Emirates",
+      "flag": "🇦🇪",
+      "coordinates": [
+        54,
+        24
+      ]
+    },
+    {
+      "code": "AF",
+      "nameZh": "阿富汗",
+      "nameEn": "Afghanistan",
+      "flag": "🇦🇫",
+      "coordinates": [
+        65,
+        33
+      ]
+    },
+    {
+      "code": "AG",
+      "nameZh": "安提瓜和巴布達",
+      "nameEn": "Antigua and Barbuda",
+      "flag": "🇦🇬",
+      "coordinates": [
+        -61.8,
+        17.05
+      ]
+    },
+    {
+      "code": "AI",
+      "nameZh": "安圭拉",
+      "nameEn": "Anguilla",
+      "flag": "🇦🇮",
+      "coordinates": [
+        -63.16666666,
+        18.25
+      ]
+    },
+    {
+      "code": "AL",
+      "nameZh": "阿爾巴尼亞",
+      "nameEn": "Albania",
+      "flag": "🇦🇱",
+      "coordinates": [
+        20,
+        41
+      ]
+    },
+    {
+      "code": "AM",
+      "nameZh": "亞美尼亞",
+      "nameEn": "Armenia",
+      "flag": "🇦🇲",
+      "coordinates": [
+        45,
+        40
+      ]
+    },
+    {
+      "code": "AO",
+      "nameZh": "安哥拉",
+      "nameEn": "Angola",
+      "flag": "🇦🇴",
+      "coordinates": [
+        18.5,
+        -12.5
+      ]
+    },
+    {
+      "code": "AQ",
+      "nameZh": "南極洲",
+      "nameEn": "Antarctica",
+      "flag": "🇦🇶",
+      "coordinates": [
+        0,
+        -90
+      ]
+    },
+    {
+      "code": "AR",
+      "nameZh": "阿根廷",
+      "nameEn": "Argentina",
+      "flag": "🇦🇷",
+      "coordinates": [
+        -64,
+        -34
+      ]
+    },
+    {
+      "code": "AS",
+      "nameZh": "美屬薩摩亞",
+      "nameEn": "American Samoa",
+      "flag": "🇦🇸",
+      "coordinates": [
+        -170,
+        -14.33333333
+      ]
+    },
+    {
+      "code": "AT",
+      "nameZh": "奧地利",
+      "nameEn": "Austria",
+      "flag": "🇦🇹",
+      "coordinates": [
+        13.33333333,
+        47.33333333
+      ]
+    },
+    {
+      "code": "AU",
+      "nameZh": "澳大利亞",
+      "nameEn": "Australia",
+      "flag": "🇦🇺",
+      "coordinates": [
+        133,
+        -27
+      ]
+    },
+    {
+      "code": "AW",
+      "nameZh": "阿魯巴",
+      "nameEn": "Aruba",
+      "flag": "🇦🇼",
+      "coordinates": [
+        -69.96666666,
+        12.5
+      ]
+    },
+    {
+      "code": "AX",
+      "nameZh": "奧蘭群島",
+      "nameEn": "Åland Islands",
+      "flag": "🇦🇽",
+      "coordinates": [
+        19.9,
+        60.116667
+      ]
+    },
+    {
+      "code": "AZ",
+      "nameZh": "阿塞拜疆",
+      "nameEn": "Azerbaijan",
+      "flag": "🇦🇿",
+      "coordinates": [
+        47.5,
+        40.5
+      ]
+    },
+    {
+      "code": "BA",
+      "nameZh": "波士尼亞與赫塞哥維納",
+      "nameEn": "Bosnia and Herzegovina",
+      "flag": "🇧🇦",
+      "coordinates": [
+        18,
+        44
+      ]
+    },
+    {
+      "code": "BB",
+      "nameZh": "巴巴多斯",
+      "nameEn": "Barbados",
+      "flag": "🇧🇧",
+      "coordinates": [
+        -59.53333333,
+        13.16666666
+      ]
+    },
+    {
+      "code": "BD",
+      "nameZh": "孟加拉國",
+      "nameEn": "Bangladesh",
+      "flag": "🇧🇩",
+      "coordinates": [
+        90,
+        24
+      ]
+    },
+    {
+      "code": "BE",
+      "nameZh": "比利時",
+      "nameEn": "Belgium",
+      "flag": "🇧🇪",
+      "coordinates": [
+        4,
+        50.83333333
+      ]
+    },
+    {
+      "code": "BF",
+      "nameZh": "布基納法索",
+      "nameEn": "Burkina Faso",
+      "flag": "🇧🇫",
+      "coordinates": [
+        -2,
+        13
+      ]
+    },
+    {
+      "code": "BG",
+      "nameZh": "保加利亞",
+      "nameEn": "Bulgaria",
+      "flag": "🇧🇬",
+      "coordinates": [
+        25,
+        43
+      ]
+    },
+    {
+      "code": "BH",
+      "nameZh": "巴林",
+      "nameEn": "Bahrain",
+      "flag": "🇧🇭",
+      "coordinates": [
+        50.55,
+        26
+      ]
+    },
+    {
+      "code": "BI",
+      "nameZh": "布隆迪",
+      "nameEn": "Burundi",
+      "flag": "🇧🇮",
+      "coordinates": [
+        30,
+        -3.5
+      ]
+    },
+    {
+      "code": "BJ",
+      "nameZh": "貝寧",
+      "nameEn": "Benin",
+      "flag": "🇧🇯",
+      "coordinates": [
+        2.25,
+        9.5
+      ]
+    },
+    {
+      "code": "BL",
+      "nameZh": "聖巴泰勒米",
+      "nameEn": "Saint Barthélemy",
+      "flag": "🇧🇱",
+      "coordinates": [
+        -63.41666666,
+        18.5
+      ]
+    },
+    {
+      "code": "BM",
+      "nameZh": "百慕大",
+      "nameEn": "Bermuda",
+      "flag": "🇧🇲",
+      "coordinates": [
+        -64.75,
+        32.33333333
+      ]
+    },
+    {
+      "code": "BN",
+      "nameZh": "文萊",
+      "nameEn": "Brunei",
+      "flag": "🇧🇳",
+      "coordinates": [
+        114.66666666,
+        4.5
+      ]
+    },
+    {
+      "code": "BO",
+      "nameZh": "玻利維亞",
+      "nameEn": "Bolivia",
+      "flag": "🇧🇴",
+      "coordinates": [
+        -65,
+        -17
+      ]
+    },
+    {
+      "code": "BQ",
+      "nameZh": "荷蘭加勒比區",
+      "nameEn": "Caribbean Netherlands",
+      "flag": "🇧🇶",
+      "coordinates": [
+        -68.25,
+        12.18
+      ]
+    },
+    {
+      "code": "BR",
+      "nameZh": "巴西",
+      "nameEn": "Brazil",
+      "flag": "🇧🇷",
+      "coordinates": [
+        -55,
+        -10
+      ]
+    },
+    {
+      "code": "BS",
+      "nameZh": "巴哈馬",
+      "nameEn": "Bahamas",
+      "flag": "🇧🇸",
+      "coordinates": [
+        -77.3963,
+        25.0343
+      ]
+    },
+    {
+      "code": "BT",
+      "nameZh": "不丹",
+      "nameEn": "Bhutan",
+      "flag": "🇧🇹",
+      "coordinates": [
+        90.5,
+        27.5
+      ]
+    },
+    {
+      "code": "BV",
+      "nameZh": "布維島",
+      "nameEn": "Bouvet Island",
+      "flag": "🇧🇻",
+      "coordinates": [
+        3.3464,
+        -54.4208
+      ]
+    },
+    {
+      "code": "BW",
+      "nameZh": "博茨瓦納",
+      "nameEn": "Botswana",
+      "flag": "🇧🇼",
+      "coordinates": [
+        24,
+        -22
+      ]
+    },
+    {
+      "code": "BY",
+      "nameZh": "白俄羅斯",
+      "nameEn": "Belarus",
+      "flag": "🇧🇾",
+      "coordinates": [
+        28,
+        53
+      ]
+    },
+    {
+      "code": "BZ",
+      "nameZh": "伯利茲",
+      "nameEn": "Belize",
+      "flag": "🇧🇿",
+      "coordinates": [
+        -88.75,
+        17.25
+      ]
+    },
+    {
+      "code": "CA",
+      "nameZh": "加拿大",
+      "nameEn": "Canada",
+      "flag": "🇨🇦",
+      "coordinates": [
+        -95,
+        60
+      ]
+    },
+    {
+      "code": "CC",
+      "nameZh": "科科斯",
+      "nameEn": "Cocos (Keeling) Islands",
+      "flag": "🇨🇨",
+      "coordinates": [
+        96.871,
+        -12.1642
+      ]
+    },
+    {
+      "code": "CD",
+      "nameZh": "剛果民主共和國",
+      "nameEn": "DR Congo",
+      "flag": "🇨🇩",
+      "coordinates": [
+        25,
+        0
+      ]
+    },
+    {
+      "code": "CF",
+      "nameZh": "中非共和國",
+      "nameEn": "Central African Republic",
+      "flag": "🇨🇫",
+      "coordinates": [
+        21,
+        7
+      ]
+    },
+    {
+      "code": "CG",
+      "nameZh": "剛果共和國",
+      "nameEn": "Republic of the Congo",
+      "flag": "🇨🇬",
+      "coordinates": [
+        15,
+        -1
+      ]
+    },
+    {
+      "code": "CH",
+      "nameZh": "瑞士",
+      "nameEn": "Switzerland",
+      "flag": "🇨🇭",
+      "coordinates": [
+        8,
+        47
+      ]
+    },
+    {
+      "code": "CI",
+      "nameZh": "科特迪瓦",
+      "nameEn": "Ivory Coast",
+      "flag": "🇨🇮",
+      "coordinates": [
+        -5,
+        8
+      ]
+    },
+    {
+      "code": "CK",
+      "nameZh": "庫克群島",
+      "nameEn": "Cook Islands",
+      "flag": "🇨🇰",
+      "coordinates": [
+        -159.76666666,
+        -21.23333333
+      ]
+    },
+    {
+      "code": "CL",
+      "nameZh": "智利",
+      "nameEn": "Chile",
+      "flag": "🇨🇱",
+      "coordinates": [
+        -71,
+        -30
+      ]
+    },
+    {
+      "code": "CM",
+      "nameZh": "喀麥隆",
+      "nameEn": "Cameroon",
+      "flag": "🇨🇲",
+      "coordinates": [
+        12,
+        6
+      ]
+    },
+    {
+      "code": "CN",
+      "nameZh": "中國",
+      "nameEn": "China",
+      "flag": "🇨🇳",
+      "coordinates": [
+        105,
+        35
+      ]
+    },
+    {
+      "code": "CO",
+      "nameZh": "哥倫比亞",
+      "nameEn": "Colombia",
+      "flag": "🇨🇴",
+      "coordinates": [
+        -72,
+        4
+      ]
+    },
+    {
+      "code": "CR",
+      "nameZh": "哥斯達黎加",
+      "nameEn": "Costa Rica",
+      "flag": "🇨🇷",
+      "coordinates": [
+        -84,
+        10
+      ]
+    },
+    {
+      "code": "CU",
+      "nameZh": "古巴",
+      "nameEn": "Cuba",
+      "flag": "🇨🇺",
+      "coordinates": [
+        -80,
+        21.5
+      ]
+    },
+    {
+      "code": "CV",
+      "nameZh": "佛得角",
+      "nameEn": "Cape Verde",
+      "flag": "🇨🇻",
+      "coordinates": [
+        -23.0418,
+        16.5388
+      ]
+    },
+    {
+      "code": "CW",
+      "nameZh": "庫拉索",
+      "nameEn": "Curaçao",
+      "flag": "🇨🇼",
+      "coordinates": [
+        -68.933333,
+        12.116667
+      ]
+    },
+    {
+      "code": "CX",
+      "nameZh": "聖誕島",
+      "nameEn": "Christmas Island",
+      "flag": "🇨🇽",
+      "coordinates": [
+        105.66666666,
+        -10.5
+      ]
+    },
+    {
+      "code": "CY",
+      "nameZh": "塞浦路斯",
+      "nameEn": "Cyprus",
+      "flag": "🇨🇾",
+      "coordinates": [
+        33,
+        35
+      ]
+    },
+    {
+      "code": "CZ",
+      "nameZh": "捷克",
+      "nameEn": "Czechia",
+      "flag": "🇨🇿",
+      "coordinates": [
+        15.5,
+        49.75
+      ]
+    },
+    {
+      "code": "DE",
+      "nameZh": "德國",
+      "nameEn": "Germany",
+      "flag": "🇩🇪",
+      "coordinates": [
+        9,
+        51
+      ]
+    },
+    {
+      "code": "DJ",
+      "nameZh": "吉布提",
+      "nameEn": "Djibouti",
+      "flag": "🇩🇯",
+      "coordinates": [
+        43,
+        11.5
+      ]
+    },
+    {
+      "code": "DK",
+      "nameZh": "丹麥",
+      "nameEn": "Denmark",
+      "flag": "🇩🇰",
+      "coordinates": [
+        10,
+        56
+      ]
+    },
+    {
+      "code": "DM",
+      "nameZh": "多米尼加",
+      "nameEn": "Dominica",
+      "flag": "🇩🇲",
+      "coordinates": [
+        -61.33333333,
+        15.41666666
+      ]
+    },
+    {
+      "code": "DO",
+      "nameZh": "多明尼加",
+      "nameEn": "Dominican Republic",
+      "flag": "🇩🇴",
+      "coordinates": [
+        -70.66666666,
+        19
+      ]
+    },
+    {
+      "code": "DZ",
+      "nameZh": "阿爾及利亞",
+      "nameEn": "Algeria",
+      "flag": "🇩🇿",
+      "coordinates": [
+        3,
+        28
+      ]
+    },
+    {
+      "code": "EC",
+      "nameZh": "厄瓜多爾",
+      "nameEn": "Ecuador",
+      "flag": "🇪🇨",
+      "coordinates": [
+        -77.5,
+        -2
+      ]
+    },
+    {
+      "code": "EE",
+      "nameZh": "愛沙尼亞",
+      "nameEn": "Estonia",
+      "flag": "🇪🇪",
+      "coordinates": [
+        26,
+        59
+      ]
+    },
+    {
+      "code": "EG",
+      "nameZh": "埃及",
+      "nameEn": "Egypt",
+      "flag": "🇪🇬",
+      "coordinates": [
+        30,
+        27
+      ]
+    },
+    {
+      "code": "EH",
+      "nameZh": "西撒哈拉",
+      "nameEn": "Western Sahara",
+      "flag": "🇪🇭",
+      "coordinates": [
+        -13,
+        24.5
+      ]
+    },
+    {
+      "code": "ER",
+      "nameZh": "厄立特里亞",
+      "nameEn": "Eritrea",
+      "flag": "🇪🇷",
+      "coordinates": [
+        39,
+        15
+      ]
+    },
+    {
+      "code": "ES",
+      "nameZh": "西班牙",
+      "nameEn": "Spain",
+      "flag": "🇪🇸",
+      "coordinates": [
+        -4,
+        40
+      ]
+    },
+    {
+      "code": "ET",
+      "nameZh": "埃塞俄比亞",
+      "nameEn": "Ethiopia",
+      "flag": "🇪🇹",
+      "coordinates": [
+        38,
+        8
+      ]
+    },
+    {
+      "code": "FI",
+      "nameZh": "芬蘭",
+      "nameEn": "Finland",
+      "flag": "🇫🇮",
+      "coordinates": [
+        26,
+        64
+      ]
+    },
+    {
+      "code": "FJ",
+      "nameZh": "斐濟",
+      "nameEn": "Fiji",
+      "flag": "🇫🇯",
+      "coordinates": [
+        178.065,
+        -17.7134
+      ]
+    },
+    {
+      "code": "FK",
+      "nameZh": "福克蘭群島",
+      "nameEn": "Falkland Islands",
+      "flag": "🇫🇰",
+      "coordinates": [
+        -59,
+        -51.75
+      ]
+    },
+    {
+      "code": "FM",
+      "nameZh": "密克羅尼西亞",
+      "nameEn": "Micronesia",
+      "flag": "🇫🇲",
+      "coordinates": [
+        158.25,
+        6.91666666
+      ]
+    },
+    {
+      "code": "FO",
+      "nameZh": "法羅群島",
+      "nameEn": "Faroe Islands",
+      "flag": "🇫🇴",
+      "coordinates": [
+        -7,
+        62
+      ]
+    },
+    {
+      "code": "FR",
+      "nameZh": "法國",
+      "nameEn": "France",
+      "flag": "🇫🇷",
+      "coordinates": [
+        2,
+        46
+      ]
+    },
+    {
+      "code": "GA",
+      "nameZh": "加蓬",
+      "nameEn": "Gabon",
+      "flag": "🇬🇦",
+      "coordinates": [
+        11.75,
+        -1
+      ]
+    },
+    {
+      "code": "GB",
+      "nameZh": "英國",
+      "nameEn": "United Kingdom",
+      "flag": "🇬🇧",
+      "coordinates": [
+        -2,
+        54
+      ]
+    },
+    {
+      "code": "GD",
+      "nameZh": "格林納達",
+      "nameEn": "Grenada",
+      "flag": "🇬🇩",
+      "coordinates": [
+        -61.66666666,
+        12.11666666
+      ]
+    },
+    {
+      "code": "GE",
+      "nameZh": "格魯吉亞",
+      "nameEn": "Georgia",
+      "flag": "🇬🇪",
+      "coordinates": [
+        43.5,
+        42
+      ]
+    },
+    {
+      "code": "GF",
+      "nameZh": "法屬圭亞那",
+      "nameEn": "French Guiana",
+      "flag": "🇬🇫",
+      "coordinates": [
+        -53,
+        4
+      ]
+    },
+    {
+      "code": "GG",
+      "nameZh": "根西島",
+      "nameEn": "Guernsey",
+      "flag": "🇬🇬",
+      "coordinates": [
+        -2.58333333,
+        49.46666666
+      ]
+    },
+    {
+      "code": "GH",
+      "nameZh": "加納",
+      "nameEn": "Ghana",
+      "flag": "🇬🇭",
+      "coordinates": [
+        -2,
+        8
+      ]
+    },
+    {
+      "code": "GI",
+      "nameZh": "直布羅陀",
+      "nameEn": "Gibraltar",
+      "flag": "🇬🇮",
+      "coordinates": [
+        -5.35,
+        36.13333333
+      ]
+    },
+    {
+      "code": "GL",
+      "nameZh": "格陵蘭",
+      "nameEn": "Greenland",
+      "flag": "🇬🇱",
+      "coordinates": [
+        -40,
+        72
+      ]
+    },
+    {
+      "code": "GM",
+      "nameZh": "岡比亞",
+      "nameEn": "Gambia",
+      "flag": "🇬🇲",
+      "coordinates": [
+        -16.56666666,
+        13.46666666
+      ]
+    },
+    {
+      "code": "GN",
+      "nameZh": "幾內亞",
+      "nameEn": "Guinea",
+      "flag": "🇬🇳",
+      "coordinates": [
+        -10,
+        11
+      ]
+    },
+    {
+      "code": "GP",
+      "nameZh": "瓜德羅普島",
+      "nameEn": "Guadeloupe",
+      "flag": "🇬🇵",
+      "coordinates": [
+        -61.583333,
+        16.25
+      ]
+    },
+    {
+      "code": "GQ",
+      "nameZh": "赤道幾內亞",
+      "nameEn": "Equatorial Guinea",
+      "flag": "🇬🇶",
+      "coordinates": [
+        10,
+        2
+      ]
+    },
+    {
+      "code": "GR",
+      "nameZh": "希臘",
+      "nameEn": "Greece",
+      "flag": "🇬🇷",
+      "coordinates": [
+        22,
+        39
+      ]
+    },
+    {
+      "code": "GS",
+      "nameZh": "南喬治亞",
+      "nameEn": "South Georgia",
+      "flag": "🇬🇸",
+      "coordinates": [
+        -37,
+        -54.5
+      ]
+    },
+    {
+      "code": "GT",
+      "nameZh": "危地馬拉",
+      "nameEn": "Guatemala",
+      "flag": "🇬🇹",
+      "coordinates": [
+        -90.25,
+        15.5
+      ]
+    },
+    {
+      "code": "GU",
+      "nameZh": "關島",
+      "nameEn": "Guam",
+      "flag": "🇬🇺",
+      "coordinates": [
+        144.78333333,
+        13.46666666
+      ]
+    },
+    {
+      "code": "GW",
+      "nameZh": "幾內亞比紹",
+      "nameEn": "Guinea-Bissau",
+      "flag": "🇬🇼",
+      "coordinates": [
+        -15,
+        12
+      ]
+    },
+    {
+      "code": "GY",
+      "nameZh": "圭亞那",
+      "nameEn": "Guyana",
+      "flag": "🇬🇾",
+      "coordinates": [
+        -59,
+        5
+      ]
+    },
+    {
+      "code": "HK",
+      "nameZh": "香港",
+      "nameEn": "Hong Kong",
+      "flag": "🇭🇰",
+      "coordinates": [
+        114.188,
+        22.267
+      ]
+    },
+    {
+      "code": "HM",
+      "nameZh": "赫德島和麥當勞群島",
+      "nameEn": "Heard Island and McDonald Islands",
+      "flag": "🇭🇲",
+      "coordinates": [
+        73.5042,
+        -53.0818
+      ]
+    },
+    {
+      "code": "HN",
+      "nameZh": "洪都拉斯",
+      "nameEn": "Honduras",
+      "flag": "🇭🇳",
+      "coordinates": [
+        -86.5,
+        15
+      ]
+    },
+    {
+      "code": "HR",
+      "nameZh": "克羅地亞",
+      "nameEn": "Croatia",
+      "flag": "🇭🇷",
+      "coordinates": [
+        15.5,
+        45.16666666
+      ]
+    },
+    {
+      "code": "HT",
+      "nameZh": "海地",
+      "nameEn": "Haiti",
+      "flag": "🇭🇹",
+      "coordinates": [
+        -72.41666666,
+        19
+      ]
+    },
+    {
+      "code": "HU",
+      "nameZh": "匈牙利",
+      "nameEn": "Hungary",
+      "flag": "🇭🇺",
+      "coordinates": [
+        20,
+        47
+      ]
+    },
+    {
+      "code": "ID",
+      "nameZh": "印度尼西亞",
+      "nameEn": "Indonesia",
+      "flag": "🇮🇩",
+      "coordinates": [
+        120,
+        -5
+      ]
+    },
+    {
+      "code": "IE",
+      "nameZh": "愛爾蘭",
+      "nameEn": "Ireland",
+      "flag": "🇮🇪",
+      "coordinates": [
+        -8,
+        53
+      ]
+    },
+    {
+      "code": "IL",
+      "nameZh": "以色列",
+      "nameEn": "Israel",
+      "flag": "🇮🇱",
+      "coordinates": [
+        35.13,
+        31.47
+      ]
+    },
+    {
+      "code": "IM",
+      "nameZh": "馬恩島",
+      "nameEn": "Isle of Man",
+      "flag": "🇮🇲",
+      "coordinates": [
+        -4.5,
+        54.25
+      ]
+    },
+    {
+      "code": "IN",
+      "nameZh": "印度",
+      "nameEn": "India",
+      "flag": "🇮🇳",
+      "coordinates": [
+        77,
+        20
+      ]
+    },
+    {
+      "code": "IO",
+      "nameZh": "英屬印度洋領地",
+      "nameEn": "British Indian Ocean Territory",
+      "flag": "🇮🇴",
+      "coordinates": [
+        71.5,
+        -6
+      ]
+    },
+    {
+      "code": "IQ",
+      "nameZh": "伊拉克",
+      "nameEn": "Iraq",
+      "flag": "🇮🇶",
+      "coordinates": [
+        44,
+        33
+      ]
+    },
+    {
+      "code": "IR",
+      "nameZh": "伊朗",
+      "nameEn": "Iran",
+      "flag": "🇮🇷",
+      "coordinates": [
+        53,
+        32
+      ]
+    },
+    {
+      "code": "IS",
+      "nameZh": "冰島",
+      "nameEn": "Iceland",
+      "flag": "🇮🇸",
+      "coordinates": [
+        -18,
+        65
+      ]
+    },
+    {
+      "code": "IT",
+      "nameZh": "意大利",
+      "nameEn": "Italy",
+      "flag": "🇮🇹",
+      "coordinates": [
+        12.83333333,
+        42.83333333
+      ]
+    },
+    {
+      "code": "JE",
+      "nameZh": "澤西島",
+      "nameEn": "Jersey",
+      "flag": "🇯🇪",
+      "coordinates": [
+        -2.16666666,
+        49.25
+      ]
+    },
+    {
+      "code": "JM",
+      "nameZh": "牙買加",
+      "nameEn": "Jamaica",
+      "flag": "🇯🇲",
+      "coordinates": [
+        -77.5,
+        18.25
+      ]
+    },
+    {
+      "code": "JO",
+      "nameZh": "約旦",
+      "nameEn": "Jordan",
+      "flag": "🇯🇴",
+      "coordinates": [
+        36,
+        31
+      ]
+    },
+    {
+      "code": "JP",
+      "nameZh": "日本",
+      "nameEn": "Japan",
+      "flag": "🇯🇵",
+      "coordinates": [
+        138,
+        36
+      ]
+    },
+    {
+      "code": "KE",
+      "nameZh": "肯尼亞",
+      "nameEn": "Kenya",
+      "flag": "🇰🇪",
+      "coordinates": [
+        38,
+        1
+      ]
+    },
+    {
+      "code": "KG",
+      "nameZh": "吉爾吉斯斯坦",
+      "nameEn": "Kyrgyzstan",
+      "flag": "🇰🇬",
+      "coordinates": [
+        75,
+        41
+      ]
+    },
+    {
+      "code": "KH",
+      "nameZh": "柬埔寨",
+      "nameEn": "Cambodia",
+      "flag": "🇰🇭",
+      "coordinates": [
+        105,
+        13
+      ]
+    },
+    {
+      "code": "KI",
+      "nameZh": "基里巴斯",
+      "nameEn": "Kiribati",
+      "flag": "🇰🇮",
+      "coordinates": [
+        173,
+        1.41666666
+      ]
+    },
+    {
+      "code": "KM",
+      "nameZh": "科摩羅",
+      "nameEn": "Comoros",
+      "flag": "🇰🇲",
+      "coordinates": [
+        44.25,
+        -12.16666666
+      ]
+    },
+    {
+      "code": "KN",
+      "nameZh": "聖基茨和尼維斯",
+      "nameEn": "Saint Kitts and Nevis",
+      "flag": "🇰🇳",
+      "coordinates": [
+        -62.75,
+        17.33333333
+      ]
+    },
+    {
+      "code": "KP",
+      "nameZh": "北韓",
+      "nameEn": "North Korea",
+      "flag": "🇰🇵",
+      "coordinates": [
+        127,
+        40
+      ]
+    },
+    {
+      "code": "KR",
+      "nameZh": "南韓",
+      "nameEn": "South Korea",
+      "flag": "🇰🇷",
+      "coordinates": [
+        127.5,
+        37
+      ]
+    },
+    {
+      "code": "KW",
+      "nameZh": "科威特",
+      "nameEn": "Kuwait",
+      "flag": "🇰🇼",
+      "coordinates": [
+        45.75,
+        29.5
+      ]
+    },
+    {
+      "code": "KY",
+      "nameZh": "開曼群島",
+      "nameEn": "Cayman Islands",
+      "flag": "🇰🇾",
+      "coordinates": [
+        -81.2546,
+        19.3133
+      ]
+    },
+    {
+      "code": "KZ",
+      "nameZh": "哈薩克斯坦",
+      "nameEn": "Kazakhstan",
+      "flag": "🇰🇿",
+      "coordinates": [
+        66.9237,
+        48.0196
+      ]
+    },
+    {
+      "code": "LA",
+      "nameZh": "寮國",
+      "nameEn": "Laos",
+      "flag": "🇱🇦",
+      "coordinates": [
+        105,
+        18
+      ]
+    },
+    {
+      "code": "LB",
+      "nameZh": "黎巴嫩",
+      "nameEn": "Lebanon",
+      "flag": "🇱🇧",
+      "coordinates": [
+        35.83333333,
+        33.83333333
+      ]
+    },
+    {
+      "code": "LC",
+      "nameZh": "聖盧西亞",
+      "nameEn": "Saint Lucia",
+      "flag": "🇱🇨",
+      "coordinates": [
+        -60.96666666,
+        13.88333333
+      ]
+    },
+    {
+      "code": "LI",
+      "nameZh": "列支敦士登",
+      "nameEn": "Liechtenstein",
+      "flag": "🇱🇮",
+      "coordinates": [
+        9.53333333,
+        47.26666666
+      ]
+    },
+    {
+      "code": "LK",
+      "nameZh": "斯里蘭卡",
+      "nameEn": "Sri Lanka",
+      "flag": "🇱🇰",
+      "coordinates": [
+        81,
+        7
+      ]
+    },
+    {
+      "code": "LR",
+      "nameZh": "賴比瑞亞",
+      "nameEn": "Liberia",
+      "flag": "🇱🇷",
+      "coordinates": [
+        -9.5,
+        6.5
+      ]
+    },
+    {
+      "code": "LS",
+      "nameZh": "萊索托",
+      "nameEn": "Lesotho",
+      "flag": "🇱🇸",
+      "coordinates": [
+        28.5,
+        -29.5
+      ]
+    },
+    {
+      "code": "LT",
+      "nameZh": "立陶宛",
+      "nameEn": "Lithuania",
+      "flag": "🇱🇹",
+      "coordinates": [
+        24,
+        56
+      ]
+    },
+    {
+      "code": "LU",
+      "nameZh": "盧森堡",
+      "nameEn": "Luxembourg",
+      "flag": "🇱🇺",
+      "coordinates": [
+        6.16666666,
+        49.75
+      ]
+    },
+    {
+      "code": "LV",
+      "nameZh": "拉脫維亞",
+      "nameEn": "Latvia",
+      "flag": "🇱🇻",
+      "coordinates": [
+        25,
+        57
+      ]
+    },
+    {
+      "code": "LY",
+      "nameZh": "利比亞",
+      "nameEn": "Libya",
+      "flag": "🇱🇾",
+      "coordinates": [
+        17,
+        25
+      ]
+    },
+    {
+      "code": "MA",
+      "nameZh": "摩洛哥",
+      "nameEn": "Morocco",
+      "flag": "🇲🇦",
+      "coordinates": [
+        -5,
+        32
+      ]
+    },
+    {
+      "code": "MC",
+      "nameZh": "摩納哥",
+      "nameEn": "Monaco",
+      "flag": "🇲🇨",
+      "coordinates": [
+        7.4,
+        43.73333333
+      ]
+    },
+    {
+      "code": "MD",
+      "nameZh": "摩爾多瓦",
+      "nameEn": "Moldova",
+      "flag": "🇲🇩",
+      "coordinates": [
+        29,
+        47
+      ]
+    },
+    {
+      "code": "ME",
+      "nameZh": "黑山",
+      "nameEn": "Montenegro",
+      "flag": "🇲🇪",
+      "coordinates": [
+        19.3,
+        42.5
+      ]
+    },
+    {
+      "code": "MF",
+      "nameZh": "聖馬丁",
+      "nameEn": "Saint Martin",
+      "flag": "🇲🇫",
+      "coordinates": [
+        -63.0501,
+        18.0708
+      ]
+    },
+    {
+      "code": "MG",
+      "nameZh": "馬達加斯加",
+      "nameEn": "Madagascar",
+      "flag": "🇲🇬",
+      "coordinates": [
+        47,
+        -20
+      ]
+    },
+    {
+      "code": "MH",
+      "nameZh": "馬紹爾群島",
+      "nameEn": "Marshall Islands",
+      "flag": "🇲🇭",
+      "coordinates": [
+        168,
+        9
+      ]
+    },
+    {
+      "code": "MK",
+      "nameZh": "北馬其頓",
+      "nameEn": "North Macedonia",
+      "flag": "🇲🇰",
+      "coordinates": [
+        22,
+        41.83333333
+      ]
+    },
+    {
+      "code": "ML",
+      "nameZh": "馬裡",
+      "nameEn": "Mali",
+      "flag": "🇲🇱",
+      "coordinates": [
+        -4,
+        17
+      ]
+    },
+    {
+      "code": "MM",
+      "nameZh": "緬甸",
+      "nameEn": "Myanmar",
+      "flag": "🇲🇲",
+      "coordinates": [
+        98,
+        22
+      ]
+    },
+    {
+      "code": "MN",
+      "nameZh": "蒙古",
+      "nameEn": "Mongolia",
+      "flag": "🇲🇳",
+      "coordinates": [
+        105,
+        46
+      ]
+    },
+    {
+      "code": "MO",
+      "nameZh": "澳門",
+      "nameEn": "Macau",
+      "flag": "🇲🇴",
+      "coordinates": [
+        113.55,
+        22.16666666
+      ]
+    },
+    {
+      "code": "MP",
+      "nameZh": "北馬里亞納群島",
+      "nameEn": "Northern Mariana Islands",
+      "flag": "🇲🇵",
+      "coordinates": [
+        145.75,
+        15.2
+      ]
+    },
+    {
+      "code": "MQ",
+      "nameZh": "馬提尼克",
+      "nameEn": "Martinique",
+      "flag": "🇲🇶",
+      "coordinates": [
+        -61,
+        14.666667
+      ]
+    },
+    {
+      "code": "MR",
+      "nameZh": "毛里塔尼亞",
+      "nameEn": "Mauritania",
+      "flag": "🇲🇷",
+      "coordinates": [
+        -12,
+        20
+      ]
+    },
+    {
+      "code": "MS",
+      "nameZh": "蒙特塞拉特",
+      "nameEn": "Montserrat",
+      "flag": "🇲🇸",
+      "coordinates": [
+        -62.2,
+        16.75
+      ]
+    },
+    {
+      "code": "MT",
+      "nameZh": "馬耳他",
+      "nameEn": "Malta",
+      "flag": "🇲🇹",
+      "coordinates": [
+        14.3754,
+        35.9375
+      ]
+    },
+    {
+      "code": "MU",
+      "nameZh": "毛里求斯",
+      "nameEn": "Mauritius",
+      "flag": "🇲🇺",
+      "coordinates": [
+        57.55,
+        -20.28333333
+      ]
+    },
+    {
+      "code": "MV",
+      "nameZh": "馬爾代夫",
+      "nameEn": "Maldives",
+      "flag": "🇲🇻",
+      "coordinates": [
+        73,
+        3.25
+      ]
+    },
+    {
+      "code": "MW",
+      "nameZh": "馬拉維",
+      "nameEn": "Malawi",
+      "flag": "🇲🇼",
+      "coordinates": [
+        34,
+        -13.5
+      ]
+    },
+    {
+      "code": "MX",
+      "nameZh": "墨西哥",
+      "nameEn": "Mexico",
+      "flag": "🇲🇽",
+      "coordinates": [
+        -102,
+        23
+      ]
+    },
+    {
+      "code": "MY",
+      "nameZh": "馬來西亞",
+      "nameEn": "Malaysia",
+      "flag": "🇲🇾",
+      "coordinates": [
+        112.5,
+        2.5
+      ]
+    },
+    {
+      "code": "MZ",
+      "nameZh": "莫桑比克",
+      "nameEn": "Mozambique",
+      "flag": "🇲🇿",
+      "coordinates": [
+        35,
+        -18.25
+      ]
+    },
+    {
+      "code": "NA",
+      "nameZh": "納米比亞",
+      "nameEn": "Namibia",
+      "flag": "🇳🇦",
+      "coordinates": [
+        17,
+        -22
+      ]
+    },
+    {
+      "code": "NC",
+      "nameZh": "新喀里多尼亞",
+      "nameEn": "New Caledonia",
+      "flag": "🇳🇨",
+      "coordinates": [
+        165.5,
+        -21.5
+      ]
+    },
+    {
+      "code": "NE",
+      "nameZh": "尼日爾",
+      "nameEn": "Niger",
+      "flag": "🇳🇪",
+      "coordinates": [
+        8,
+        16
+      ]
+    },
+    {
+      "code": "NF",
+      "nameZh": "諾福克島",
+      "nameEn": "Norfolk Island",
+      "flag": "🇳🇫",
+      "coordinates": [
+        167.95,
+        -29.03333333
+      ]
+    },
+    {
+      "code": "NG",
+      "nameZh": "尼日利亞",
+      "nameEn": "Nigeria",
+      "flag": "🇳🇬",
+      "coordinates": [
+        8,
+        10
+      ]
+    },
+    {
+      "code": "NI",
+      "nameZh": "尼加拉瓜",
+      "nameEn": "Nicaragua",
+      "flag": "🇳🇮",
+      "coordinates": [
+        -85,
+        13
+      ]
+    },
+    {
+      "code": "NL",
+      "nameZh": "荷蘭",
+      "nameEn": "Netherlands",
+      "flag": "🇳🇱",
+      "coordinates": [
+        5.75,
+        52.5
+      ]
+    },
+    {
+      "code": "NO",
+      "nameZh": "挪威",
+      "nameEn": "Norway",
+      "flag": "🇳🇴",
+      "coordinates": [
+        10,
+        62
+      ]
+    },
+    {
+      "code": "NP",
+      "nameZh": "尼泊爾",
+      "nameEn": "Nepal",
+      "flag": "🇳🇵",
+      "coordinates": [
+        84,
+        28
+      ]
+    },
+    {
+      "code": "NR",
+      "nameZh": "瑙魯",
+      "nameEn": "Nauru",
+      "flag": "🇳🇷",
+      "coordinates": [
+        166.91666666,
+        -0.53333333
+      ]
+    },
+    {
+      "code": "NU",
+      "nameZh": "紐埃",
+      "nameEn": "Niue",
+      "flag": "🇳🇺",
+      "coordinates": [
+        -169.86666666,
+        -19.03333333
+      ]
+    },
+    {
+      "code": "NZ",
+      "nameZh": "新西蘭",
+      "nameEn": "New Zealand",
+      "flag": "🇳🇿",
+      "coordinates": [
+        174,
+        -41
+      ]
+    },
+    {
+      "code": "OM",
+      "nameZh": "阿曼",
+      "nameEn": "Oman",
+      "flag": "🇴🇲",
+      "coordinates": [
+        57,
+        21
+      ]
+    },
+    {
+      "code": "PA",
+      "nameZh": "巴拿馬",
+      "nameEn": "Panama",
+      "flag": "🇵🇦",
+      "coordinates": [
+        -80,
+        9
+      ]
+    },
+    {
+      "code": "PE",
+      "nameZh": "秘魯",
+      "nameEn": "Peru",
+      "flag": "🇵🇪",
+      "coordinates": [
+        -76,
+        -10
+      ]
+    },
+    {
+      "code": "PF",
+      "nameZh": "法屬波利尼西亞",
+      "nameEn": "French Polynesia",
+      "flag": "🇵🇫",
+      "coordinates": [
+        -149.4068,
+        -17.6797
+      ]
+    },
+    {
+      "code": "PG",
+      "nameZh": "巴布亞新幾內亞",
+      "nameEn": "Papua New Guinea",
+      "flag": "🇵🇬",
+      "coordinates": [
+        147,
+        -6
+      ]
+    },
+    {
+      "code": "PH",
+      "nameZh": "菲律賓",
+      "nameEn": "Philippines",
+      "flag": "🇵🇭",
+      "coordinates": [
+        122,
+        13
+      ]
+    },
+    {
+      "code": "PK",
+      "nameZh": "巴基斯坦",
+      "nameEn": "Pakistan",
+      "flag": "🇵🇰",
+      "coordinates": [
+        70,
+        30
+      ]
+    },
+    {
+      "code": "PL",
+      "nameZh": "波蘭",
+      "nameEn": "Poland",
+      "flag": "🇵🇱",
+      "coordinates": [
+        20,
+        52
+      ]
+    },
+    {
+      "code": "PM",
+      "nameZh": "聖皮埃爾和密克隆",
+      "nameEn": "Saint Pierre and Miquelon",
+      "flag": "🇵🇲",
+      "coordinates": [
+        -56.33333333,
+        46.83333333
+      ]
+    },
+    {
+      "code": "PN",
+      "nameZh": "皮特凱恩群島",
+      "nameEn": "Pitcairn Islands",
+      "flag": "🇵🇳",
+      "coordinates": [
+        -130.1,
+        -25.06666666
+      ]
+    },
+    {
+      "code": "PR",
+      "nameZh": "波多黎各",
+      "nameEn": "Puerto Rico",
+      "flag": "🇵🇷",
+      "coordinates": [
+        -66.5,
+        18.25
+      ]
+    },
+    {
+      "code": "PS",
+      "nameZh": "巴勒斯坦",
+      "nameEn": "Palestine",
+      "flag": "🇵🇸",
+      "coordinates": [
+        35.2,
+        31.9
+      ]
+    },
+    {
+      "code": "PT",
+      "nameZh": "葡萄牙",
+      "nameEn": "Portugal",
+      "flag": "🇵🇹",
+      "coordinates": [
+        -8,
+        39.5
+      ]
+    },
+    {
+      "code": "PW",
+      "nameZh": "帕勞",
+      "nameEn": "Palau",
+      "flag": "🇵🇼",
+      "coordinates": [
+        134.5,
+        7.5
+      ]
+    },
+    {
+      "code": "PY",
+      "nameZh": "巴拉圭",
+      "nameEn": "Paraguay",
+      "flag": "🇵🇾",
+      "coordinates": [
+        -58,
+        -23
+      ]
+    },
+    {
+      "code": "QA",
+      "nameZh": "卡塔爾",
+      "nameEn": "Qatar",
+      "flag": "🇶🇦",
+      "coordinates": [
+        51.25,
+        25.5
+      ]
+    },
+    {
+      "code": "RE",
+      "nameZh": "留尼旺島",
+      "nameEn": "Réunion",
+      "flag": "🇷🇪",
+      "coordinates": [
+        55.5,
+        -21.15
+      ]
+    },
+    {
+      "code": "RO",
+      "nameZh": "羅馬尼亞",
+      "nameEn": "Romania",
+      "flag": "🇷🇴",
+      "coordinates": [
+        25,
+        46
+      ]
+    },
+    {
+      "code": "RS",
+      "nameZh": "塞爾維亞",
+      "nameEn": "Serbia",
+      "flag": "🇷🇸",
+      "coordinates": [
+        21,
+        44
+      ]
+    },
+    {
+      "code": "RU",
+      "nameZh": "俄羅斯",
+      "nameEn": "Russia",
+      "flag": "🇷🇺",
+      "coordinates": [
+        100,
+        60
+      ]
+    },
+    {
+      "code": "RW",
+      "nameZh": "盧旺達",
+      "nameEn": "Rwanda",
+      "flag": "🇷🇼",
+      "coordinates": [
+        30,
+        -2
+      ]
+    },
+    {
+      "code": "SA",
+      "nameZh": "沙特阿拉伯",
+      "nameEn": "Saudi Arabia",
+      "flag": "🇸🇦",
+      "coordinates": [
+        45,
+        25
+      ]
+    },
+    {
+      "code": "SB",
+      "nameZh": "所羅門群島",
+      "nameEn": "Solomon Islands",
+      "flag": "🇸🇧",
+      "coordinates": [
+        159,
+        -8
+      ]
+    },
+    {
+      "code": "SC",
+      "nameZh": "塞舌爾",
+      "nameEn": "Seychelles",
+      "flag": "🇸🇨",
+      "coordinates": [
+        55.66666666,
+        -4.58333333
+      ]
+    },
+    {
+      "code": "SD",
+      "nameZh": "蘇丹",
+      "nameEn": "Sudan",
+      "flag": "🇸🇩",
+      "coordinates": [
+        30,
+        15
+      ]
+    },
+    {
+      "code": "SE",
+      "nameZh": "瑞典",
+      "nameEn": "Sweden",
+      "flag": "🇸🇪",
+      "coordinates": [
+        15,
+        62
+      ]
+    },
+    {
+      "code": "SG",
+      "nameZh": "新加坡",
+      "nameEn": "Singapore",
+      "flag": "🇸🇬",
+      "coordinates": [
+        103.8,
+        1.36666666
+      ]
+    },
+    {
+      "code": "SH",
+      "nameZh": "聖赫勒拿、阿森松和特里斯坦-達庫尼亞",
+      "nameEn": "Saint Helena, Ascension and Tristan da Cunha",
+      "flag": "🇸🇭",
+      "coordinates": [
+        -5.72,
+        -15.95
+      ]
+    },
+    {
+      "code": "SI",
+      "nameZh": "斯洛文尼亞",
+      "nameEn": "Slovenia",
+      "flag": "🇸🇮",
+      "coordinates": [
+        14.81666666,
+        46.11666666
+      ]
+    },
+    {
+      "code": "SJ",
+      "nameZh": "斯瓦爾巴特",
+      "nameEn": "Svalbard and Jan Mayen",
+      "flag": "🇸🇯",
+      "coordinates": [
+        20,
+        78
+      ]
+    },
+    {
+      "code": "SK",
+      "nameZh": "斯洛伐克",
+      "nameEn": "Slovakia",
+      "flag": "🇸🇰",
+      "coordinates": [
+        19.5,
+        48.66666666
+      ]
+    },
+    {
+      "code": "SL",
+      "nameZh": "塞拉利昂",
+      "nameEn": "Sierra Leone",
+      "flag": "🇸🇱",
+      "coordinates": [
+        -11.5,
+        8.5
+      ]
+    },
+    {
+      "code": "SM",
+      "nameZh": "聖馬力諾",
+      "nameEn": "San Marino",
+      "flag": "🇸🇲",
+      "coordinates": [
+        12.41666666,
+        43.76666666
+      ]
+    },
+    {
+      "code": "SN",
+      "nameZh": "塞內加爾",
+      "nameEn": "Senegal",
+      "flag": "🇸🇳",
+      "coordinates": [
+        -14,
+        14
+      ]
+    },
+    {
+      "code": "SO",
+      "nameZh": "索馬里",
+      "nameEn": "Somalia",
+      "flag": "🇸🇴",
+      "coordinates": [
+        49,
+        10
+      ]
+    },
+    {
+      "code": "SR",
+      "nameZh": "蘇里南",
+      "nameEn": "Suriname",
+      "flag": "🇸🇷",
+      "coordinates": [
+        -56,
+        4
+      ]
+    },
+    {
+      "code": "SS",
+      "nameZh": "南蘇丹",
+      "nameEn": "South Sudan",
+      "flag": "🇸🇸",
+      "coordinates": [
+        30,
+        7
+      ]
+    },
+    {
+      "code": "ST",
+      "nameZh": "聖多美和普林西比",
+      "nameEn": "São Tomé and Príncipe",
+      "flag": "🇸🇹",
+      "coordinates": [
+        7,
+        1
+      ]
+    },
+    {
+      "code": "SV",
+      "nameZh": "薩爾瓦多",
+      "nameEn": "El Salvador",
+      "flag": "🇸🇻",
+      "coordinates": [
+        -88.91666666,
+        13.83333333
+      ]
+    },
+    {
+      "code": "SX",
+      "nameZh": "聖馬丁島",
+      "nameEn": "Sint Maarten",
+      "flag": "🇸🇽",
+      "coordinates": [
+        -63.05,
+        18.033333
+      ]
+    },
+    {
+      "code": "SY",
+      "nameZh": "敘利亞",
+      "nameEn": "Syria",
+      "flag": "🇸🇾",
+      "coordinates": [
+        38,
+        35
+      ]
+    },
+    {
+      "code": "SZ",
+      "nameZh": "史瓦帝尼",
+      "nameEn": "Eswatini",
+      "flag": "🇸🇿",
+      "coordinates": [
+        31.5,
+        -26.5
+      ]
+    },
+    {
+      "code": "TC",
+      "nameZh": "特克斯和凱科斯群島",
+      "nameEn": "Turks and Caicos Islands",
+      "flag": "🇹🇨",
+      "coordinates": [
+        -71.58333333,
+        21.75
+      ]
+    },
+    {
+      "code": "TD",
+      "nameZh": "乍得",
+      "nameEn": "Chad",
+      "flag": "🇹🇩",
+      "coordinates": [
+        19,
+        15
+      ]
+    },
+    {
+      "code": "TF",
+      "nameZh": "法國南部和南極土地",
+      "nameEn": "French Southern and Antarctic Lands",
+      "flag": "🇹🇫",
+      "coordinates": [
+        69.167,
+        -49.25
+      ]
+    },
+    {
+      "code": "TG",
+      "nameZh": "多哥",
+      "nameEn": "Togo",
+      "flag": "🇹🇬",
+      "coordinates": [
+        1.16666666,
+        8
+      ]
+    },
+    {
+      "code": "TH",
+      "nameZh": "泰國",
+      "nameEn": "Thailand",
+      "flag": "🇹🇭",
+      "coordinates": [
+        100,
+        15
+      ]
+    },
+    {
+      "code": "TJ",
+      "nameZh": "塔吉克斯坦",
+      "nameEn": "Tajikistan",
+      "flag": "🇹🇯",
+      "coordinates": [
+        71,
+        39
+      ]
+    },
+    {
+      "code": "TK",
+      "nameZh": "托克勞",
+      "nameEn": "Tokelau",
+      "flag": "🇹🇰",
+      "coordinates": [
+        -172,
+        -9
+      ]
+    },
+    {
+      "code": "TL",
+      "nameZh": "東帝汶",
+      "nameEn": "Timor-Leste",
+      "flag": "🇹🇱",
+      "coordinates": [
+        125.91666666,
+        -8.83333333
+      ]
+    },
+    {
+      "code": "TM",
+      "nameZh": "土庫曼斯坦",
+      "nameEn": "Turkmenistan",
+      "flag": "🇹🇲",
+      "coordinates": [
+        60,
+        40
+      ]
+    },
+    {
+      "code": "TN",
+      "nameZh": "突尼斯",
+      "nameEn": "Tunisia",
+      "flag": "🇹🇳",
+      "coordinates": [
+        9,
+        34
+      ]
+    },
+    {
+      "code": "TO",
+      "nameZh": "湯加",
+      "nameEn": "Tonga",
+      "flag": "🇹🇴",
+      "coordinates": [
+        -175,
+        -20
+      ]
+    },
+    {
+      "code": "TR",
+      "nameZh": "土耳其",
+      "nameEn": "Turkey",
+      "flag": "🇹🇷",
+      "coordinates": [
+        35,
+        39
+      ]
+    },
+    {
+      "code": "TT",
+      "nameZh": "特立尼達和多巴哥",
+      "nameEn": "Trinidad and Tobago",
+      "flag": "🇹🇹",
+      "coordinates": [
+        -61.2225,
+        10.6918
+      ]
+    },
+    {
+      "code": "TV",
+      "nameZh": "圖瓦盧",
+      "nameEn": "Tuvalu",
+      "flag": "🇹🇻",
+      "coordinates": [
+        178,
+        -8
+      ]
+    },
+    {
+      "code": "TZ",
+      "nameZh": "坦桑尼亞",
+      "nameEn": "Tanzania",
+      "flag": "🇹🇿",
+      "coordinates": [
+        35,
+        -6
+      ]
+    },
+    {
+      "code": "UA",
+      "nameZh": "烏克蘭",
+      "nameEn": "Ukraine",
+      "flag": "🇺🇦",
+      "coordinates": [
+        32,
+        49
+      ]
+    },
+    {
+      "code": "UG",
+      "nameZh": "烏干達",
+      "nameEn": "Uganda",
+      "flag": "🇺🇬",
+      "coordinates": [
+        32,
+        1
+      ]
+    },
+    {
+      "code": "UM",
+      "nameZh": "美國本土外小島嶼",
+      "nameEn": "United States Minor Outlying Islands",
+      "flag": "🇺🇲",
+      "coordinates": [
+        166.633333,
+        19.3
+      ]
+    },
+    {
+      "code": "US",
+      "nameZh": "美國",
+      "nameEn": "United States",
+      "flag": "🇺🇸",
+      "coordinates": [
+        -97,
+        38
+      ]
+    },
+    {
+      "code": "UY",
+      "nameZh": "烏拉圭",
+      "nameEn": "Uruguay",
+      "flag": "🇺🇾",
+      "coordinates": [
+        -56,
+        -33
+      ]
+    },
+    {
+      "code": "UZ",
+      "nameZh": "烏茲別克斯坦",
+      "nameEn": "Uzbekistan",
+      "flag": "🇺🇿",
+      "coordinates": [
+        64,
+        41
+      ]
+    },
+    {
+      "code": "VA",
+      "nameZh": "梵蒂岡",
+      "nameEn": "Vatican City",
+      "flag": "🇻🇦",
+      "coordinates": [
+        12.45,
+        41.9
+      ]
+    },
+    {
+      "code": "VC",
+      "nameZh": "聖文森特和格林納丁斯",
+      "nameEn": "Saint Vincent and the Grenadines",
+      "flag": "🇻🇨",
+      "coordinates": [
+        -61.2,
+        13.25
+      ]
+    },
+    {
+      "code": "VE",
+      "nameZh": "委內瑞拉",
+      "nameEn": "Venezuela",
+      "flag": "🇻🇪",
+      "coordinates": [
+        -66,
+        8
+      ]
+    },
+    {
+      "code": "VG",
+      "nameZh": "英屬維爾京群島",
+      "nameEn": "British Virgin Islands",
+      "flag": "🇻🇬",
+      "coordinates": [
+        -64.62305,
+        18.431383
+      ]
+    },
+    {
+      "code": "VI",
+      "nameZh": "美屬維爾京群島",
+      "nameEn": "United States Virgin Islands",
+      "flag": "🇻🇮",
+      "coordinates": [
+        -64.933333,
+        18.35
+      ]
+    },
+    {
+      "code": "VN",
+      "nameZh": "越南",
+      "nameEn": "Vietnam",
+      "flag": "🇻🇳",
+      "coordinates": [
+        107.83333333,
+        16.16666666
+      ]
+    },
+    {
+      "code": "VU",
+      "nameZh": "瓦努阿圖",
+      "nameEn": "Vanuatu",
+      "flag": "🇻🇺",
+      "coordinates": [
+        167,
+        -16
+      ]
+    },
+    {
+      "code": "WF",
+      "nameZh": "瓦利斯和富圖納群島",
+      "nameEn": "Wallis and Futuna",
+      "flag": "🇼🇫",
+      "coordinates": [
+        -176.2,
+        -13.3
+      ]
+    },
+    {
+      "code": "WS",
+      "nameZh": "薩摩亞",
+      "nameEn": "Samoa",
+      "flag": "🇼🇸",
+      "coordinates": [
+        -172.33333333,
+        -13.58333333
+      ]
+    },
+    {
+      "code": "XK",
+      "nameZh": "科索沃",
+      "nameEn": "Kosovo",
+      "flag": "🇽🇰",
+      "coordinates": [
+        21.166667,
+        42.666667
+      ]
+    },
+    {
+      "code": "YE",
+      "nameZh": "也門",
+      "nameEn": "Yemen",
+      "flag": "🇾🇪",
+      "coordinates": [
+        48,
+        15
+      ]
+    },
+    {
+      "code": "YT",
+      "nameZh": "馬約特",
+      "nameEn": "Mayotte",
+      "flag": "🇾🇹",
+      "coordinates": [
+        45.16666666,
+        -12.83333333
+      ]
+    },
+    {
+      "code": "ZA",
+      "nameZh": "南非",
+      "nameEn": "South Africa",
+      "flag": "🇿🇦",
+      "coordinates": [
+        24,
+        -29
+      ]
+    },
+    {
+      "code": "ZM",
+      "nameZh": "贊比亞",
+      "nameEn": "Zambia",
+      "flag": "🇿🇲",
+      "coordinates": [
+        30,
+        -15
+      ]
+    },
+    {
+      "code": "ZW",
+      "nameZh": "津巴布韋",
+      "nameEn": "Zimbabwe",
+      "flag": "🇿🇼",
+      "coordinates": [
+        30,
+        -20
+      ]
+    }
+  ]
+}

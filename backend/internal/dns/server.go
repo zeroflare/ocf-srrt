@@ -19,7 +19,6 @@ import (
 	"sync"
 	"time"
 
-	probing "github.com/go-ping/ping"
 	"github.com/miekg/dns"
 	"github.com/patrickmn/go-cache"
 	"golang.org/x/time/rate"
@@ -27,21 +26,19 @@ import (
 
 // Server 定義了 DNS 伺服器結構
 type Server struct {
-	udpServer    *dns.Server
-	tcpServer    *dns.Server
-	broadcast    chan api.BroadcastMessage
-	tokenStore   *auth.TokenStore
-	limiters     *cache.Cache
-	udpClient    *dns.Client
-	tcpClient    *dns.Client
-	upstreams    []string
-	dnsCache     *cache.Cache // DNS 回應快取
-	osCache      *cache.Cache // Per-IP OS fingerprint 快取
-	probeCache   *cache.Cache // 境外 IP 探測結果快取 (避免重複探測)
-	probeWorkers chan struct{}
-	wg           sync.WaitGroup
-	ctx          context.Context
-	cancel       context.CancelFunc
+	udpServer  *dns.Server
+	tcpServer  *dns.Server
+	broadcast  chan api.BroadcastMessage
+	tokenStore *auth.TokenStore
+	limiters   *cache.Cache
+	udpClient  *dns.Client
+	tcpClient  *dns.Client
+	upstreams  []string
+	dnsCache   *cache.Cache // DNS 回應快取
+	osCache    *cache.Cache // Per-IP OS fingerprint 快取
+	wg         sync.WaitGroup
+	ctx        context.Context
+	cancel     context.CancelFunc
 }
 
 // buildUpstreams 從環境變數或預設值建立 upstream 列表
@@ -86,13 +83,11 @@ func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore)
 			Net:     "tcp",
 			Timeout: 3 * time.Second,
 		},
-		upstreams:    buildUpstreams(),
-		dnsCache:     cache.New(30*time.Second, 60*time.Second),
-		osCache:      cache.New(30*time.Minute, 60*time.Minute),
-		probeCache:   cache.New(10*time.Minute, 20*time.Minute),
-		probeWorkers: make(chan struct{}, 100), // 限制最多 100 個並發探測任務
-		ctx:          ctx,
-		cancel:       cancel,
+		upstreams: buildUpstreams(),
+		dnsCache:  cache.New(30*time.Second, 60*time.Second),
+		osCache:   cache.New(30*time.Minute, 60*time.Minute),
+		ctx:       ctx,
+		cancel:    cancel,
 	}
 	s.udpServer.Handler = s
 	s.tcpServer.Handler = s
@@ -262,13 +257,6 @@ func (s *Server) getLimiter(ip string) *rate.Limiter {
 	return newLimiter
 }
 
-// probeResult 儲存探測後的暫存資料
-type probeResult struct {
-	isForeign         bool
-	foreignConfidence string
-	latency           float64
-}
-
 func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 	if len(req.Question) == 0 {
 		return
@@ -300,67 +288,8 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		// 合併查詢 Country/City/Coords/ASN，減少重複 MMDB 查詢
 		geoResult, _ := geoip.GetAll(resultIP)
 		resultCountry := geoResult.Country
-		isForeign := localCountry != "" && resultCountry != localCountry
-		foreignConfidence := ""
-		latency := -1.0
-
-		// 境外判斷機制：GeoIP 判定外國後，用延遲進一步驗證
-		if isForeign {
-			// 檢查快取
-			if cached, found := s.probeCache.Get(resultIP); found {
-				res := cached.(probeResult)
-				isForeign = res.isForeign
-				foreignConfidence = res.foreignConfidence
-				latency = res.latency
-			} else {
-				// 嘗試獲取 Worker 令牌，若滿了則跳過探測 (降低壓力，確保 shutdown 不超時)
-				select {
-				case s.probeWorkers <- struct{}{}:
-					// 使用獨立 goroutine 執行探測，以免阻塞當前 processAndRecord
-					// 雖然 processAndRecord 本身已在 goroutine，但在處理多個 Answer 時仍會同步阻塞
-					func() {
-						defer func() { <-s.probeWorkers }()
-
-						// 建立帶超時的 Context
-						ctx, cancel := context.WithTimeout(s.ctx, 3*time.Second)
-						defer cancel()
-
-						resLatency := pingIP(ctx, resultIP)
-						resForeign := true
-						resConfidence := ""
-
-						if resLatency >= 0 {
-							if resLatency < 10 {
-								resForeign = false
-							} else {
-								resConfidence = "high"
-							}
-						} else {
-							resLatency = tcpProbe(ctx, resultIP)
-							if resLatency >= 0 {
-								if resLatency < 10 {
-									resForeign = false
-								} else {
-									resConfidence = "high"
-								}
-							} else {
-								resConfidence = "low"
-							}
-						}
-
-						// 更新區域變數與快取
-						isForeign = resForeign
-						foreignConfidence = resConfidence
-						latency = resLatency
-						s.probeCache.Set(resultIP, probeResult{resForeign, resConfidence, resLatency}, cache.DefaultExpiration)
-					}()
-				default:
-					// Worker 滿，跳過探測，標記為低確信度
-					slog.Warn("Probe workers full, skipping detailed probe", "ip", resultIP)
-					foreignConfidence = "low (busy)"
-				}
-			}
-		}
+		// resultCountry 必須非空才算境外，避免私有 IP 或 GeoIP 查無資料時被誤判
+		isForeign := localCountry != "" && resultCountry != "" && resultCountry != localCountry
 
 		appResult := recognition.IdentifyApp(question.Name)
 
@@ -375,26 +304,24 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		}
 
 		record := types.DNSQueryRecord{
-			Timestamp:         time.Now(),
-			Domain:            question.Name,
-			Type:              recordType,
-			ResultIP:          resultIP,
-			IsForeign:         isForeign,
-			ForeignConfidence: foreignConfidence,
-			Latency:           latency,
-			SourceIP:          sourceIp,
-			Country:           resultCountry,
-			City:              geoResult.City,
-			Subdivision:       geoResult.Subdivision,
-			ASN:               geoResult.ASN,
-			ISP:               geoResult.ISP,
-			AppName:           appResult.Name,
-			AppCategory:       appResult.Category,
-			OS:                detectedOS,
-			AppMatchMethod:    string(appResult.MatchMethod),
-			OsInferred:        detectedOS != "",
-			GeoInferred:       resultCountry != "",
-			IsAnycast:         geoResult.IsAnycast,
+			Timestamp:      time.Now(),
+			Domain:         question.Name,
+			Type:           recordType,
+			ResultIP:       resultIP,
+			IsForeign:      isForeign,
+			SourceIP:       sourceIp,
+			Country:        resultCountry,
+			City:           geoResult.City,
+			Subdivision:    geoResult.Subdivision,
+			ASN:            geoResult.ASN,
+			ISP:            geoResult.ISP,
+			AppName:        appResult.Name,
+			AppCategory:    appResult.Category,
+			OS:             detectedOS,
+			AppMatchMethod: string(appResult.MatchMethod),
+			OsInferred:     detectedOS != "",
+			GeoInferred:    resultCountry != "",
+			IsAnycast:      geoResult.IsAnycast,
 		}
 		if geoResult.Coords != nil && len(geoResult.Coords) == 2 {
 			record.Longitude = geoResult.Coords[0]
@@ -417,61 +344,6 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			}
 		}
 	}
-}
-
-// pingIP 使用 go-ping 執行 ICMP ping 並傳回延遲 (ms)，失敗回 -1
-func pingIP(ctx context.Context, ip string) float64 {
-	pinger, err := probing.NewPinger(ip)
-	if err != nil {
-		return -1
-	}
-	pinger.Count = 1
-	pinger.Timeout = 1 * time.Second
-	pinger.SetPrivileged(false) // unprivileged mode (UDP)，不需 root
-
-	// 建立一個 channel 接收 Run 結果
-	done := make(chan error, 1)
-	go func() {
-		done <- pinger.Run()
-	}()
-
-	select {
-	case <-ctx.Done():
-		pinger.Stop()
-		return -1
-	case err := <-done:
-		if err != nil {
-			return -1
-		}
-	}
-
-	stats := pinger.Statistics()
-	if stats.PacketsRecv == 0 {
-		return -1
-	}
-
-	return float64(stats.AvgRtt.Microseconds()) / 1000.0
-}
-
-// tcpProbe 嘗試 TCP 連線探測延遲 (ms)，失敗回 -1
-func tcpProbe(ctx context.Context, ip string) float64 {
-	ports := []string{"443", "80"}
-	for _, port := range ports {
-		select {
-		case <-ctx.Done():
-			return -1
-		default:
-		}
-		start := time.Now()
-		d := net.Dialer{Timeout: 1 * time.Second}
-		conn, err := d.DialContext(ctx, "tcp", net.JoinHostPort(ip, port))
-		if err != nil {
-			continue
-		}
-		conn.Close()
-		return float64(time.Since(start).Microseconds()) / 1000.0
-	}
-	return -1
 }
 
 // Wait 等待所有 enrichment goroutine 完成

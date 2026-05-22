@@ -6,19 +6,22 @@ import { TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
 
 export const TrafficDashboard: React.FC<{ className?: string; expanded?: boolean }> = ({ className, expanded }) => {
   const { t } = useTranslation();
-  const { totalQueries, foreignQueries, records } = useDnsStore();
+  const { totalQueries, records } = useDnsStore();
 
-  const percentageVal = totalQueries > 0 ? (foreignQueries / totalQueries) * 100 : 0;
+  // 分母只計算有 GeoIP country 資料的記錄，排除私有 IP 或查不到地理位置的項目
+  const knownCountryTotal = useMemo(() => records.filter(r => !!r.country).length, [records]);
+  const knownCountryForeign = useMemo(() => records.filter(r => !!r.country && r.isForeign).length, [records]);
+  const percentageVal = knownCountryTotal > 0 ? (knownCountryForeign / knownCountryTotal) * 100 : 0;
   const foreignPercentage = percentageVal.toFixed(1);
 
   // Track previous foreign percentage for trend calculation
   const prevPercentageRef = useRef(percentageVal);
 
-  // Calculate recent 30s foreign percentage from records
+  // Calculate recent 30s foreign percentage (same denominator: known country only)
   const recentForeignPct = useMemo(() => {
     const now = Date.now();
     const cutoff = now - 30_000;
-    const recent = records.filter(r => new Date(r.timestamp).getTime() > cutoff);
+    const recent = records.filter(r => !!r.country && new Date(r.timestamp).getTime() > cutoff);
     if (recent.length === 0) return 0;
     const recentForeign = recent.filter(r => r.isForeign).length;
     return (recentForeign / recent.length) * 100;

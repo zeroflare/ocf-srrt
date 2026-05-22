@@ -111,6 +111,7 @@ export interface Hop {
 export interface TraceResult {
   target: string;
   resolvedIP?: string;        // DNS 預解析的 IP（當 target 為域名時）
+  targetCountry?: string;     // 目標 IP 的 GeoIP 國家（直接查詢，非取自 hop）
   hops: Hop[];
   status: 'completed' | 'timeout' | 'error';
   time: string;

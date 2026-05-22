@@ -80,12 +80,13 @@ type Hop struct {
 
 // TraceResult 包含完整的 Traceroute 結果
 type TraceResult struct {
-	Target     string    `json:"target"`
-	ResolvedIP string    `json:"resolvedIP,omitempty"` // DNS 預解析的 IP（當 target 為域名時）
-	Hops       []Hop     `json:"hops"`
-	Status     string    `json:"status"` // "completed", "timeout", "error"
-	Time       time.Time `json:"time"`
-	Cached     bool      `json:"cached"` // 是否為快取結果
+	Target        string    `json:"target"`
+	ResolvedIP    string    `json:"resolvedIP,omitempty"`    // DNS 預解析的 IP（當 target 為域名時）
+	TargetCountry string    `json:"targetCountry,omitempty"` // 目標 IP 的 GeoIP 國家（直接查詢，非取自 hop）
+	Hops          []Hop     `json:"hops"`
+	Status        string    `json:"status"` // "completed", "timeout", "error"
+	Time          time.Time `json:"time"`
+	Cached        bool      `json:"cached"` // 是否為快取結果
 
 	// 可觀測性欄位
 	Mode           string  `json:"mode"`                     // "tcp" / "icmp"
@@ -251,6 +252,9 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 	// 當 target 為域名時，記錄解析後的 IP
 	if resolvedIP != originalTarget {
 		result.ResolvedIP = resolvedIP
+	}
+	if geo, err := geoip.GetAll(resolvedIP); err == nil && geo.Country != "" {
+		result.TargetCountry = geo.Country
 	}
 
 	// Slice 預分配：避免多次記憶體重新分配

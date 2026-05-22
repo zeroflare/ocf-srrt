@@ -150,7 +150,7 @@ const TraceroutePage: React.FC = () => {
 
   const hasGeoHops = result ? result.hops.some((h) => h.ip !== '*' && h.coords && h.coords.length === 2) : false;
   const targetCountryHop = result?.hops.filter((h) => h.country).slice(-1)[0];
-  const targetCountry = targetCountryHop?.country || '—';
+  const targetCountry = result?.targetCountry || targetCountryHop?.country || '—';
   const targetAsn = targetCountryHop?.asn ? `AS${targetCountryHop.asn}${targetCountryHop.isp ? ' · ' + targetCountryHop.isp : ''}` : '—';
 
   return (

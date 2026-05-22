@@ -251,16 +251,22 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
       columnHelper.accessor('domain', {
         id: 'domain',
         header: t('domain'),
-        cell: (info) => (
-          <Link
-            to={`/traceroute?target=${encodeURIComponent(info.getValue())}`}
-            className="text-emerald-600 dark:text-emerald-400 hover:underline"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            {info.getValue()}
-          </Link>
-        ),
+        cell: (info) => {
+          const domain = info.getValue();
+          const resultIp = info.row.original.resultIp;
+          const target = resultIp && !resultIp.includes(':') ? resultIp : domain;
+
+          return (
+            <Link
+              to={`/traceroute?target=${encodeURIComponent(target)}`}
+              className="text-emerald-600 dark:text-emerald-400 hover:underline"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {domain}
+            </Link>
+          );
+        },
       }),
       columnHelper.accessor('resultIp', {
         id: 'resultIp',

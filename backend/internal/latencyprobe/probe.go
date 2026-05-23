@@ -205,6 +205,27 @@ func ShouldCorrectToLocal(localCountry, geoCountry string, probe Result) bool {
 	return probe.OK && probe.LatencyMs < DomesticThresholdMs
 }
 
+// ResolveCountry 依 GeoIP 國家與 RTT 探測決定最終國家（與 DNS processAndRecord 邏輯一致）。
+func (p *Prober) ResolveCountry(ctx context.Context, localCountry, geoCountry, ip string) string {
+	if localCountry == "" || geoCountry == "" || geoCountry == localCountry || ip == "" {
+		return geoCountry
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, ProbeTimeout+MtrTimeout)
+	defer cancel()
+	probe := p.Probe(probeCtx, ip)
+	if ShouldCorrectToLocal(localCountry, geoCountry, probe) {
+		slog.Debug("GeoIP country corrected by latency probe",
+			"component", "latencyprobe",
+			"ip", ip,
+			"geoCountry", geoCountry,
+			"localCountry", localCountry,
+			"probe", FormatMethod(probe),
+		)
+		return localCountry
+	}
+	return geoCountry
+}
+
 var defaultProber *Prober
 var defaultProberOnce sync.Once
 

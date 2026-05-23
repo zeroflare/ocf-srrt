@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"ocf-srrt/backend/internal/geoip"
+	"ocf-srrt/backend/internal/latencyprobe"
 	"os/exec"
 	"regexp"
 	"strconv"
@@ -98,8 +99,20 @@ type TraceResult struct {
 
 // RunOptions 控制 mtr 執行模式
 type RunOptions struct {
-	Mode string // "tcp" 或 "icmp"，預設 "tcp"
-	Port string // TCP 模式的目標 port，預設 "443"
+	Mode         string // "tcp" 或 "icmp"，預設 "tcp"
+	Port         string // TCP 模式的目標 port，預設 "443"
+	LocalCountry string // 境內國家代碼（如 TW），用於 RTT <10ms 時覆寫 GeoIP
+}
+
+// latencyProber 抽象探測器，方便單元測試注入 mock。
+type latencyProber interface {
+	Probe(ctx context.Context, ip string) latencyprobe.Result
+}
+
+type defaultLatencyProber struct{}
+
+func (defaultLatencyProber) Probe(ctx context.Context, ip string) latencyprobe.Result {
+	return latencyprobe.Default().Probe(ctx, ip)
 }
 
 // ErrIPv6NotSupported 表示 target 為 IPv6 且無法轉換為 IPv4
@@ -389,7 +402,76 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 	// 後處理階段 3：最終目標 TLD 輔助（對最後一跳用 domain TLD 提升信心度）
 	enrichLastHopWithTLD(result.Hops, target)
 
+	// 後處理階段 4：RTT 探測（ping / mtr TCP 443）<10ms 視為境內，覆寫 GeoIP（與 DNS server 一致）
+	enrichWithDomesticProbe(ctx, result.Hops, &result.TargetCountry, resolvedIP, opts.LocalCountry, defaultLatencyProber{})
+
 	return result, nil
+}
+
+// enrichWithDomesticProbe 對各 hop 與目標國家套用延遲探測校正。
+func enrichWithDomesticProbe(ctx context.Context, hops []Hop, targetCountry *string, resolvedIP, localCountry string, prober latencyProber) {
+	if localCountry == "" {
+		return
+	}
+
+	applyCorrection := func(hop *Hop, geoCountry, ip string) {
+		if corrected := correctCountryWithProbe(ctx, prober, localCountry, geoCountry, ip); corrected != geoCountry {
+			hop.Country = corrected
+			hop.City = ""
+			hop.Subdivision = ""
+			if centroid := geoip.GetCountryCentroid(localCountry); len(centroid) == 2 {
+				hop.Coords = centroid
+			}
+			hop.GeoConfidence = "low"
+		}
+	}
+
+	for i := range hops {
+		hop := &hops[i]
+		if hop.IP == "*" || net.ParseIP(hop.IP) == nil {
+			continue
+		}
+		if hop.Country == "" || hop.Country == "XX" || hop.Country == localCountry {
+			continue
+		}
+		applyCorrection(hop, hop.Country, hop.IP)
+	}
+
+	if targetCountry == nil || resolvedIP == "" {
+		return
+	}
+	if *targetCountry == "" || *targetCountry == "XX" || *targetCountry == localCountry {
+		return
+	}
+	if corrected := correctCountryWithProbe(ctx, prober, localCountry, *targetCountry, resolvedIP); corrected != *targetCountry {
+		*targetCountry = corrected
+		for i := len(hops) - 1; i >= 0; i-- {
+			if hops[i].IP == resolvedIP {
+				applyCorrection(&hops[i], hops[i].Country, resolvedIP)
+				break
+			}
+		}
+	}
+}
+
+func correctCountryWithProbe(ctx context.Context, prober latencyProber, localCountry, geoCountry, ip string) string {
+	if localCountry == "" || geoCountry == "" || geoCountry == localCountry || ip == "" {
+		return geoCountry
+	}
+	probeCtx, cancel := context.WithTimeout(ctx, latencyprobe.ProbeTimeout+latencyprobe.MtrTimeout)
+	defer cancel()
+	probe := prober.Probe(probeCtx, ip)
+	if latencyprobe.ShouldCorrectToLocal(localCountry, geoCountry, probe) {
+		slog.Debug("traceroute country corrected by latency probe",
+			"component", "traceroute",
+			"ip", ip,
+			"geoCountry", geoCountry,
+			"localCountry", localCountry,
+			"probe", latencyprobe.FormatMethod(probe),
+		)
+		return localCountry
+	}
+	return geoCountry
 }
 
 // enrichWithLatencyHeuristic 用延遲差異修正可疑的 GeoIP 結果。

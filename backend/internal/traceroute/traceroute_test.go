@@ -1,6 +1,8 @@
 package traceroute
 
 import (
+	"context"
+	"ocf-srrt/backend/internal/latencyprobe"
 	"testing"
 )
 
@@ -94,5 +96,58 @@ func TestEnrichWithLatencyHeuristic_SkipsStar(t *testing.T) {
 	// Hop 3 前一跳是 *，不應修正
 	if hops[2].Country != "US" {
 		t.Errorf("hops[2].Country = %q, want %q (should not be corrected when prev is *)", hops[2].Country, "US")
+	}
+}
+
+type mockLatencyProber struct {
+	results map[string]latencyprobe.Result
+}
+
+func (m mockLatencyProber) Probe(_ context.Context, ip string) latencyprobe.Result {
+	if r, ok := m.results[ip]; ok {
+		return r
+	}
+	return latencyprobe.Result{OK: false}
+}
+
+func TestEnrichWithDomesticProbe(t *testing.T) {
+	hops := []Hop{
+		{Index: 1, IP: "104.18.10.20", Country: "US", GeoConfidence: "high"},
+		{Index: 2, IP: "8.8.8.8", Country: "US", GeoConfidence: "high"},
+	}
+	targetCountry := "US"
+	prober := mockLatencyProber{
+		results: map[string]latencyprobe.Result{
+			"104.18.10.20": {OK: true, LatencyMs: 4.0, Method: "icmp"},
+			"8.8.8.8":      {OK: true, LatencyMs: 80.0, Method: "icmp"},
+		},
+	}
+
+	enrichWithDomesticProbe(context.Background(), hops, &targetCountry, "104.18.10.20", "TW", prober)
+
+	if hops[0].Country != "TW" {
+		t.Errorf("hops[0].Country = %q, want TW (low RTT)", hops[0].Country)
+	}
+	if hops[1].Country != "US" {
+		t.Errorf("hops[1].Country = %q, want US (high RTT)", hops[1].Country)
+	}
+	if targetCountry != "TW" {
+		t.Errorf("targetCountry = %q, want TW", targetCountry)
+	}
+}
+
+func TestCorrectCountryWithProbe(t *testing.T) {
+	prober := mockLatencyProber{
+		results: map[string]latencyprobe.Result{
+			"1.2.3.4": {OK: true, LatencyMs: 9.9, Method: "tcp443"},
+		},
+	}
+	got := correctCountryWithProbe(context.Background(), prober, "TW", "US", "1.2.3.4")
+	if got != "TW" {
+		t.Errorf("correctCountryWithProbe() = %q, want TW", got)
+	}
+	got = correctCountryWithProbe(context.Background(), prober, "TW", "US", "9.9.9.9")
+	if got != "US" {
+		t.Errorf("correctCountryWithProbe() = %q, want US (no probe result)", got)
 	}
 }

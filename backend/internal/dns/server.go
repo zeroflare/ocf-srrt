@@ -292,24 +292,12 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		geoResult, _ := geoip.GetAll(resultIP)
 		resultCountry := geoResult.Country
 		// GeoIP 可能將 CDN/Anycast 節點誤判為境外；以 RTT 探測修正（<10ms 視為境內）
-		if localCountry != "" && resultCountry != "" && resultCountry != localCountry {
-			probeCtx, probeCancel := context.WithTimeout(s.ctx, latencyprobe.ProbeTimeout+latencyprobe.MtrTimeout)
-			probe := s.latencyProbe.Probe(probeCtx, resultIP)
-			probeCancel()
-			if latencyprobe.ShouldCorrectToLocal(localCountry, resultCountry, probe) {
-				slog.Debug("GeoIP country corrected by latency probe",
-					"component", "dns",
-					"resultIp", resultIP,
-					"geoCountry", resultCountry,
-					"localCountry", localCountry,
-					"probe", latencyprobe.FormatMethod(probe),
-				)
-				resultCountry = localCountry
-				geoResult.City = ""
-				geoResult.Subdivision = ""
-				if centroid := geoip.GetCountryCentroid(localCountry); len(centroid) == 2 {
-					geoResult.Coords = centroid
-				}
+		if corrected := s.latencyProbe.ResolveCountry(s.ctx, localCountry, resultCountry, resultIP); corrected != resultCountry {
+			resultCountry = corrected
+			geoResult.City = ""
+			geoResult.Subdivision = ""
+			if centroid := geoip.GetCountryCentroid(localCountry); len(centroid) == 2 {
+				geoResult.Coords = centroid
 			}
 		}
 		// resultCountry 必須非空才算境外，避免私有 IP 或 GeoIP 查無資料時被誤判

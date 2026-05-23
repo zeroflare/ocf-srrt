@@ -214,11 +214,12 @@ func main() {
 		json.NewEncoder(w).Encode(resp)
 	})
 	mux.Handle("/api/traceroute", &api.TracerouteHandler{
-		TokenStore: tokenStore,
-		Limiter:    traceLimiter,
-		Semaphore:  traceSemaphore,
-		Cache:      traceCache,
-		LocalIP:    dnsPublicIP,
+		TokenStore:   tokenStore,
+		Limiter:      traceLimiter,
+		Semaphore:    traceSemaphore,
+		Cache:        traceCache,
+		LocalIP:      dnsPublicIP,
+		LocalCountry: localCountryOverride,
 	})
 	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")

@@ -15,11 +15,21 @@ import (
 
 // TracerouteHandler 封裝 traceroute API 的依賴
 type TracerouteHandler struct {
-	TokenStore *auth.TokenStore
-	Limiter    *ratelimit.TokenLimiter
-	Semaphore  *ratelimit.Semaphore
-	Cache      *traceroute.Cache
-	LocalIP    string // DNS 公網 IP，用於 Hop 0
+	TokenStore   *auth.TokenStore
+	Limiter      *ratelimit.TokenLimiter
+	Semaphore    *ratelimit.Semaphore
+	Cache        *traceroute.Cache
+	LocalIP      string // DNS 公網 IP，用於 Hop 0
+	LocalCountry string // 預設境內國家（LOCAL_COUNTRY），可被 token 綁定值覆寫
+}
+
+func (h *TracerouteHandler) resolveLocalCountry(clientIP string) string {
+	if clientIP != "" {
+		if lc, ok := h.TokenStore.GetLocalCountry(clientIP); ok && lc != "" {
+			return lc
+		}
+	}
+	return h.LocalCountry
 }
 
 func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -41,10 +51,12 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "missing token", http.StatusUnauthorized)
 		return
 	}
-	if _, ok := h.TokenStore.ValidateToken(token); !ok {
+	clientIP, ok := h.TokenStore.ValidateToken(token)
+	if !ok {
 		http.Error(w, "invalid token", http.StatusUnauthorized)
 		return
 	}
+	localCountry := h.resolveLocalCountry(clientIP)
 
 	target := r.URL.Query().Get("target")
 	if target == "" {
@@ -93,7 +105,7 @@ func (h *TracerouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
 	defer cancel()
 
-	opts := traceroute.RunOptions{Mode: mode, Port: port}
+	opts := traceroute.RunOptions{Mode: mode, Port: port, LocalCountry: localCountry}
 	result, err := traceroute.Run(ctx, target, h.LocalIP, opts)
 	if err != nil {
 		if errors.Is(err, traceroute.ErrIPv6NotSupported) {

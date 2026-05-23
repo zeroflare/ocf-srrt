@@ -260,12 +260,49 @@ func (s *Server) getLimiter(ip string) *rate.Limiter {
 	return newLimiter
 }
 
+// answerIPEntry 為回應中的 A/AAAA 解析結果（去重後）。
+type answerIPEntry struct {
+	ip  string
+	typ string // "A" | "AAAA"
+}
+
+// collectAnswerIPs 掃描 DNS 回應：是否含 CNAME，以及所有 A/AAAA 的 IP。
+func collectAnswerIPs(resp *dns.Msg) (hasCNAME bool, entries []answerIPEntry) {
+	seen := make(map[string]bool)
+	for _, ans := range resp.Answer {
+		switch rr := ans.(type) {
+		case *dns.CNAME:
+			hasCNAME = true
+		case *dns.A:
+			ip := rr.A.String()
+			if ip == "" || seen[ip] {
+				continue
+			}
+			seen[ip] = true
+			entries = append(entries, answerIPEntry{ip: ip, typ: "A"})
+		case *dns.AAAA:
+			ip := rr.AAAA.String()
+			if ip == "" || seen[ip] {
+				continue
+			}
+			seen[ip] = true
+			entries = append(entries, answerIPEntry{ip: ip, typ: "AAAA"})
+		}
+	}
+	return hasCNAME, entries
+}
+
 func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 	if len(req.Question) == 0 {
 		return
 	}
 
 	question := req.Question[0]
+	hasCNAME, ipEntries := collectAnswerIPs(resp)
+	if len(ipEntries) == 0 {
+		return
+	}
+
 	// per-user localCountry：優先從 token store 查詢，fallback 到環境變數
 	localCountry := ""
 	if lc, ok := s.tokenStore.GetLocalCountry(sourceIp); ok {
@@ -274,24 +311,27 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		localCountry = os.Getenv("LOCAL_COUNTRY")
 	}
 
-	for _, answer := range resp.Answer {
-		var resultIP string
+	appResult := recognition.IdentifyApp(question.Name)
 
-		switch rr := answer.(type) {
-		case *dns.A:
-			resultIP = rr.A.String()
-		case *dns.AAAA:
-			resultIP = rr.AAAA.String()
-		default:
-			continue
+	detectedOS := ""
+	if cached, found := s.osCache.Get(sourceIp); found {
+		detectedOS = cached.(string)
+	}
+	if os := osfingerprint.Detect(question.Name); os != "" {
+		detectedOS = os
+		s.osCache.Set(sourceIp, os, cache.DefaultExpiration)
+	}
+
+	for _, entry := range ipEntries {
+		recordType := entry.typ
+		// 回應含 CNAME 鏈時：顯示原始查詢網域 + 最終解析 IP，Type 標為 CNAME
+		if hasCNAME {
+			recordType = "CNAME"
 		}
 
-		recordType := dns.TypeToString[answer.Header().Rrtype]
-
-		// 合併查詢 Country/City/Coords/ASN，減少重複 MMDB 查詢
+		resultIP := entry.ip
 		geoResult, _ := geoip.GetAll(resultIP)
 		resultCountry := geoResult.Country
-		// GeoIP 可能將 CDN/Anycast 節點誤判為境外；以 RTT 探測修正（<10ms 視為境內）
 		if corrected := s.latencyProbe.ResolveCountry(s.ctx, localCountry, resultCountry, resultIP); corrected != resultCountry {
 			resultCountry = corrected
 			geoResult.City = ""
@@ -300,20 +340,7 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 				geoResult.Coords = centroid
 			}
 		}
-		// resultCountry 必須非空才算境外，避免私有 IP 或 GeoIP 查無資料時被誤判
 		isForeign := localCountry != "" && resultCountry != "" && resultCountry != localCountry
-
-		appResult := recognition.IdentifyApp(question.Name)
-
-		// OS Fingerprinting: 嘗試從域名推斷 OS，結果快取在 Per-IP osCache 中
-		detectedOS := ""
-		if cached, found := s.osCache.Get(sourceIp); found {
-			detectedOS = cached.(string)
-		}
-		if os := osfingerprint.Detect(question.Name); os != "" {
-			detectedOS = os
-			s.osCache.Set(sourceIp, os, cache.DefaultExpiration)
-		}
 
 		record := types.DNSQueryRecord{
 			Timestamp:      time.Now(),
@@ -340,13 +367,10 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 			record.Latitude = geoResult.Coords[1]
 		}
 
-		// per-request log 用 Debug，避免在 prod 把 disk 灌爆；需要時 LOG_LEVEL=debug 即可開啟
-		slog.Debug("DNS record processed", "component", "dns", "domain", question.Name, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)
+		slog.Debug("DNS record processed", "component", "dns", "domain", question.Name, "type", recordType, "resultIp", resultIP, "country", resultCountry, "app", appResult.Name, "appMatch", string(appResult.MatchMethod), "sourceIp", sourceIp)
 
-		// 存入 Ring Buffer
 		buffer.Add(sourceIp, record)
 
-		// WebSocket 推送
 		data, err := json.Marshal(record)
 		if err == nil {
 			select {

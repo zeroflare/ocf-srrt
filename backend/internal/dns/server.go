@@ -11,6 +11,7 @@ import (
 	"ocf-srrt/backend/internal/auth"
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/geoip"
+	"ocf-srrt/backend/internal/latencyprobe"
 	"ocf-srrt/backend/internal/osfingerprint"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/types"
@@ -36,6 +37,7 @@ type Server struct {
 	upstreams  []string
 	dnsCache   *cache.Cache // DNS 回應快取
 	osCache    *cache.Cache // Per-IP OS fingerprint 快取
+	latencyProbe *latencyprobe.Prober
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -86,6 +88,7 @@ func NewServer(broadcast chan api.BroadcastMessage, tokenStore *auth.TokenStore)
 		upstreams: buildUpstreams(),
 		dnsCache:  cache.New(30*time.Second, 60*time.Second),
 		osCache:   cache.New(30*time.Minute, 60*time.Minute),
+		latencyProbe: latencyprobe.Default(),
 		ctx:       ctx,
 		cancel:    cancel,
 	}
@@ -288,6 +291,27 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 		// 合併查詢 Country/City/Coords/ASN，減少重複 MMDB 查詢
 		geoResult, _ := geoip.GetAll(resultIP)
 		resultCountry := geoResult.Country
+		// GeoIP 可能將 CDN/Anycast 節點誤判為境外；以 RTT 探測修正（<10ms 視為境內）
+		if localCountry != "" && resultCountry != "" && resultCountry != localCountry {
+			probeCtx, probeCancel := context.WithTimeout(s.ctx, latencyprobe.ProbeTimeout+latencyprobe.MtrTimeout)
+			probe := s.latencyProbe.Probe(probeCtx, resultIP)
+			probeCancel()
+			if latencyprobe.ShouldCorrectToLocal(localCountry, resultCountry, probe) {
+				slog.Debug("GeoIP country corrected by latency probe",
+					"component", "dns",
+					"resultIp", resultIP,
+					"geoCountry", resultCountry,
+					"localCountry", localCountry,
+					"probe", latencyprobe.FormatMethod(probe),
+				)
+				resultCountry = localCountry
+				geoResult.City = ""
+				geoResult.Subdivision = ""
+				if centroid := geoip.GetCountryCentroid(localCountry); len(centroid) == 2 {
+					geoResult.Coords = centroid
+				}
+			}
+		}
 		// resultCountry 必須非空才算境外，避免私有 IP 或 GeoIP 查無資料時被誤判
 		isForeign := localCountry != "" && resultCountry != "" && resultCountry != localCountry
 

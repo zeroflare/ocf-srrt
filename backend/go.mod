@@ -3,6 +3,7 @@ module ocf-srrt/backend
 go 1.24.0
 
 require (
+	github.com/go-ping/ping v1.2.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/miekg/dns v1.1.72
 )
@@ -14,7 +15,6 @@ require (
 )
 
 require (
-	github.com/go-ping/ping v1.2.0 // indirect
 	github.com/google/uuid v1.2.0 // indirect
 	github.com/oschwald/maxminddb-golang v1.13.1 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect

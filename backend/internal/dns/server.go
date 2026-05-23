@@ -340,6 +340,15 @@ func (s *Server) processAndRecord(sourceIp string, req, resp *dns.Msg) {
 				geoResult.Coords = centroid
 			}
 		}
+		// XX／空值不顯示未知，預設 US（延遲 <10ms 校正為境內者已在上方保留）
+		if geoip.IsUnknownCountryCode(resultCountry) {
+			resultCountry = geoip.DefaultDisplayCountry
+			geoResult.City = ""
+			geoResult.Subdivision = ""
+			if centroid := geoip.GetCountryCentroid(resultCountry); len(centroid) == 2 {
+				geoResult.Coords = centroid
+			}
+		}
 		isForeign := localCountry != "" && resultCountry != "" && resultCountry != localCountry
 
 		record := types.DNSQueryRecord{

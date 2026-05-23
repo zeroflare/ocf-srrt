@@ -405,7 +405,32 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 	// 後處理階段 4：RTT 探測（ping / mtr TCP 443）<10ms 視為境內，覆寫 GeoIP（與 DNS server 一致）
 	enrichWithDomesticProbe(ctx, result.Hops, &result.TargetCountry, resolvedIP, opts.LocalCountry, defaultLatencyProber{})
 
+	// 後處理階段 5：XX／空值預設 US（境內校正結果已在階段 4 保留）
+	normalizeDisplayCountries(result.Hops, &result.TargetCountry)
+
 	return result, nil
+}
+
+func normalizeDisplayCountries(hops []Hop, targetCountry *string) {
+	apply := func(country *string, hop *Hop) {
+		if !geoip.IsUnknownCountryCode(*country) {
+			return
+		}
+		*country = geoip.NormalizeDisplayCountry(*country)
+		if hop != nil {
+			hop.City = ""
+			hop.Subdivision = ""
+			if centroid := geoip.GetCountryCentroid(*country); len(centroid) == 2 {
+				hop.Coords = centroid
+			}
+		}
+	}
+	for i := range hops {
+		apply(&hops[i].Country, &hops[i])
+	}
+	if targetCountry != nil {
+		apply(targetCountry, nil)
+	}
 }
 
 // enrichWithDomesticProbe 對各 hop 與目標國家套用延遲探測校正。

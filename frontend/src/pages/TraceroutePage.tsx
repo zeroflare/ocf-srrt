@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router';
 import { AlertTriangle, ArrowLeft, Map as MapIcon, Play, Share2, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { TraceResult } from '../types';
+import { resolveDisplayCountry } from '../utils/countryFlag';
 import { decodeTraceResult, buildTracerouteShareUrl } from '../utils/tracerouteShare';
 import { useDnsStore } from '../stores/useDnsStore';
 import { createMockTraceResult } from '../stores/useTracerouteStore';
@@ -150,7 +151,9 @@ const TraceroutePage: React.FC = () => {
 
   const hasGeoHops = result ? result.hops.some((h) => h.ip !== '*' && h.coords && h.coords.length === 2) : false;
   const targetCountryHop = result?.hops.filter((h) => h.country).slice(-1)[0];
-  const targetCountry = result?.targetCountry || targetCountryHop?.country || '—';
+  const targetCountry = result
+    ? resolveDisplayCountry(result.targetCountry || targetCountryHop?.country)
+    : '—';
   const targetAsn = targetCountryHop?.asn ? `AS${targetCountryHop.asn}${targetCountryHop.isp ? ' · ' + targetCountryHop.isp : ''}` : '—';
 
   return (

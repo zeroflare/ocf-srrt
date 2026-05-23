@@ -5,7 +5,7 @@ import { Feature, Point } from 'geojson';
 import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
 import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHops } from '../utils/geo';
-import { countryFlag } from '../utils/countryFlag';
+import { countryFlag, resolveDisplayCountry } from '../utils/countryFlag';
 import { useTranslation } from 'react-i18next';
 import { Radio, Search } from 'lucide-react';
 import countryHubsData from '../data/countries-hubs.json';
@@ -402,13 +402,13 @@ export const CyberMap: React.FC = () => {
   const destinations = useMemo(() => {
     const byCountry = new Map<string, { coords: [number, number]; country: string; foreign: boolean }>();
     for (const r of records) {
-      if (!r.country) continue;
-      const hub = HUB_BY_CODE.get(r.country);
+      const cc = resolveDisplayCountry(r.country);
+      const hub = HUB_BY_CODE.get(cc);
       if (!hub) continue;
-      if (byCountry.has(r.country)) continue;
-      byCountry.set(r.country, {
+      if (byCountry.has(cc)) continue;
+      byCountry.set(cc, {
         coords: hub.coordinates,
-        country: r.country,
+        country: cc,
         foreign: !!r.isForeign,
       });
     }

@@ -59,8 +59,9 @@ type BroadcastMessage struct {
 
 // subscribeMsg 前端發送的訂閱訊息，用於切換監控目標 IP
 type subscribeMsg struct {
-	Type string `json:"type"`
-	IP   string `json:"ip"`
+	Type  string `json:"type"`
+	IP    string `json:"ip"`
+	Fresh bool   `json:"fresh"` // true：不送歷史 snapshot，從按下「開始」起算
 }
 
 // Client 是 WebSocket 連線的抽象
@@ -229,10 +230,12 @@ func (c *Client) readPump() {
 			c.clientIP = newIP
 			c.mu.Unlock()
 
-			slog.Info("Client subscribed to new IP", "component", "ws", "oldIp", oldIP, "newIp", newIP)
+			slog.Info("Client subscribed to new IP", "component", "ws", "oldIp", oldIP, "newIp", newIP, "fresh", msg.Fresh)
 
-			// 切換後立即發送新 IP 的歷史 snapshot
-			c.sendSnapshot(newIP)
+			// 切換後發送歷史 snapshot（使用者按下「開始」且 fresh=true 時略過）
+			if !msg.Fresh {
+				c.sendSnapshot(newIP)
+			}
 		}
 	}
 }

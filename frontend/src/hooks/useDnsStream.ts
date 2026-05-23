@@ -79,11 +79,11 @@ export const useDnsStream = (enabled: boolean = true) => {
   // 追蹤目前訂閱的 IP，供重連時自動重新 subscribe
   const subscribedIpRef = useRef<string | null>(null);
 
-  // 發送 subscribe 訊息，切換後端監聽的目標 IP
-  const sendSubscribe = useRef((ip: string) => {
+  // 發送 subscribe 訊息，切換後端監聽的目標 IP；fresh=true 時不請求歷史 snapshot
+  const sendSubscribe = useRef((ip: string, fresh = false) => {
     subscribedIpRef.current = ip; // 記住最新的訂閱 IP
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
-      const msg = JSON.stringify({ type: 'subscribe', ip });
+      const msg = JSON.stringify({ type: 'subscribe', ip, fresh });
       ws.current.send(msg);
     }
   });
@@ -121,7 +121,8 @@ export const useDnsStream = (enabled: boolean = true) => {
         // 否則後端用 token 原始 IP（可能是 IPv6），snapshot 和推播都會對不上
         const ipToSubscribe = subscribedIpRef.current;
         if (ipToSubscribe && ws.current && ws.current.readyState === WebSocket.OPEN) {
-          const msg = JSON.stringify({ type: 'subscribe', ip: ipToSubscribe });
+          const fresh = useDnsStore.getState().freshSession;
+          const msg = JSON.stringify({ type: 'subscribe', ip: ipToSubscribe, fresh });
           ws.current.send(msg);
         }
       };

@@ -23,7 +23,7 @@ const ReportPage = lazy(() => import('./pages/ReportPage'));
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, isSharedReport, theme, records, selectedRowIds } = useDnsStore();
+  const { monitoringIp, setMonitoringIp, startMonitoring, isSharedReport, theme, records, selectedRowIds } = useDnsStore();
   const { myIp, sendSubscribe } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -61,8 +61,8 @@ function App() {
 
   const handleStartMonitoring = () => {
     if (ipInput) {
-      setMonitoringIp(ipInput);
-      sendSubscribe(ipInput);
+      startMonitoring(ipInput);
+      sendSubscribe(ipInput, true);
     }
   };
 

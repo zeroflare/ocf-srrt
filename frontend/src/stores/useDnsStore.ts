@@ -17,6 +17,8 @@ interface DnsState {
   foreignQueries: number;
   isPaused: boolean;
   monitoringIp: string | null;
+  /** 為 true 時忽略 WebSocket snapshot（按下「開始」後的新 session） */
+  freshSession: boolean;
   maxRecords: number;
   isSharedReport: boolean;
   theme: 'dark' | 'light';
@@ -34,6 +36,8 @@ interface DnsState {
   loadSnapshot: (records: DnsRecord[]) => void;
   setPaused: (paused: boolean) => void;
   setMonitoringIp: (ip: string | null) => void;
+  /** 按下「開始監控」：清空列表與統計，不載入歷史 snapshot */
+  startMonitoring: (ip: string) => void;
   setSharedReport: (isShared: boolean) => void;
   setTheme: (theme: 'dark' | 'light') => void;
   toggleTheme: () => void;
@@ -152,6 +156,7 @@ export const useDnsStore = create<DnsState>((set, get) => {
     foreignQueries: 0,
     isPaused: false,
     monitoringIp: null,
+    freshSession: false,
     maxRecords: MAX_RECORDS,
     isSharedReport: false,
     theme: getPersistedTheme(),
@@ -172,10 +177,11 @@ export const useDnsStore = create<DnsState>((set, get) => {
     // 這是給 WebSocket 一連線時用的，直接替換當前列表
     // 如果 monitoringIp 尚未設定，先暫存快照，等 setMonitoringIp 後自動重播
     loadSnapshot: (historyRecords: DnsRecord[]) => {
-      // 無論如何都儲存原始快照
-      pendingSnapshot = historyRecords;
+      const { monitoringIp, maxRecords, freshSession } = get();
+      // 按下「開始」後的新 session 不載入歷史
+      if (freshSession) return;
 
-      const { monitoringIp, maxRecords } = get();
+      pendingSnapshot = historyRecords;
       if (!monitoringIp) return;
 
       const filtered = historyRecords.filter(r => r.sourceIp === monitoringIp);
@@ -193,10 +199,39 @@ export const useDnsStore = create<DnsState>((set, get) => {
 
     setPaused: (paused: boolean) => set({ isPaused: paused }),
 
+    startMonitoring: (ip: string) => {
+      pendingSnapshot = null;
+      batchBuffer = [];
+      set({
+        monitoringIp: ip,
+        freshSession: true,
+        records: [],
+        totalQueries: 0,
+        foreignQueries: 0,
+        selectedRowIds: new Set<string>(),
+        isPaused: false,
+        isSharedReport: false,
+      });
+    },
+
     setMonitoringIp: (ip: string | null) => {
+      if (!ip) {
+        pendingSnapshot = null;
+        batchBuffer = [];
+        set({
+          monitoringIp: null,
+          freshSession: false,
+          records: [],
+          totalQueries: 0,
+          foreignQueries: 0,
+          selectedRowIds: new Set<string>(),
+        });
+        return;
+      }
+
       const { maxRecords } = get();
-      // 如果有暫存快照且設定了新 IP，立即重播快照
-      if (ip && pendingSnapshot && pendingSnapshot.length > 0) {
+      // 分享報告等情境：有暫存快照則載入歷史
+      if (pendingSnapshot && pendingSnapshot.length > 0) {
         const filtered = pendingSnapshot.filter(r => r.sourceIp === ip);
         const sortedRecords = [...filtered].reverse().slice(0, maxRecords).map(assignId);
         const historyForeignCount = sortedRecords.reduce(
@@ -209,17 +244,17 @@ export const useDnsStore = create<DnsState>((set, get) => {
           foreignQueries: historyForeignCount,
           isSharedReport: state.isSharedReport && ip === state.monitoringIp,
         }));
-      } else {
-        // 停止監控或無快照時，同步清空選取狀態
-        set((state) => ({
-          monitoringIp: ip,
-          records: [],
-          totalQueries: 0,
-          foreignQueries: 0,
-          selectedRowIds: new Set<string>(),
-          isSharedReport: state.isSharedReport && ip === state.monitoringIp,
-        }));
+        return;
       }
+
+      set((state) => ({
+        monitoringIp: ip,
+        records: [],
+        totalQueries: 0,
+        foreignQueries: 0,
+        selectedRowIds: new Set<string>(),
+        isSharedReport: state.isSharedReport && ip === state.monitoringIp,
+      }));
     },
 
     setSharedReport: (isShared: boolean) => set({ isSharedReport: isShared }),

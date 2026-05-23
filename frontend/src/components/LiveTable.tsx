@@ -271,10 +271,9 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         header: t('result_ip'),
         cell: (info) => {
           const ip = info.getValue();
-          const target = ip.includes(':') ? info.row.original.domain : ip;
           return (
             <Link
-              to={`/traceroute?target=${encodeURIComponent(target)}`}
+              to={`/traceroute?target=${encodeURIComponent(ip)}`}
               className="text-slate-700 dark:text-slate-300 font-mono hover:underline hover:text-emerald-600 dark:hover:text-emerald-400"
               target="_blank"
               rel="noopener noreferrer"

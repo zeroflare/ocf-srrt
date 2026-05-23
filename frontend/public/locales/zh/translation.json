@@ -111,6 +111,7 @@
   "generate_report": "產生報告",
   "report_export": "產生報告",
   "share_report_snapshot": "分享報告快照（前50筆）",
+  "share_report_snapshot_unique": "分享報告快照（不重複網域前50筆）",
   "export_data": "匯出 JSON 檔",
   "export_data_done": "已匯出 JSON",
   "share_data": "分享監控數據",

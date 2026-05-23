@@ -111,6 +111,7 @@
   "generate_report": "Report",
   "report_export": "Report",
   "share_report_snapshot": "Share report snapshot (first 50)",
+  "share_report_snapshot_unique": "Share snapshot (50 unique domains)",
   "export_data": "Export JSON",
   "export_data_done": "JSON exported",
   "share_data": "Share Monitoring Data",

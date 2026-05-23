@@ -13,8 +13,13 @@ const rec = (domain: string, ip: string, type = 'A', timestamp?: string): DnsRec
   domain,
   resultIp: ip,
   isForeign: false,
+  latency: 0,
   sourceIp: '1.2.3.4',
   country: 'US',
+  asn: 0,
+  isp: '',
+  appName: '',
+  appCategory: '',
   type,
 });
 

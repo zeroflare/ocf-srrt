@@ -45,6 +45,6 @@ export function isUnknownCountry(cc: string | null | undefined): boolean {
  * 表格／地圖顯示用國碼：XX／空值 → US；延遲校正後的境內國家（如 TW）保留。
  */
 export function resolveDisplayCountry(cc: string | null | undefined): string {
-  if (isUnknownCountry(cc)) return DEFAULT_DISPLAY_COUNTRY;
+  if (!cc || isUnknownCountry(cc)) return DEFAULT_DISPLAY_COUNTRY;
   return cc;
 }

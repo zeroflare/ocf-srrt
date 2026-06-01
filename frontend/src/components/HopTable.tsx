@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Hop } from '../types';
+import { resolveDisplayCountry } from '../utils/countryFlag';
 
 const LatencyBar: React.FC<{ hop: Hop; maxLatency: number }> = ({ hop, maxLatency }) => {
   const avg = hop.latency;
@@ -89,12 +90,14 @@ export const HopTable: React.FC<HopTableProps> = ({ hops, compact = false, isDar
                 )}
               </td>
               <td className={`${px} ${py}`}>
-                {!isStar && hop.country && (
+                {!isStar && (
                   <span
                     className={`text-[10px] px-1.5 py-0.5 rounded ${isDark ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-600'} ${hop.geoConfidence === 'low' ? 'opacity-50' : ''}`}
                     title={hop.geoConfidence === 'low' ? 'GeoIP confidence: low (CDN/Anycast)' : undefined}
                   >
-                    {hop.country}{hop.city ? ` · ${hop.city}` : ''}{hop.geoConfidence === 'low' ? '?' : ''}
+                    {resolveDisplayCountry(hop.country)}
+                    {hop.city ? ` · ${hop.city}` : ''}
+                    {hop.geoConfidence === 'low' ? '?' : ''}
                   </span>
                 )}
               </td>

@@ -182,3 +182,19 @@ func GetCountryCentroid(country string) []float64 {
 	}
 	return nil
 }
+
+// DefaultDisplayCountry 為 GeoIP 無法解析（XX）時的預設顯示國家。
+const DefaultDisplayCountry = "US"
+
+// IsUnknownCountryCode 是否為 GeoIP 保留／未知國碼。
+func IsUnknownCountryCode(country string) bool {
+	return country == "" || country == "XX"
+}
+
+// NormalizeDisplayCountry 將未知國碼改為 DefaultDisplayCountry；其餘（含延遲校正後的境內）保留。
+func NormalizeDisplayCountry(country string) string {
+	if IsUnknownCountryCode(country) {
+		return DefaultDisplayCountry
+	}
+	return country
+}

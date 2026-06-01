@@ -3,7 +3,7 @@ import { MoreHorizontal } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useDnsStore } from '../stores/useDnsStore';
 import { DnsRecord } from '../types';
-import { countryFlag } from '../utils/countryFlag';
+import { countryFlag, resolveDisplayCountry } from '../utils/countryFlag';
 
 type Entry = { key: string; label: string; count: number };
 type TopAggregate = { rows: Entry[]; maxCount: number };
@@ -15,10 +15,10 @@ const PLACEHOLDER_LABEL = '—';
 const pickDomain: Picker = (r) => (r.domain ? { key: r.domain, label: r.domain } : null);
 
 const pickCountry: Picker = (r) => {
-  if (!r.country) return null;
-  const flag = countryFlag(r.country);
-  const label = [flag, r.country].filter(Boolean).join(' ').trim() || r.country;
-  return { key: r.country, label };
+  const cc = resolveDisplayCountry(r.country);
+  const flag = countryFlag(cc);
+  const label = [flag, cc].filter(Boolean).join(' ').trim() || cc;
+  return { key: cc, label };
 };
 
 const pickService: Picker = (r) => (r.appName ? { key: r.appName, label: r.appName } : null);

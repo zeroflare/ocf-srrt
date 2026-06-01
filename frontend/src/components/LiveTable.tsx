@@ -6,7 +6,7 @@ import { Cpu, Search, SlidersHorizontal, FileText, ChevronRight, ChevronDown, Pi
 import { AppInfoTooltip } from './AppInfoTooltip';
 import { getAppInfoByName } from '../utils/appInfo';
 import { mergeDnsRecords } from '../utils/mergeDnsRecords';
-import { countryFlag, countryLabel, isUnknownCountry } from '../utils/countryFlag';
+import { countryFlag, countryLabel, isUnknownCountry, resolveDisplayCountry } from '../utils/countryFlag';
 import { formatTime } from '../utils/formatTime';
 import { detectCloudProvider } from '../utils/cloudProvider';
 import { Link } from 'react-router';
@@ -253,12 +253,10 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         header: t('domain'),
         cell: (info) => {
           const domain = info.getValue();
-          const resultIp = info.row.original.resultIp;
-          const target = resultIp && !resultIp.includes(':') ? resultIp : domain;
 
           return (
             <Link
-              to={`/traceroute?target=${encodeURIComponent(target)}`}
+              to={`/traceroute?target=${encodeURIComponent(domain)}`}
               className="text-emerald-600 dark:text-emerald-400 hover:underline"
               target="_blank"
               rel="noopener noreferrer"
@@ -273,10 +271,9 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         header: t('result_ip'),
         cell: (info) => {
           const ip = info.getValue();
-          const target = ip.includes(':') ? info.row.original.domain : ip;
           return (
             <Link
-              to={`/traceroute?target=${encodeURIComponent(target)}`}
+              to={`/traceroute?target=${encodeURIComponent(ip)}`}
               className="text-slate-700 dark:text-slate-300 font-mono hover:underline hover:text-emerald-600 dark:hover:text-emerald-400"
               target="_blank"
               rel="noopener noreferrer"
@@ -292,19 +289,16 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
         cell: (info) => {
           const country = info.getValue();
           const row = info.row.original;
-          const flag = countryFlag(country);
-          const label = countryLabel(country);
+          const displayCountry = resolveDisplayCountry(country);
+          const flag = countryFlag(displayCountry);
+          const label = countryLabel(displayCountry);
           const unknown = isUnknownCountry(country);
-          // Anycast 判定優先順序：
-          //   1. 後端 isAnycast 旗標（geoip 套件以 ASN 表查表，最可靠）
-          //   2. 前端 ISP 字串比對 fallback（針對尚未更新到新後端 / 舊報告快照）
           const cdn = (unknown || row.isAnycast) ? detectCloudProvider(row.isp || '') : null;
-          const isAnycastView = row.isAnycast || (unknown && !!cdn);
           return (
             <div className="flex items-center gap-1.5">
               {flag && <span>{flag}</span>}
               <span className="text-slate-600 dark:text-slate-400">
-                {isAnycastView ? t('country_anycast') : label}
+                {label}
                 {row.city ? ` · ${row.city}` : ''}
               </span>
               {cdn ? (
@@ -313,13 +307,6 @@ export const LiveTable: React.FC<LiveTableProps> = ({ onOpenReport }) => {
                   className={`inline-flex items-center px-1 py-px rounded text-xs font-bold leading-none ${cdn.colorClass}`}
                 >
                   {cdn.name}
-                </span>
-              ) : isAnycastView ? (
-                <span
-                  title={t('country_anycast_hint', { provider: row.isp || 'CDN' })}
-                  className="inline-flex items-center px-1 py-px rounded text-xs font-bold leading-none bg-orange-500/15 text-orange-600 dark:text-orange-400"
-                >
-                  Anycast
                 </span>
               ) : (
                 <GeoIPBadge />

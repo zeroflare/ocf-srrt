@@ -10,7 +10,11 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { useTranslation } from 'react-i18next';
 import { Download, Share2 } from 'lucide-react';
 import { EMPTY_APP_INFO, ReportData } from './types/report';
-import { buildReportUrl } from './utils/reportShare';
+import {
+  buildReportUrl,
+  pickUniqueDomainRecords,
+  REPORT_SNAPSHOT_MAX_RECORDS,
+} from './utils/reportShare';
 import Joyride, { CallBackProps, STATUS } from 'react-joyride';
 import { SiteHeader, Hero, SectionHeading, SiteFooter } from './components/SiteHeader';
 import { SetupCards } from './components/SetupCards';
@@ -23,7 +27,7 @@ const ReportPage = lazy(() => import('./pages/ReportPage'));
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, isSharedReport, theme, records, selectedRowIds } = useDnsStore();
+  const { monitoringIp, setMonitoringIp, startMonitoring, isSharedReport, theme, records, selectedRowIds } = useDnsStore();
   const { myIp, sendSubscribe } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -61,8 +65,8 @@ function App() {
 
   const handleStartMonitoring = () => {
     if (ipInput) {
-      setMonitoringIp(ipInput);
-      sendSubscribe(ipInput);
+      startMonitoring(ipInput);
+      sendSubscribe(ipInput, true);
     }
   };
 
@@ -77,21 +81,34 @@ function App() {
     setRunTour(true);
   }, []);
 
+  const openReportSnapshot = useCallback(
+    (snapshotRecords: typeof records) => {
+      if (snapshotRecords.length === 0) return;
+      const data: ReportData = {
+        records: snapshotRecords,
+        appInfo: EMPTY_APP_INFO,
+        generatedAt: new Date().toISOString(),
+        phoneBrand: effectiveBrand,
+      };
+      const url = buildReportUrl(data);
+      navigator.clipboard.writeText(url).then(() => {
+        setToast(t('share_report_copied'));
+        setTimeout(() => setToast(null), 2400);
+      });
+      window.open(url, '_blank', 'noopener,noreferrer');
+    },
+    [effectiveBrand, t],
+  );
+
   const handleShareSnapshot = () => {
     if (records.length === 0) return;
-    // 跟 wireframe 一致：取前 50 筆、直接開新分頁，不彈 modal、不要求填 App 資訊
-    const data: ReportData = {
-      records: records.slice(0, 50),
-      appInfo: EMPTY_APP_INFO,
-      generatedAt: new Date().toISOString(),
-      phoneBrand: effectiveBrand,
-    };
-    const url = buildReportUrl(data);
-    navigator.clipboard.writeText(url).then(() => {
-      setToast(t('share_report_copied'));
-      setTimeout(() => setToast(null), 2400);
-    });
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openReportSnapshot(records.slice(0, REPORT_SNAPSHOT_MAX_RECORDS));
+  };
+
+  const handleShareUniqueDomainSnapshot = () => {
+    const unique = pickUniqueDomainRecords(records, REPORT_SNAPSHOT_MAX_RECORDS);
+    if (unique.length === 0) return;
+    openReportSnapshot(unique);
   };
 
   /**
@@ -173,6 +190,15 @@ function App() {
                   >
                     <Share2 className="h-5 w-5 shrink-0" />
                     {t('share_report_snapshot')}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleShareUniqueDomainSnapshot}
+                    disabled={!hasRecords}
+                    className="inline-flex items-center gap-2 rounded-xl border border-violet-200 bg-violet-50 px-5 py-2.5 text-sm font-bold text-violet-900 shadow-sm transition-colors hover:bg-violet-100/90 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400 dark:border-violet-800/60 dark:bg-violet-950/40 dark:text-violet-100 dark:hover:bg-violet-950/70 dark:disabled:bg-slate-900 dark:disabled:text-slate-500"
+                  >
+                    <Share2 className="h-5 w-5 shrink-0" />
+                    {t('share_report_snapshot_unique')}
                   </button>
                   <button
                     type="button"

@@ -41,7 +41,9 @@ services:
       - "8080:8080"
 
     environment:
-      - LOCAL_COUNTRY=TW
+      # 境內國家：留空時由 data/host-location.json 的 country 決定；可用環境變數覆寫
+      - LOCAL_COUNTRY=${LOCAL_COUNTRY:-}
+      - HOST_LOCATION_PATH=/app/data/host-location.json
       - NETWORK_INTERFACE=eth0
       - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb

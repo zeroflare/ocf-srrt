@@ -31,7 +31,7 @@ graph TB
 - **No new privileges**: 禁止提權。
 - **Capabilities**: 僅授予 `NET_ADMIN`、`NET_RAW`、`NET_BIND_SERVICE`（DNS :53 所需）。
 - **Memory limit**: 1GB per container。
-- **Volume mounts**: MMDB 與 app.json 以 read-only 掛載。
+- **Volume mounts**: MMDB、app.json 與 host-location.json 以 read-only 掛載。
 
 ## Development Environment
 - Backend port: `1053:53`（DNS）、`8080:8080`（HTTP/WS）
@@ -81,9 +81,24 @@ services:
 
 ### 步驟 4：設定環境變數
 於 `docker-compose.prod.yml` 或 `.env` 中設定：
-- `LOCAL_COUNTRY`：本地國碼（如 `TW`）
+- `LOCAL_COUNTRY`：本地國碼（如 `TW`）。留空時改由 `host-location.json` 的 `country` 決定（見步驟 4.1）；環境變數優先。
 - `DNS_PUBLIC_IP`：VM 公網 IP，供前端顯示 DNS 設定指引
 - `NETWORK_INTERFACE`：VM 網卡名稱（GCP 預設 `ens4`）
+- `HOST_LOCATION_PATH`：主機節點設定檔路徑（預設 `data/host-location.json`）
+
+### 步驟 4.1：設定主機節點位置（多節點部署）
+DNS 主機可能部署於不同國家（TW、JP…）。各節點掛載各自的 `backend/data/host-location.json`，
+讓同一份映像檔不需重編譯即可部署到不同節點：
+
+```json
+{ "country": "TW", "label": "台灣節點", "coordinates": [121.5654, 25.033], "mapZoom": 6.2 }
+```
+
+- `country`：境內國碼，驅動境內/境外判定（等同 `LOCAL_COUNTRY`）。
+- `label` / `coordinates` / `mapZoom`：經 `/api/token` 回傳給前端，決定地圖中心、縮放與節點顯示名稱。
+
+設定來源優先序：`LOCAL_COUNTRY` 環境變數 > `host-location.json` 的 `country`。
+設定檔不存在時，後端退回環境變數 / GeoIP，維持向後相容。
 
 ### 步驟 5：設定 SSL 憑證
 使用 Certbot 或 Cloudflare 取得 HTTPS 憑證，放置於 VM 的 `/etc/letsencrypt` 目錄（容器以 read-only 掛載）。

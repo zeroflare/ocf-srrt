@@ -134,3 +134,10 @@ Traceroute 視覺化（`TraceMap` 與 `CyberMap` 的 trace overlay）改為**只
 - **實作**: 後端新增 `readPump` goroutine 監聽前端訊息，收到 subscribe 後透過 mutex 安全更新 `client.clientIP` 並立即重送目標 IP 的歷史 snapshot。前端在使用者點擊「開始監控」時呼叫 `sendSubscribe(ip)`。
 - **優點**: 完全向後相容（不發 subscribe 則行為與原本一致）；解決所有跨裝置、跨 IP 版本的監控場景。
 - **取捨**: subscribe 不驗證目標 IP 的所有權，理論上可監控任意已知 IP 的 DNS 流量。在本專案的單一用戶/小規模部署場景中可接受；若需多租戶隔離，需加入權限驗證機制。
+
+## 主機節點位置外部化（多節點部署）
+新增 `backend/internal/hostloc` 套件與 `backend/data/host-location.json` 設定檔，將「DNS 主機所在國家」外部化為一份可掛載的 JSON。
+- **動機**: DNS 主機部署於不同國家（TW、JP…），前端地圖中心與境內/境外判定都需知道主機所在地。原本只能靠 `LOCAL_COUNTRY` 環境變數提供國碼，缺少地圖中心座標、縮放與顯示名稱等資訊。
+- **實作**: 啟動時載入 `host-location.json`（`country` / `label` / `coordinates` / `mapZoom`）。`country` 在 `LOCAL_COUNTRY` 未設定時驅動境內國家；`label` / `coordinates` / `mapZoom` 經 `/api/token` 回傳前端。同一份映像檔藉由掛載不同設定檔即可部署到不同節點，不需重編譯。
+- **優點**: 設定外部化、單一映像多節點；完全向後相容（設定檔不存在時退回環境變數 / GeoIP）。環境變數仍優先於設定檔，既有部署行為不變。
+- **取捨**: 境內/境外判定的演算法不變（仍由後端 `localCountry` 驅動），本變更只是讓 `localCountry` 多一個設定來源並附帶地圖中心資訊。

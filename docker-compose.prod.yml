@@ -45,11 +45,16 @@ services:
       - ./backend/data/GeoLite2-ASN.mmdb:/home/dns-proxy/data/GeoLite2-ASN.mmdb:ro
       - ./backend/data/GeoLite2-City.mmdb:/home/dns-proxy/data/GeoLite2-City.mmdb:ro
       - ./backend/data/app.json:/home/dns-proxy/data/app.json:ro
+      # 主機節點位置設定：不同節點掛載不同的 host-location.json（TW / JP …）
+      - ./backend/data/host-location.json:/home/dns-proxy/data/host-location.json:ro
 
     environment:
       # Log level：prod 預設 warn，降低 log 量；除錯時可改 info 或 debug
       - LOG_LEVEL=${LOG_LEVEL:-warn}
-      - LOCAL_COUNTRY=TW
+      # 境內國家：留空時由 data/host-location.json 的 country 決定（建議做法）；
+      # 仍可用環境變數覆寫，例如 LOCAL_COUNTRY=JP。
+      - LOCAL_COUNTRY=${LOCAL_COUNTRY:-}
+      - HOST_LOCATION_PATH=data/host-location.json
       - NETWORK_INTERFACE=ens4 # GCP 預設網卡
       - ASN_DB_PATH=data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=data/GeoLite2-City.mmdb
@@ -68,6 +73,7 @@ services:
       - RIPE_IPMAP_USER_AGENT=${RIPE_IPMAP_USER_AGENT:-srrt-dns-analyzer/1.0}
       - MAXMIND_LOCATION_ENABLED=${MAXMIND_LOCATION_ENABLED:-true}
       - MAXMIND_ASN_ENABLED=${MAXMIND_ASN_ENABLED:-true}
+      - TRACEROUTE_LOG_PATH=/tmp/traceroute.log
     restart: unless-stopped
 
   # =========================================

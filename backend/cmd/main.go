@@ -12,6 +12,7 @@ import (
 	"ocf-srrt/backend/internal/buffer"
 	"ocf-srrt/backend/internal/dns"
 	"ocf-srrt/backend/internal/geoip"
+	"ocf-srrt/backend/internal/hostloc"
 	"ocf-srrt/backend/internal/ratelimit"
 	"ocf-srrt/backend/internal/recognition"
 	"ocf-srrt/backend/internal/traceroute"
@@ -180,7 +181,27 @@ func main() {
 			slog.Warn("Could not auto-detect public IP; hop 0 and DNS banner will be unavailable", "component", "main")
 		}
 	}
+	// 載入主機節點位置設定（country / label / coordinates / mapZoom）。
+	// 設定檔可選，找不到時退回環境變數 / GeoIP，維持既有部署的向後相容。
+	hostLocPath := os.Getenv("HOST_LOCATION_PATH")
+	if hostLocPath == "" {
+		hostLocPath = "data/host-location.json"
+	}
+	hostLocation, err := hostloc.Load(hostLocPath)
+	if err != nil {
+		slog.Info("Host location config not loaded; falling back to env/GeoIP",
+			"component", "main", "path", hostLocPath, "error", err)
+	} else {
+		slog.Info("Host location config loaded",
+			"component", "main", "country", hostLocation.Country, "label", hostLocation.Label)
+	}
+
+	// 境內國家來源優先序：LOCAL_COUNTRY 環境變數 > host-location.json 的 country。
+	// 維持環境變數優先，確保既有部署行為不變。
 	localCountryOverride := os.Getenv("LOCAL_COUNTRY")
+	if localCountryOverride == "" && hostLocation != nil && hostLocation.Country != "" {
+		localCountryOverride = hostLocation.Country
+	}
 
 	mux.HandleFunc("/api/token", func(w http.ResponseWriter, r *http.Request) {
 		clientIP, err := extractClientIP(r, trustedProxies)
@@ -203,13 +224,25 @@ func main() {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		resp := map[string]string{
+		resp := map[string]interface{}{
 			"token":        token,
 			"ip":           clientIP,
 			"localCountry": localCountry,
 		}
 		if dnsPublicIP != "" {
 			resp["dnsIp"] = dnsPublicIP
+		}
+		// 主機節點資訊：供前端決定地圖中心、縮放與節點顯示名稱。
+		if hostLocation != nil {
+			if hostLocation.Label != "" {
+				resp["hostLabel"] = hostLocation.Label
+			}
+			if hostLocation.HasCoordinates() {
+				resp["hostCoordinates"] = hostLocation.Coordinates
+			}
+			if hostLocation.MapZoom > 0 {
+				resp["mapZoom"] = hostLocation.MapZoom
+			}
 		}
 		json.NewEncoder(w).Encode(resp)
 	})

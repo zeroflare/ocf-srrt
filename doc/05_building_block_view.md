@@ -90,7 +90,7 @@ graph LR
 | Endpoint | Method | Auth | 用途 |
 |----------|--------|------|------|
 | `/ws` | WebSocket | Token (query param) | 即時 DNS 記錄串流，連線時發送歷史快照。支援 `subscribe` 訊息動態切換監控目標 IP（跨裝置監控） |
-| `/api/token` | GET | None | 取得/建立 session token，回傳 token、client IP、localCountry、dnsPublicIP |
+| `/api/token` | GET | None | 取得/建立 session token，回傳 token、client IP、localCountry、dnsPublicIP；若有設定主機節點，另回傳 hostLabel、hostCoordinates、mapZoom |
 | `/api/traceroute` | GET | Token (Bearer / query) | 執行 MTR，含快取檢查 + 速率限制 + 併發控制 |
 | `/health` | GET | None | 健康檢查（status、uptime、session count、client count） |
 

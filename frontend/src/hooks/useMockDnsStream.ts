@@ -4,9 +4,19 @@ import { generateRandomDnsRecord, generateSnapshot } from '../mocks/mockDataGene
 import { logger } from '../utils/logger';
 
 export const useMockDnsStream = (enabled: boolean = true) => {
-  const { addRecord, monitoringIp } = useDnsStore();
+  const { addRecord, monitoringIp, setLocalCountry } = useDnsStore();
   const [isConnected, setIsConnected] = useState(false);
   const intervalRef = useRef<number | undefined>(undefined);
+
+  // Dev 模擬節點：mock 模式下以 VITE_LOCAL_COUNTRY 模擬主機所在國家（如 TW / JP），
+  // 同時驅動地圖原點與境內/境外統計（mockDataGenerator 也讀 store.localCountry）。
+  // 未設定時維持 null，地圖原點 fallback TW，與原本行為一致。
+  useEffect(() => {
+    const mockCountry = (import.meta.env.VITE_LOCAL_COUNTRY as string | undefined)?.toUpperCase();
+    if (mockCountry) {
+      setLocalCountry(mockCountry);
+    }
+  }, [setLocalCountry]);
 
   useEffect(() => {
     if (!enabled) {

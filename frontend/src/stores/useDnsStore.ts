@@ -25,6 +25,12 @@ interface DnsState {
   token: string | null;
   dnsIp: string | null;
   localCountry: string | null;
+  /** 主機節點地圖中心座標 [lon, lat]，來自後端 host-location.json；null 時前端用 hub 座標 fallback */
+  hostCoordinates: [number, number] | null;
+  /** 主機節點地圖預設 zoom，來自後端 host-location.json；null 時用前端預設值 */
+  mapZoom: number | null;
+  /** 主機節點顯示名稱，來自後端 host-location.json */
+  hostLabel: string | null;
   selectedRowIds: Set<string>;
 
   // LiveTable 合併重複列開關
@@ -46,6 +52,8 @@ interface DnsState {
   setToken: (token: string | null) => void;
   setDnsIp: (ip: string | null) => void;
   setLocalCountry: (country: string | null) => void;
+  /** 設定主機節點地圖資訊（座標 / zoom / 顯示名稱），由 token API 回傳後寫入 */
+  setHostLocation: (info: { coordinates?: [number, number] | null; mapZoom?: number | null; label?: string | null }) => void;
   toggleRowSelection: (id: string) => void;
   toggleAllSelection: (ids: string[]) => void;
   clearSelection: () => void;
@@ -163,6 +171,9 @@ export const useDnsStore = create<DnsState>((set, get) => {
     token: null,
     dnsIp: null,
     localCountry: null,
+    hostCoordinates: null,
+    mapZoom: null,
+    hostLabel: null,
     selectedRowIds: new Set<string>(),
     mergeRecords: false,
 
@@ -277,6 +288,12 @@ export const useDnsStore = create<DnsState>((set, get) => {
     setDnsIp: (ip: string | null) => set({ dnsIp: ip }),
 
     setLocalCountry: (country: string | null) => set({ localCountry: country }),
+
+    setHostLocation: (info) => set((state) => ({
+      hostCoordinates: info.coordinates !== undefined ? info.coordinates : state.hostCoordinates,
+      mapZoom: info.mapZoom !== undefined ? info.mapZoom : state.mapZoom,
+      hostLabel: info.label !== undefined ? info.label : state.hostLabel,
+    })),
 
     toggleRowSelection: (id: string) => set((state) => {
       const next = new Set(state.selectedRowIds);

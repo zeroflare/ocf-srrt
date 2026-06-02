@@ -66,7 +66,7 @@ const setCachedLocalCountry = (country: string) => {
 };
 
 export const useDnsStream = (enabled: boolean = true) => {
-  const { addRecord, loadSnapshot, setToken, setDnsIp, setLocalCountry, monitoringIp } = useDnsStore();
+  const { addRecord, loadSnapshot, setToken, setDnsIp, setLocalCountry, setHostLocation, monitoringIp } = useDnsStore();
 
   const [isConnected, setIsConnected] = useState(false);
   const [reconnectDelay, setReconnectDelay] = useState<number | null>(null);
@@ -203,6 +203,14 @@ export const useDnsStream = (enabled: boolean = true) => {
         if (data.localCountry) {
           setLocalCountry(data.localCountry);
           setCachedLocalCountry(data.localCountry);
+        }
+        // 主機節點地圖資訊（座標 / zoom / 顯示名稱），供地圖中心隨主機位置而變
+        if (data.hostCoordinates || data.mapZoom || data.hostLabel) {
+          setHostLocation({
+            coordinates: Array.isArray(data.hostCoordinates) ? data.hostCoordinates : null,
+            mapZoom: typeof data.mapZoom === 'number' ? data.mapZoom : null,
+            label: typeof data.hostLabel === 'string' ? data.hostLabel : null,
+          });
         }
         connectWithToken(data.token);
       } catch (error) {

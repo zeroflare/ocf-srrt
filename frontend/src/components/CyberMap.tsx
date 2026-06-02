@@ -6,34 +6,13 @@ import { useTracerouteStore } from '../stores/useTracerouteStore';
 import { useDnsStore } from '../stores/useDnsStore';
 import { calculateDistance, createCurve, pickPathEndpoints, spreadOverlappingHops } from '../utils/geo';
 import { countryFlag, resolveDisplayCountry } from '../utils/countryFlag';
+import { getHub, getOriginCode, getOriginCoords, getMapView, MIN_MAP_ZOOM } from '../utils/origin';
 import { useTranslation } from 'react-i18next';
 import { Radio, Search } from 'lucide-react';
-import countryHubsData from '../data/countries-hubs.json';
 
-// Country hub 座標表（與 wireframe 共用同一份 data/countries-hubs.json）
-// 設計：spokes 端點與圓形旗幟 marker 都讀同一張表，保證「線」與「icon」永遠對齊。
-interface CountryHub {
-  code: string;
-  nameZh: string;
-  nameEn?: string;
-  flag: string;
-  coordinates: [number, number];
-}
-const HUB_BY_CODE: Map<string, CountryHub> = new Map(
-  (countryHubsData.countries as CountryHub[]).map((c) => [c.code, c]),
-);
-
-// Spokes 原點：本地國家（與 wireframe 一致使用 TW hub 座標 [121.5654, 25.033]）
-const ORIGIN_CODE = 'TW';
-const ORIGIN_HUB = HUB_BY_CODE.get(ORIGIN_CODE);
-const TAIWAN_CENTER: [number, number] = ORIGIN_HUB
-  ? (ORIGIN_HUB.coordinates as [number, number])
-  : [121.5654, 25.033];
-// 預設地圖視野：以台灣為中心，台灣 zoom 等級
-const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
-const DEFAULT_ZOOM = 6.2;
-// 縮到最小 = 全世界視野（同 wireframe）
-const MIN_ZOOM = 0.8158546915390924;
+// Country hub 座標表與原點 / 相機中心邏輯集中於 utils/origin.ts，
+// spokes 端點與圓形旗幟 marker 都讀同一張表，保證「線」與「icon」永遠對齊。
+// 原點（spokes 起點 / 原點 marker）隨後端 localCountry 動態決定，預設 TW。
 
 /**
  * 與 wireframe 相同：line-gradient + line-progress 表達式，
@@ -88,10 +67,26 @@ export const CyberMap: React.FC = () => {
   const [mapReady, setMapReady] = useState(false);
 
   const { activeResult } = useTracerouteStore();
-  const { records, monitoringIp, theme } = useDnsStore();
+  const { records, monitoringIp, theme, localCountry, hostCoordinates, mapZoom } = useDnsStore();
+
+  // 原點國碼與座標：隨後端 localCountry / 主機設定動態決定（預設 TW）
+  const originCode = useMemo(() => getOriginCode(localCountry), [localCountry]);
+  const originCoords = useMemo(() => getOriginCoords(originCode), [originCode]);
+  const mapView = useMemo(
+    () => getMapView(originCode, hostCoordinates, mapZoom),
+    [originCode, hostCoordinates, mapZoom],
+  );
+  // 記錄上次套用的原點，避免使用者手動平移後又被重置
+  const appliedOriginRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (!mapContainer.current) return;
+
+    // 初始相機中心：直接讀當下 store 值（init 只跑一次，避免列入依賴重建地圖）
+    const initState = useDnsStore.getState();
+    const initOriginCode = getOriginCode(initState.localCountry);
+    const initView = getMapView(initOriginCode, initState.hostCoordinates, initState.mapZoom);
+    appliedOriginRef.current = initOriginCode;
 
     map.current = new maplibregl.Map({
       container: mapContainer.current,
@@ -143,9 +138,9 @@ export const CyberMap: React.FC = () => {
           },
         ],
       },
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      minZoom: MIN_ZOOM,
+      center: initView.center,
+      zoom: initView.zoom,
+      minZoom: MIN_MAP_ZOOM,
       dragRotate: false,
       touchZoomRotate: false,
       pitchWithRotate: false,
@@ -243,6 +238,15 @@ export const CyberMap: React.FC = () => {
       map.current?.remove();
     };
   }, []);
+
+  // 主機節點（originCode）變更時把相機飛到新的中心；
+  // 只在原點「身分」改變時觸發（每次載入至多一次），不干擾使用者手動平移/縮放。
+  useEffect(() => {
+    if (!mapReady || !map.current) return;
+    if (appliedOriginRef.current === originCode) return;
+    appliedOriginRef.current = originCode;
+    map.current.flyTo({ center: mapView.center, zoom: mapView.zoom, duration: 600 });
+  }, [mapReady, originCode, mapView]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -403,7 +407,7 @@ export const CyberMap: React.FC = () => {
     const byCountry = new Map<string, { coords: [number, number]; country: string; foreign: boolean }>();
     for (const r of records) {
       const cc = resolveDisplayCountry(r.country);
-      const hub = HUB_BY_CODE.get(cc);
+      const hub = getHub(cc);
       if (!hub) continue;
       if (byCountry.has(cc)) continue;
       byCountry.set(cc, {
@@ -418,9 +422,9 @@ export const CyberMap: React.FC = () => {
   // 連線：監測起點 → 各目的地（與 wireframe 相同採直線，跨換日線 unwrap 經度避免繞地球反方向）
   const dnsSpokeFeatures = useMemo(() => {
     const features: Feature[] = [];
-    const [oLon, oLat] = TAIWAN_CENTER;
+    const [oLon, oLat] = originCoords;
     for (const dest of destinations.values()) {
-      if (dest.country === 'TW') continue; // 不畫從原點到自己的線
+      if (dest.country === originCode) continue; // 不畫從原點到自己的線
       const [dLon, dLat] = dest.coords;
       const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
       features.push({
@@ -436,7 +440,7 @@ export const CyberMap: React.FC = () => {
       });
     }
     return features;
-  }, [destinations]);
+  }, [destinations, originCoords, originCode]);
 
   useEffect(() => {
     if (!mapReady || !map.current) return;
@@ -486,17 +490,17 @@ export const CyberMap: React.FC = () => {
     for (const m of markersRef.current) m.remove();
     markersRef.current = [];
 
-    // 整合：所有目的地 + 強制加入原點台灣（即使沒紀錄）
+    // 整合：所有目的地 + 強制加入原點（本地監控國家，即使沒紀錄）
     type MarkerInfo = { coords: [number, number]; country: string; isOrigin: boolean };
     const items: MarkerInfo[] = [];
-    let hasTW = false;
+    let hasOrigin = false;
     for (const dest of destinations.values()) {
-      const isOrigin = dest.country === 'TW';
-      if (isOrigin) hasTW = true;
+      const isOrigin = dest.country === originCode;
+      if (isOrigin) hasOrigin = true;
       items.push({ coords: dest.coords, country: dest.country, isOrigin });
     }
-    if (!hasTW && destinations.size > 0) {
-      items.unshift({ coords: TAIWAN_CENTER, country: 'TW', isOrigin: true });
+    if (!hasOrigin && destinations.size > 0) {
+      items.unshift({ coords: originCoords, country: originCode, isOrigin: true });
     }
 
     const dark = theme === 'dark';
@@ -529,7 +533,7 @@ export const CyberMap: React.FC = () => {
         .addTo(map.current);
       markersRef.current.push(marker);
     }
-  }, [destinations, mapReady, theme]);
+  }, [destinations, mapReady, theme, originCode, originCoords]);
 
   return (
       <div className="w-full h-full relative overflow-hidden tour-map">

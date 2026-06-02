@@ -6,33 +6,14 @@ import { Hop } from '../types';
 import { pickPathEndpoints } from '../utils/geo';
 import { useDnsStore } from '../stores/useDnsStore';
 import { countryFlag } from '../utils/countryFlag';
-import countryHubsData from '../data/countries-hubs.json';
+import { getHub, getOriginCode, getOriginCoords, getMapView, MIN_MAP_ZOOM } from '../utils/origin';
 
 interface TraceMapProps {
   hops: Hop[];
 }
 
-// 與 CyberMap 共用同一份 countries-hubs.json，確保線端 / 旗幟 marker 永遠對齊
-interface CountryHub {
-  code: string;
-  nameZh: string;
-  nameEn?: string;
-  flag: string;
-  coordinates: [number, number];
-}
-const HUB_BY_CODE: Map<string, CountryHub> = new Map(
-  (countryHubsData.countries as CountryHub[]).map((c) => [c.code, c]),
-);
-
-// 原點：本地國家（與 CyberMap、wireframe 一致使用 TW hub 座標 [121.5654, 25.033]）
-const ORIGIN_CODE = 'TW';
-const ORIGIN_HUB = HUB_BY_CODE.get(ORIGIN_CODE);
-const TAIWAN_CENTER: [number, number] = ORIGIN_HUB
-  ? (ORIGIN_HUB.coordinates as [number, number])
-  : [121.5654, 25.033];
-const DEFAULT_CENTER: [number, number] = [121.0, 23.7];
-const DEFAULT_ZOOM = 6.2;
-const MIN_ZOOM = 0.8158546915390924;
+// Hub 查表與原點 / 相機中心邏輯集中於 utils/origin.ts（與 CyberMap 共用），
+// 確保線端 / 旗幟 marker 永遠對齊。原點隨後端 localCountry 動態決定，預設 TW。
 
 /**
  * 與 CyberMap 完全相同的 line-gradient 流動動畫 expression。
@@ -105,8 +86,17 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
   const map = useRef<maplibregl.Map | null>(null);
   const flowRafRef = useRef<number | null>(null);
   const markersRef = useRef<maplibregl.Marker[]>([]);
-  const { theme } = useDnsStore();
+  const { theme, localCountry, hostCoordinates, mapZoom } = useDnsStore();
   const isDark = theme === 'dark';
+
+  // 原點國碼與座標：隨後端 localCountry / 主機設定動態決定（預設 TW）
+  const originCode = useMemo(() => getOriginCode(localCountry), [localCountry]);
+  const originCoords = useMemo(() => getOriginCoords(originCode), [originCode]);
+  const mapView = useMemo(
+    () => getMapView(originCode, hostCoordinates, mapZoom),
+    [originCode, hostCoordinates, mapZoom],
+  );
+  const appliedOriginRef = useRef<string | null>(null);
 
   // 起點 + 終點（過濾掉沒有座標的 hop）
   const endpoints = useMemo(() => {
@@ -119,6 +109,12 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
   // 初始化地圖（只跑一次）
   useEffect(() => {
     if (!mapContainer.current) return;
+
+    // 初始相機中心：讀當下 store 值（init 只跑一次，不列入依賴避免重建地圖）
+    const initState = useDnsStore.getState();
+    const initOriginCode = getOriginCode(initState.localCountry);
+    const initView = getMapView(initOriginCode, initState.hostCoordinates, initState.mapZoom);
+    appliedOriginRef.current = initOriginCode;
 
     const m = new maplibregl.Map({
       container: mapContainer.current,
@@ -160,9 +156,9 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
           },
         ],
       },
-      center: DEFAULT_CENTER,
-      zoom: DEFAULT_ZOOM,
-      minZoom: MIN_ZOOM,
+      center: initView.center,
+      zoom: initView.zoom,
+      minZoom: MIN_MAP_ZOOM,
       dragRotate: false,
       touchZoomRotate: false,
       pitchWithRotate: false,
@@ -230,6 +226,16 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
     }
   }, [isDark]);
 
+  // 主機節點（originCode）變更時把相機飛到新中心；只在原點身分改變時觸發。
+  // 若同時有 trace endpoints，後續 endpoints effect 的 fitBounds 會接手收斂視野。
+  useEffect(() => {
+    const m = map.current;
+    if (!m) return;
+    if (appliedOriginRef.current === originCode) return;
+    appliedOriginRef.current = originCode;
+    m.flyTo({ center: mapView.center, zoom: mapView.zoom, duration: 600 });
+  }, [originCode, mapView]);
+
   // 寫入 endpoints 線段 + 國旗 marker
   useEffect(() => {
     const m = map.current;
@@ -252,23 +258,23 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
       //  - 同國家或 hub 表查不到時，不畫線只放原點 marker，避免線端落在不確定位置
       //  - lastHop.coords（GeoIP 經緯度）不再用於繪圖，只保留在 HopTable 顯示細節
       const lastHop = endpoints[endpoints.length - 1];
-      const destHub = lastHop.country ? HUB_BY_CODE.get(lastHop.country) : undefined;
+      const destHub = lastHop.country ? getHub(lastHop.country) : undefined;
       const destCoords: [number, number] | null =
-        destHub && destHub.code !== ORIGIN_CODE ? (destHub.coordinates as [number, number]) : null;
+        destHub && destHub.code !== originCode ? (destHub.coordinates as [number, number]) : null;
 
       const features: Feature[] = [];
       if (destCoords) {
         features.push({
           type: 'Feature',
-          geometry: { type: 'LineString', coordinates: spokeLine(TAIWAN_CENTER, destCoords) },
+          geometry: { type: 'LineString', coordinates: spokeLine(originCoords, destCoords) },
           properties: { country: lastHop.country || '' },
         });
       }
       source.setData({ type: 'FeatureCollection', features });
 
-      // marker：origin TW + 終點國家（座標都來自 hub 表，與線端永遠對齊）
+      // marker：origin（本地監控國家）+ 終點國家（座標都來自 hub 表，與線端永遠對齊）
       type MarkerInfo = { coords: [number, number]; country: string; isOrigin: boolean };
-      const items: MarkerInfo[] = [{ coords: TAIWAN_CENTER, country: 'TW', isOrigin: true }];
+      const items: MarkerInfo[] = [{ coords: originCoords, country: originCode, isOrigin: true }];
       if (destCoords && destHub) {
         items.push({ coords: destCoords, country: destHub.code, isOrigin: false });
       }
@@ -300,9 +306,9 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         markersRef.current.push(marker);
       }
 
-      // fitBounds：包住起點與終點，跨換日線時走太平洋；同國 / 查不到 hub 時拉回台灣中心
+      // fitBounds：包住起點與終點，跨換日線時走太平洋；同國 / 查不到 hub 時拉回原點中心
       if (destCoords) {
-        const [oLon, oLat] = TAIWAN_CENTER;
+        const [oLon, oLat] = originCoords;
         const [dLon, dLat] = destCoords;
         const endLon = oLon > 50 && dLon < -30 ? dLon + 360 : dLon;
         const lons = [oLon, endLon];
@@ -313,7 +319,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
         );
         m.fitBounds(bounds, { padding: 80, maxZoom: 5, duration: 600 });
       } else {
-        m.flyTo({ center: TAIWAN_CENTER, zoom: 6, duration: 600 });
+        m.flyTo({ center: mapView.center, zoom: mapView.zoom, duration: 600 });
       }
     };
 
@@ -322,7 +328,7 @@ export const TraceMap: React.FC<TraceMapProps> = ({ hops }) => {
     } else {
       m.once('load', apply);
     }
-  }, [endpoints, isDark]);
+  }, [endpoints, isDark, originCode, originCoords, mapView]);
 
   // 流動動畫（與 CyberMap 同款）
   useEffect(() => {

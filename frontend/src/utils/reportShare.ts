@@ -21,7 +21,11 @@ export function isIPv4(ip: string): boolean {
 }
 
 /**
- * 同一網域兩筆紀錄擇一：IPv4 優先，其次 Type A，同級則較新 timestamp。
+ * 同一網域兩筆紀錄擇一：IPv4 優先，其次 Type A，同級則保留先出現者（first-seen）。
+ *
+ * pickUniqueDomainRecords 傳入的列表為「最新在前」（見其註解），因此同級時
+ * 先出現者即為較新者，直接保留 current 即可；不再以 timestamp 比較，避免兩筆
+ * 時間戳相近時因毫秒級差異而非決定性地換成後出現的紀錄。
  */
 export function preferDomainRecord(current: DnsRecord, candidate: DnsRecord): DnsRecord {
   const curV4 = isIPv4(current.resultIp);
@@ -32,9 +36,7 @@ export function preferDomainRecord(current: DnsRecord, candidate: DnsRecord): Dn
   const candA = candidate.type === 'A';
   if (curA !== candA) return candA ? candidate : current;
 
-  const curTs = new Date(current.timestamp).getTime();
-  const candTs = new Date(candidate.timestamp).getTime();
-  return candTs >= curTs ? candidate : current;
+  return current;
 }
 
 /**

@@ -4,6 +4,7 @@ import { Copy, Check, Play, Pause, Square, X, Sparkles, RotateCcw, ExternalLink 
 import { useTranslation } from 'react-i18next';
 import { useDnsStore } from '../stores/useDnsStore';
 import { BrandDetection, PhoneBrand } from '../utils/phoneBrand';
+import { HOST_NODES, resolveCurrentNode } from '../config/hostNodes';
 
 // DNS Changer app 商店連結（同 wireframe constants.js）
 const DNS_CHANGER_PLAY_URL = 'https://play.google.com/store/apps/details?id=com.burakgon.dnschanger&hl=zh_TW';
@@ -69,7 +70,7 @@ const HintModal: React.FC<{ open: boolean; onClose: () => void; title: string; c
 
 export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onStart, onStop, detection, manualBrand, setManualBrand }) => {
   const { t } = useTranslation();
-  const { dnsIp, monitoringIp, isPaused, setPaused, isSharedReport } = useDnsStore();
+  const { dnsIp, monitoringIp, isPaused, setPaused, isSharedReport, localCountry } = useDnsStore();
   const [copied, setCopied] = useState(false);
   const [dnsHint, setDnsHint] = useState(false);
   const [ipHint, setIpHint] = useState(false);
@@ -82,6 +83,18 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
       setTimeout(() => setCopied(false), 2000);
     });
   }, [dnsTarget]);
+
+  // 目前所在主機節點（依 hostname / localCountry 判定），供下拉預設選中
+  const currentNode = resolveCurrentNode(localCountry);
+  const currentNodeCode = currentNode?.code ?? '';
+
+  // 切換節點：直接跳轉到該節點網址（不做 SPA 內切換）
+  const handleNodeChange = useCallback((code: string) => {
+    const node = HOST_NODES.find((n) => n.code === code);
+    if (node && node.code !== currentNodeCode) {
+      window.location.href = node.url;
+    }
+  }, [currentNodeCode]);
 
   const startDisabled = !ipInput || isSharedReport;
   const isMonitoring = !!monitoringIp;
@@ -111,7 +124,23 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
         <div className="border-b border-slate-200 bg-slate-50 px-[24px] py-[16px] dark:border-slate-600 dark:bg-slate-800/60">
           <h3 className="text-[18px] font-bold leading-tight text-slate-900 dark:text-slate-100">{t('setup_step1_title')}</h3>
         </div>
-        <div className="flex flex-col bg-white p-6 dark:bg-slate-900/50">
+        <div className="flex flex-col gap-4 bg-white p-6 dark:bg-slate-900/50">
+          {HOST_NODES.length > 1 && (
+            <div className="flex flex-col gap-2">
+              <label htmlFor="wf-host-node" className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-none">{t('host_node_label')}</label>
+              <select
+                id="wf-host-node"
+                value={currentNodeCode}
+                onChange={(e) => handleNodeChange(e.target.value)}
+                className="h-10 w-full max-w-full bg-white dark:bg-slate-950/60 border-[1.5px] border-slate-200 dark:border-slate-800 rounded-lg px-3 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-[#17d4a7]/40 cursor-pointer"
+              >
+                {currentNodeCode === '' && <option value="" disabled>{t('host_node_placeholder')}</option>}
+                {HOST_NODES.map((n) => (
+                  <option key={n.code} value={n.code}>{n.label}</option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-none">{t('dns_server_ip_label')}</label>
             <div className="h-10 w-full flex items-center gap-2 px-4 rounded-lg border-[1.5px] bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800">

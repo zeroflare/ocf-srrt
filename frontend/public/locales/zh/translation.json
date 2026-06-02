@@ -47,6 +47,8 @@
   "section_setup_phone_ip": "設定手機 IP",
   "section_view_dns_distribution": "檢視 DNS 分佈",
   "setup_step1_title": "第 1 步：修改手機 DNS",
+  "host_node_label": "選擇主機節點",
+  "host_node_placeholder": "請選擇節點",
   "setup_step2_title": "第 2 步：輸入手機 IP",
   "dns_server_ip_label": "將手機 DNS 改為",
   "dns_server_ip_hint_link": "如何修改手機 DNS？",

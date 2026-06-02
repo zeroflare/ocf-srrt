@@ -47,6 +47,8 @@
   "section_setup_phone_ip": "Configure phone IP",
   "section_view_dns_distribution": "View DNS distribution",
   "setup_step1_title": "Step 1: Change phone DNS",
+  "host_node_label": "Select host node",
+  "host_node_placeholder": "Select a node",
   "setup_step2_title": "Step 2: Enter phone IP",
   "dns_server_ip_label": "Set your phone DNS to",
   "dns_server_ip_hint_link": "How do I change my phone's DNS?",

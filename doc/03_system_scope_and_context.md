@@ -1,13 +1,13 @@
 # 03. System Scope and Context
 
 ## Business Context
-SRRT 作為 DNS 代理伺服器，監聽 UDP/TCP 53 埠接收用戶端 DNS 查詢，轉發至上游解析器後攔截回應進行富化（GeoIP、ASN、應用識別、OS 指紋、境外偵測），再透過 WebSocket 即時推送給前端 Dashboard。
+SRTT 作為 DNS 代理伺服器，監聽 UDP/TCP 53 埠接收用戶端 DNS 查詢，轉發至上游解析器後攔截回應進行富化（GeoIP、ASN、應用識別、OS 指紋、境外偵測），再透過 WebSocket 即時推送給前端 Dashboard。
 
 ```mermaid
 graph LR
     Client["Client Device"]
     Upstream["Upstream DNS<br/>1.1.1.1 / 8.8.8.8"]
-    Backend["SRRT Backend<br/>(Go :53 + :8080)"]
+    Backend["SRTT Backend<br/>(Go :53 + :8080)"]
     GeoIP["MaxMind<br/>GeoIP/ASN DB"]
     MTR["MTR<br/>路徑追蹤"]
     Nginx["Nginx<br/>:80/:443<br/>反向代理 + SSL"]

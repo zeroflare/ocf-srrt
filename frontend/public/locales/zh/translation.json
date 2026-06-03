@@ -21,7 +21,7 @@
   "last": "完成",
   "skip": "跳過",
   "about": "關於",
-  "nav_about_srrt": "關於 SRTT",
+  "nav_about_srtt": "關於 SRTT",
   "about_title": "關於 SRTT",
   "about_what_title": "這是什麼？",
   "about_what_desc": "SRTT (Service Resilience Testing Tool) 是 OCF 開放文化基金會推出的數位服務韌性檢測工具，協助使用者了解手機上 app 連到哪些網域、是否經過境外伺服器，作為個人數位主權的觀測起點。",

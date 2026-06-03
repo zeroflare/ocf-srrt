@@ -14,5 +14,5 @@
 - **rDNS**: Reverse DNS，反向 DNS 查詢（從 IP 查詢 hostname）
 - **Ring Buffer**: 循環緩衝區，一種先進先出的固定大小數據結構
 - **SLD**: Second-Level Domain，二級網域（如 google.com 中的 google）
-- **SRRT**: Real-time DNS Traffic Analyzer（專案名稱）
+- **SRTT**: Real-time DNS Traffic Analyzer（專案名稱）
 - **Subscribe**: WebSocket 雙向通訊中，前端發送的訂閱訊息，用於動態切換後端監控的目標 IP（解決跨裝置、跨 IP 版本監控問題）

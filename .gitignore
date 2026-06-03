@@ -21,8 +21,8 @@
 backend/bin/
 backend/dist/
 backend/main
-backend/srrt-backend
-backend/srrt-server
+backend/srtt-backend
+backend/srtt-server
 backend/dns-analyzer
 *.exe
 *.test

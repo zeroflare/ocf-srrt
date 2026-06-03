@@ -44,7 +44,7 @@ function App() {
     else root.classList.remove('dark');
   }, [theme]);
 
-  const [runTour, setRunTour] = useState(() => !localStorage.getItem('srrt_tour_done'));
+  const [runTour, setRunTour] = useState(() => !localStorage.getItem('srtt_tour_done'));
   const [tourKey, setTourKey] = useState(0);
 
   useEffect(() => {
@@ -55,7 +55,7 @@ function App() {
 
   const handleTourCallback = useCallback((data: CallBackProps) => {
     if (data.status === STATUS.FINISHED || data.status === STATUS.SKIPPED) {
-      localStorage.setItem('srrt_tour_done', '1');
+      localStorage.setItem('srtt_tour_done', '1');
       setRunTour(false);
     }
   }, []);
@@ -76,7 +76,7 @@ function App() {
   };
 
   const replayTour = useCallback(() => {
-    localStorage.removeItem('srrt_tour_done');
+    localStorage.removeItem('srtt_tour_done');
     setTourKey((k) => k + 1);
     setRunTour(true);
   }, []);
@@ -142,7 +142,7 @@ function App() {
     const blob = new Blob([payload], { type: 'application/json' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
-    link.download = `srrt_export_${Date.now()}.json`;
+    link.download = `srtt_export_${Date.now()}.json`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);

@@ -6,9 +6,9 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"ocf-srrt/backend/internal/auth"
-	"ocf-srrt/backend/internal/ratelimit"
-	"ocf-srrt/backend/internal/traceroute"
+	"ocf-srtt/backend/internal/auth"
+	"ocf-srtt/backend/internal/ratelimit"
+	"ocf-srtt/backend/internal/traceroute"
 	"strings"
 	"time"
 )

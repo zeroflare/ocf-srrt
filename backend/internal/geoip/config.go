@@ -12,7 +12,7 @@ const (
 	defaultRipeTimeoutMS    = 800
 	defaultRipeCacheTTLOK   = 24 * time.Hour
 	defaultRipeCacheTTLMiss = 1 * time.Minute
-	defaultRipeUserAgent    = "srrt-dns-analyzer/1.0"
+	defaultRipeUserAgent    = "srtt-dns-analyzer/1.0"
 )
 
 // Provider 決定位置查詢的主要來源；失敗時若另一邊 enabled 仍會 fallback。

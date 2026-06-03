@@ -1,4 +1,4 @@
-# SRRT - DNS Analyzer (ocf-srrt)
+# SRTT - DNS Analyzer (ocf-srtt)
 
 專為資安分析設計的 **即時 DNS 流量監控系統 (Real-time DNS Traffic Analyzer)**。
 採用 Monorepo 架構，結合 DNS Proxy 攔截與現代化前端視覺化技術，提供隱私優先、無狀態的網路可觀測性。
@@ -112,8 +112,8 @@ gcloud compute scp deploy.tar.gz <VM_NAME>:~
 
 # VM 內解壓與啟動
 ssh <VM_NAME>
-mkdir srrt && tar -xzf deploy.tar.gz -C srrt/
-cd srrt
+mkdir srtt && tar -xzf deploy.tar.gz -C srtt/
+cd srtt
 sudo docker compose -f docker-compose.prod.yml up -d --build
 ```
 
@@ -184,7 +184,7 @@ dig @<PUBLIC_IP> google.com
 | `RIPE_IPMAP_TIMEOUT_MS` | 單次查詢上限（ms）| `800` |
 | `RIPE_IPMAP_CACHE_TTL_OK` | 成功結果快取 TTL | `24h` |
 | `RIPE_IPMAP_CACHE_TTL_MISS` | 失敗 / location=null 快取 TTL（短，因應 RIPE active engines lazy 觸發）| `1m` |
-| `RIPE_IPMAP_USER_AGENT` | 出口 User-Agent | `srrt-dns-analyzer/1.0` |
+| `RIPE_IPMAP_USER_AGENT` | 出口 User-Agent | `srtt-dns-analyzer/1.0` |
 
 ### Frontend
 | 變數 | 說明 | 預設值 |

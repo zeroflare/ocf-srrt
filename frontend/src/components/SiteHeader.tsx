@@ -109,7 +109,7 @@ export const SiteHeader: React.FC<SiteHeaderProps> = ({ onTour }) => {
               className="flex items-center gap-1.5 px-2.5 py-1.5 bg-white/5 hover:bg-white/10 rounded-lg text-white/80 hover:text-white transition-all border border-white/10 font-bold"
             >
               <Info className="h-3.5 w-3.5" />
-              <span>{t('nav_about_srrt')}</span>
+              <span>{t('nav_about_srtt')}</span>
             </button>
             <button
               type="button"

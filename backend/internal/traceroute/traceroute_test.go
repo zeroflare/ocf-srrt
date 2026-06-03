@@ -2,7 +2,7 @@ package traceroute
 
 import (
 	"context"
-	"ocf-srrt/backend/internal/latencyprobe"
+	"ocf-srtt/backend/internal/latencyprobe"
 	"testing"
 )
 

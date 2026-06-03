@@ -21,7 +21,7 @@
   "last": "Done",
   "skip": "Skip",
   "about": "About",
-  "nav_about_srrt": "About SRTT",
+  "nav_about_srtt": "About SRTT",
   "about_title": "About SRTT",
   "about_what_title": "What is this?",
   "about_what_desc": "SRTT (Service Resilience Testing Tool) is an open-source service resilience testing tool by OCF (Open Culture Foundation). It helps users see which domains their apps connect to and whether traffic flows through foreign servers — a starting point for digital sovereignty observation.",

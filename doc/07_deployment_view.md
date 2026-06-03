@@ -57,10 +57,10 @@ graph TB
 在 CI 環境或本機執行：
 
 ```bash
-docker build -t <REGISTRY>/srrt-backend:latest ./backend
-docker build -t <REGISTRY>/srrt-frontend:latest ./frontend
-docker push <REGISTRY>/srrt-backend:latest
-docker push <REGISTRY>/srrt-frontend:latest
+docker build -t <REGISTRY>/srtt-backend:latest ./backend
+docker build -t <REGISTRY>/srtt-frontend:latest ./frontend
+docker push <REGISTRY>/srtt-backend:latest
+docker push <REGISTRY>/srtt-frontend:latest
 ```
 
 `<REGISTRY>` 可為 Docker Hub、GCR、ECR 等 container registry。
@@ -71,11 +71,11 @@ docker push <REGISTRY>/srrt-frontend:latest
 ```yaml
 services:
   backend:
-    image: <REGISTRY>/srrt-backend:latest
+    image: <REGISTRY>/srtt-backend:latest
     # ... 其餘設定不變
 
   frontend:
-    image: <REGISTRY>/srrt-frontend:latest
+    image: <REGISTRY>/srtt-frontend:latest
     # ... 其餘設定不變
 ```
 

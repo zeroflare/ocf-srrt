@@ -5,7 +5,7 @@ services:
   backend:
     build:
       context: ./backend
-    container_name: srrt-backend
+    container_name: srtt-backend
 
     # Host 網路模式：必須，否則拿不到真實 Client IP
     network_mode: "host"
@@ -70,7 +70,7 @@ services:
       - RIPE_IPMAP_TIMEOUT_MS=${RIPE_IPMAP_TIMEOUT_MS:-800}
       - RIPE_IPMAP_CACHE_TTL_OK=${RIPE_IPMAP_CACHE_TTL_OK:-24h}
       - RIPE_IPMAP_CACHE_TTL_MISS=${RIPE_IPMAP_CACHE_TTL_MISS:-1m}
-      - RIPE_IPMAP_USER_AGENT=${RIPE_IPMAP_USER_AGENT:-srrt-dns-analyzer/1.0}
+      - RIPE_IPMAP_USER_AGENT=${RIPE_IPMAP_USER_AGENT:-srtt-dns-analyzer/1.0}
       - MAXMIND_LOCATION_ENABLED=${MAXMIND_LOCATION_ENABLED:-true}
       - MAXMIND_ASN_ENABLED=${MAXMIND_ASN_ENABLED:-true}
       - TRACEROUTE_LOG_PATH=/tmp/traceroute.log
@@ -82,7 +82,7 @@ services:
   scraper:
     build:
       context: ./scraper
-    container_name: srrt-scraper
+    container_name: srtt-scraper
 
     # 安全強化
     read_only: true
@@ -120,7 +120,7 @@ services:
   frontend:
     build:
       context: ./frontend
-    container_name: srrt-frontend
+    container_name: srtt-frontend
 
     network_mode: "host"
     # 安全強化：唯讀根檔案系統

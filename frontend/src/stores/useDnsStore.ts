@@ -74,7 +74,7 @@ const MAX_RECORDS_FOR_SHARE = 50;
 const MAX_PINNED_RECORDS = 200;
 
 // Theme 持久化：確保子頁面（TraceroutePage, ReportPage）和新分頁能保持一致的主題
-const THEME_KEY = 'srrt_theme';
+const THEME_KEY = 'srtt_theme';
 const getPersistedTheme = (): 'dark' | 'light' => {
   try {
     const stored = globalThis.localStorage?.getItem(THEME_KEY);

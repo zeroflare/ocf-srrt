@@ -6,7 +6,7 @@ services:
     build:
       context: ./backend
       target: builder # 只構建到第一階段 (含有 Go 環境)，不跑 Runner 階段
-    container_name: srrt-backend
+    container_name: srtt-backend
 
     # 權限設定 (DNS port 53 + Packet Sniffer 需要)
     cap_add:
@@ -59,7 +59,7 @@ services:
       - RIPE_IPMAP_TIMEOUT_MS=800
       - RIPE_IPMAP_CACHE_TTL_OK=24h
       - RIPE_IPMAP_CACHE_TTL_MISS=1m
-      - RIPE_IPMAP_USER_AGENT=srrt-dns-analyzer/1.0
+      - RIPE_IPMAP_USER_AGENT=srtt-dns-analyzer/1.0
       - MAXMIND_LOCATION_ENABLED=true
       - MAXMIND_ASN_ENABLED=true
     restart: unless-stopped
@@ -71,7 +71,7 @@ services:
     build:
       context: ./frontend
       target: base # 開發模式只需要 Node + pnpm 依賴環境，不需要執行建置
-    container_name: srrt-frontend
+    container_name: srtt-frontend
 
     # 記憶體限制
     mem_limit: 1g

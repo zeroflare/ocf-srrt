@@ -150,7 +150,7 @@ print(f'Stats: {data[\"stats\"]}')
 
 ### 前置條件
 
-- GCE VM 已部署 SRRT 主服務（docker-compose.prod.yml）
+- GCE VM 已部署 SRTT 主服務（docker-compose.prod.yml）
 - VM 規格建議 e2-medium 以上（Playwright 需要約 512MB RAM）
 - Docker + Docker Compose 已安裝
 
@@ -170,15 +170,15 @@ gcloud compute scp deploy.tar.gz <VM_NAME>:~ --zone=<ZONE>
 # SSH 進入 VM
 gcloud compute ssh <VM_NAME> --zone=<ZONE>
 
-# 解壓（假設 SRRT 已部署在 ~/srrt）
-cd ~/srrt
+# 解壓（假設 SRTT 已部署在 ~/srtt）
+cd ~/srtt
 tar -xzf ~/deploy.tar.gz
 ```
 
 ### Step 2：Build scraper image
 
 ```bash
-cd ~/srrt
+cd ~/srtt
 
 # 只 build scraper service
 docker compose -f docker-compose.prod.yml --profile scraper build scraper
@@ -202,7 +202,7 @@ cat frontend/src/data/events/stats.json
 crontab -e
 
 # 加入以下排程（每天 UTC 00:00 = 台北 08:00）
-0 0 * * * cd /home/<USER>/srrt && docker compose -f docker-compose.prod.yml --profile scraper run --rm scraper >> /var/log/smc-scraper.log 2>&1
+0 0 * * * cd /home/<USER>/srtt && docker compose -f docker-compose.prod.yml --profile scraper run --rm scraper >> /var/log/smc-scraper.log 2>&1
 ```
 
 ### Step 5：設定 Systemd Timer（替代方案，更可靠）
@@ -219,7 +219,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 User=<YOUR_USER>
-WorkingDirectory=/home/<YOUR_USER>/srrt
+WorkingDirectory=/home/<YOUR_USER>/srtt
 ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml --profile scraper run --rm scraper
 StandardOutput=journal
 StandardError=journal
@@ -269,14 +269,14 @@ journalctl -u smc-scraper.service -f
 ```bash
 sudo tee /etc/systemd/system/smc-scraper-rebuild.service << 'EOF'
 [Unit]
-Description=Rebuild SRRT frontend after scraper update
+Description=Rebuild SRTT frontend after scraper update
 After=smc-scraper.service
 BindsTo=smc-scraper.service
 
 [Service]
 Type=oneshot
 User=<YOUR_USER>
-WorkingDirectory=/home/<YOUR_USER>/srrt
+WorkingDirectory=/home/<YOUR_USER>/srtt
 ExecStart=/usr/bin/docker compose -f docker-compose.prod.yml up -d --build frontend
 StandardOutput=journal
 StandardError=journal

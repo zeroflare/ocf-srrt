@@ -1,4 +1,4 @@
-module ocf-srrt/backend
+module ocf-srtt/backend
 
 go 1.24.0
 

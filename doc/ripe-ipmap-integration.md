@@ -318,7 +318,7 @@ RIPE IPmap 不提供 ASN/ISP，這部分**永遠**走 MaxMind ASN DB：
 | `RIPE_IPMAP_CACHE_TTL_OK` | `24h` | 成功（有 location）的快取 TTL |
 | `RIPE_IPMAP_CACHE_TTL_MISS` | `1m` | 失敗 / `location=null` 的快取 TTL（短，因應 lazy active engines）|
 | `RIPE_IPMAP_CACHE_SIZE` | `10000` | LRU 容量 |
-| `RIPE_IPMAP_USER_AGENT` | `srrt-dns-analyzer/1.0` | 出口 UA |
+| `RIPE_IPMAP_USER_AGENT` | `srtt-dns-analyzer/1.0` | 出口 UA |
 
 `docker-compose.dev.yml` / `docker-compose.prod.yml` 都需要加上，並在 README「快速啟動」段落補一行說明。
 

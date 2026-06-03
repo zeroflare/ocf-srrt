@@ -1,6 +1,6 @@
 # Data Directory
 
-此目錄用於存放 SRRT 運行所需的靜態資料庫與設定檔。
+此目錄用於存放 SRTT 運行所需的靜態資料庫與設定檔。
 
 ## ⚠️ 重要：關於 MaxMind GeoLite2 資料庫
 

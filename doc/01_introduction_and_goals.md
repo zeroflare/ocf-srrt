@@ -1,7 +1,7 @@
 # 01. Introduction and Goals
 
 ## Requirements Overview
-SRRT (Real-time DNS Traffic Analyzer) 是一個專為資安分析設計的即時 DNS 流量監控系統。
+SRTT (Real-time DNS Traffic Analyzer) 是一個專為資安分析設計的即時 DNS 流量監控系統。
 主要功能包括：
 - **DNS 代理伺服器 (DNS Proxy)**: 使用 `miekg/dns` 監聽 UDP/TCP 53 埠，轉發查詢至上游解析器，同時攔截並富化回應。
 - **即時資料推送 (WebSocket)**: 富化後的 DNS 記錄即時串流至前端。

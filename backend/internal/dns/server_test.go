@@ -3,9 +3,9 @@ package dns
 import (
 	"encoding/json"
 	"net"
-	"ocf-srrt/backend/internal/api"
-	"ocf-srrt/backend/internal/auth"
-	"ocf-srrt/backend/internal/types"
+	"ocf-srtt/backend/internal/api"
+	"ocf-srtt/backend/internal/auth"
+	"ocf-srtt/backend/internal/types"
 	"testing"
 	"time"
 

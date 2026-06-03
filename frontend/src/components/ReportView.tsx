@@ -38,7 +38,7 @@ const BRAND_LABELS: Record<string, string> = {
  */
 export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit, standalone = false }) => {
   const { t, i18n } = useTranslation();
-  const { records, appInfo, generatedAt, phoneBrand } = data;
+  const { records, appInfo, generatedAt, phoneBrand, localCountry, hostCoordinates, mapZoom } = data;
   const [copied, setCopied] = useState(false);
 
   const loadSnapshot = useDnsStore((s) => s.loadSnapshot);
@@ -46,11 +46,25 @@ export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit, s
   const setMonitoringIp = useDnsStore((s) => s.setMonitoringIp);
   const selectAllLoaded = useDnsStore((s) => s.selectAllLoaded);
   const clearSelection = useDnsStore((s) => s.clearSelection);
+  const setLocalCountry = useDnsStore((s) => s.setLocalCountry);
+  const setHostLocation = useDnsStore((s) => s.setHostLocation);
 
   // 進入頁面即把 snapshot records 寫進 store，並切換到「shared report」模式
   // 注意：setMonitoringIp 必須先於 loadSnapshot，loadSnapshot 內會檢查 monitoringIp 才會 commit records
   useEffect(() => {
     setSharedReport(true);
+    // 以報告產生端的主機節點資訊設定地圖原點、中心與 zoom，讓觀看者看到與產生端一致的
+    // 地圖視野與境內/境外視角。報告頁不打 /api/token，故這些資訊來自序列化的報告本身；
+    // 舊報告無這些欄位時不覆寫，地圖原點 fallback TW。
+    if (localCountry) {
+      setLocalCountry(localCountry);
+    }
+    if (hostCoordinates || mapZoom) {
+      setHostLocation({
+        coordinates: hostCoordinates ?? null,
+        mapZoom: mapZoom ?? null,
+      });
+    }
     if (records.length > 0) {
       setMonitoringIp(records[0].sourceIp || null);
     }
@@ -61,7 +75,7 @@ export const ReportView: React.FC<ReportViewProps> = ({ data, onClose, onEdit, s
       setSharedReport(false);
       clearSelection();
     };
-  }, [records, loadSnapshot, setSharedReport, setMonitoringIp, selectAllLoaded, clearSelection]);
+  }, [records, localCountry, hostCoordinates, mapZoom, loadSnapshot, setSharedReport, setMonitoringIp, setLocalCountry, setHostLocation, selectAllLoaded, clearSelection]);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(window.location.href).then(() => {

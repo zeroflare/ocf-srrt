@@ -27,7 +27,7 @@ const ReportPage = lazy(() => import('./pages/ReportPage'));
 
 function App() {
   const useMock = import.meta.env.VITE_USE_MOCK === 'true';
-  const { monitoringIp, setMonitoringIp, startMonitoring, isSharedReport, theme, records, selectedRowIds } = useDnsStore();
+  const { monitoringIp, setMonitoringIp, startMonitoring, isSharedReport, theme, records, selectedRowIds, localCountry, hostCoordinates, mapZoom } = useDnsStore();
   const { myIp, sendSubscribe } = useMock ? useMockDnsStream(!isSharedReport) : useDnsStream(!isSharedReport);
   const [ipInput, setIpInput] = useState('');
   const [toast, setToast] = useState<string | null>(null);
@@ -89,6 +89,9 @@ function App() {
         appInfo: EMPTY_APP_INFO,
         generatedAt: new Date().toISOString(),
         phoneBrand: effectiveBrand,
+        localCountry: localCountry || undefined,
+        hostCoordinates: hostCoordinates || undefined,
+        mapZoom: mapZoom || undefined,
       };
       const url = buildReportUrl(data);
       navigator.clipboard.writeText(url).then(() => {
@@ -97,7 +100,7 @@ function App() {
       });
       window.open(url, '_blank', 'noopener,noreferrer');
     },
-    [effectiveBrand, t],
+    [effectiveBrand, localCountry, hostCoordinates, mapZoom, t],
   );
 
   const handleShareSnapshot = () => {
@@ -127,9 +130,12 @@ function App() {
       appInfo: EMPTY_APP_INFO,
       generatedAt: new Date().toISOString(),
       phoneBrand: effectiveBrand,
+      localCountry: localCountry || undefined,
+      hostCoordinates: hostCoordinates || undefined,
+      mapZoom: mapZoom || undefined,
     };
     window.open(buildReportUrl(data), '_blank', 'noopener,noreferrer');
-  }, [records, selectedRowIds, effectiveBrand, t]);
+  }, [records, selectedRowIds, effectiveBrand, localCountry, hostCoordinates, mapZoom, t]);
 
   const handleExportData = () => {
     const payload = JSON.stringify(records, null, 2);

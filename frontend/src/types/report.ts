@@ -23,6 +23,15 @@ export interface ReportData {
   generatedAt: string;
   /** 監控當下選擇的手機品牌（自動偵測或手動覆寫） */
   phoneBrand?: PhoneBrand;
+  /**
+   * 產生報告的主機節點境內國碼（如 TW / JP），驅動地圖原點與境內/境外視覺基準。
+   * 報告頁不會打 /api/token，故原點資訊必須隨報告序列化；舊報告無此欄位時 fallback TW。
+   */
+  localCountry?: string;
+  /** 產生端主機地圖中心座標 [lon, lat]，讓報告地圖視野與主頁一致；無則前端用 hub 座標 fallback。 */
+  hostCoordinates?: [number, number];
+  /** 產生端主機地圖預設 zoom，讓報告地圖縮放與主頁一致；無則前端用預設值。 */
+  mapZoom?: number;
 }
 
 export const EMPTY_APP_INFO: AppInfo = {

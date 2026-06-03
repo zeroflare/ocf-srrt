@@ -82,6 +82,11 @@ export function encodeReportData(data: ReportData): string {
     },
     at: data.generatedAt,
     pb: data.phoneBrand,
+    // 產生端主機節點資訊：lc 境內國碼、hc 地圖中心、mz zoom，讓報告地圖與產生端一致。
+    // 報告頁不打 /api/token，故必須隨報告序列化。undefined 的鍵會被 JSON 自動省略。
+    lc: data.localCountry || '',
+    hc: data.hostCoordinates,
+    mz: data.mapZoom,
     r: data.records.map(r => ({
       t: r.timestamp,
       d: r.domain,
@@ -171,6 +176,9 @@ export function decodeReportData(zdata: string): ReportData | null {
       appInfo,
       generatedAt: data.at || new Date().toISOString(),
       phoneBrand: data.pb as PhoneBrand | undefined,
+      localCountry: data.lc || undefined,
+      hostCoordinates: Array.isArray(data.hc) && data.hc.length === 2 ? [data.hc[0], data.hc[1]] : undefined,
+      mapZoom: typeof data.mz === 'number' ? data.mz : undefined,
     };
   } catch {
     return null;

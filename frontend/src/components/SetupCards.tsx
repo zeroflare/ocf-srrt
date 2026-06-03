@@ -74,6 +74,7 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
   const [copied, setCopied] = useState(false);
   const [dnsHint, setDnsHint] = useState(false);
   const [ipHint, setIpHint] = useState(false);
+  const [originHint, setOriginHint] = useState(false);
 
   const dnsTarget = dnsIp || window.location.hostname;
 
@@ -118,29 +119,41 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
   };
 
   return (
-    <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-3 sm:items-stretch sm:gap-[16px]">
-      {/* 第 1 步：修改手機 DNS */}
+    <div className="grid grid-cols-1 gap-[16px] sm:grid-cols-4 sm:items-stretch sm:gap-[16px]">
+      {/* 第 1 步：選擇起始國家（主機節點） */}
+      <div id="wf-tour-step-origin" className="col-span-1 flex min-w-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/50 sm:col-span-1">
+        <div className="border-b border-slate-200 bg-slate-50 px-[24px] py-[16px] dark:border-slate-600 dark:bg-slate-800/60">
+          <h3 className="text-[18px] font-bold leading-tight text-slate-900 dark:text-slate-100">{t('setup_step_origin_title')}</h3>
+        </div>
+        <div className="flex flex-col gap-2 bg-white p-6 dark:bg-slate-900/50">
+          <label htmlFor="wf-host-node" className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-none">{t('host_node_label')}</label>
+          <select
+            id="wf-host-node"
+            value={currentNodeCode}
+            onChange={(e) => handleNodeChange(e.target.value)}
+            className="h-10 w-full max-w-full bg-white dark:bg-slate-950/60 border-[1.5px] border-slate-200 dark:border-slate-800 rounded-lg px-3 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-[#17d4a7]/40 cursor-pointer"
+          >
+            {currentNodeCode === '' && <option value="" disabled>{t('host_node_placeholder')}</option>}
+            {HOST_NODES.map((n) => (
+              <option key={n.code} value={n.code}>{n.label}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => setOriginHint(true)}
+            className="text-xs font-medium text-emerald-600 dark:text-emerald-400 hover:underline leading-none text-left bg-transparent border-0 p-0"
+          >
+            {t('host_node_hint')}
+          </button>
+        </div>
+      </div>
+
+      {/* 第 2 步：修改手機 DNS */}
       <div id="wf-tour-step1" className="col-span-1 flex min-w-0 w-full flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/50 sm:col-span-1">
         <div className="border-b border-slate-200 bg-slate-50 px-[24px] py-[16px] dark:border-slate-600 dark:bg-slate-800/60">
           <h3 className="text-[18px] font-bold leading-tight text-slate-900 dark:text-slate-100">{t('setup_step1_title')}</h3>
         </div>
-        <div className="flex flex-col gap-4 bg-white p-6 dark:bg-slate-900/50">
-          {HOST_NODES.length > 1 && (
-            <div className="flex flex-col gap-2">
-              <label htmlFor="wf-host-node" className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-none">{t('host_node_label')}</label>
-              <select
-                id="wf-host-node"
-                value={currentNodeCode}
-                onChange={(e) => handleNodeChange(e.target.value)}
-                className="h-10 w-full max-w-full bg-white dark:bg-slate-950/60 border-[1.5px] border-slate-200 dark:border-slate-800 rounded-lg px-3 text-sm font-medium text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-4 focus:ring-[#17d4a7]/40 cursor-pointer"
-              >
-                {currentNodeCode === '' && <option value="" disabled>{t('host_node_placeholder')}</option>}
-                {HOST_NODES.map((n) => (
-                  <option key={n.code} value={n.code}>{n.label}</option>
-                ))}
-              </select>
-            </div>
-          )}
+        <div className="flex flex-col bg-white p-6 dark:bg-slate-900/50">
           <div className="flex flex-col gap-2">
             <label className="text-xs font-medium text-slate-700 dark:text-slate-300 leading-none">{t('dns_server_ip_label')}</label>
             <div className="h-10 w-full flex items-center gap-2 px-4 rounded-lg border-[1.5px] bg-slate-50 dark:bg-slate-950/60 border-slate-200 dark:border-slate-800">
@@ -165,7 +178,7 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
         </div>
       </div>
 
-      {/* 第 2 步：輸入手機 IP */}
+      {/* 第 3 步：輸入手機 IP */}
       <div id="wf-tour-step2" className="col-span-1 flex min-w-0 w-full max-w-full flex-col overflow-hidden rounded-2xl border border-slate-300 bg-white shadow-sm dark:border-slate-600 dark:bg-slate-900/50 sm:col-span-2 tour-monitoring">
         <div className="border-b border-slate-200 bg-slate-50 px-[24px] py-[16px] dark:border-slate-600 dark:bg-slate-800/60">
           <h3 className="text-[18px] font-bold leading-tight text-slate-900 dark:text-slate-100">{t('setup_step2_title')}</h3>
@@ -293,6 +306,13 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
         <ol className="list-decimal space-y-3 pl-4 marker:font-semibold">
           <li className="pl-1">{t('source_ip_hint_modal_step1')}</li>
           <li className="pl-1">{t('source_ip_hint_modal_step2')}</li>
+        </ol>
+      </HintModal>
+
+      <HintModal open={originHint} onClose={() => setOriginHint(false)} title={t('host_node_hint_modal_title')}>
+        <ol className="list-decimal space-y-3 pl-4 marker:font-semibold">
+          <li className="pl-1">{t('host_node_hint_modal_step1')}</li>
+          <li className="pl-1">{t('host_node_hint_modal_step2')}</li>
         </ol>
       </HintModal>
     </div>

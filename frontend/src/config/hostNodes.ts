@@ -16,8 +16,8 @@ export interface HostNode {
 }
 
 export const HOST_NODES: HostNode[] = [
-  { code: 'TW', label: '台灣 Taiwan', url: 'https://srtt.ocf.tw/' },
-  { code: 'JP', label: '日本 Japan', url: 'https://srtt-jp.ocf.tw/' },
+  { code: 'TW', label: '台灣 (Google Cloud)', url: 'https://srtt.ocf.tw/' },
+  { code: 'JP', label: '日本 (Microsoft Azure)', url: 'https://srtt-jp.ocf.tw/' },
 ];
 
 /** 取網址的 hostname；解析失敗回空字串。 */

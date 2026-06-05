@@ -45,6 +45,8 @@ const StatCard: React.FC<{ label: string; value: React.ReactNode; size?: StatCar
 const TraceroutePage: React.FC = () => {
   const { t } = useTranslation();
   const { theme } = useDnsStore();
+  const setLocalCountry = useDnsStore((s) => s.setLocalCountry);
+  const setHostLocation = useDnsStore((s) => s.setHostLocation);
   const navigate = useNavigate();
   const [result, setResult] = useState<TraceResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,6 +60,47 @@ const TraceroutePage: React.FC = () => {
     if (theme === 'dark') root.classList.add('dark');
     else root.classList.remove('dark');
   }, [theme]);
+
+  // 把 /api/token 回應的主機節點資訊寫進 store（localCountry / 座標 / zoom）。
+  // 與 useDnsStream 同邏輯：TraceMap 原點（origin）依賴 store.localCountry，
+  // 若不設定會 fallback 成 TW，導致日本主機的地圖誤標台灣（見 origin.ts）。
+  const applyHostInfo = (data: {
+    localCountry?: string;
+    hostCoordinates?: unknown;
+    mapZoom?: unknown;
+    hostLabel?: unknown;
+  }) => {
+    if (data.localCountry) setLocalCountry(data.localCountry);
+    if (data.hostCoordinates || data.mapZoom || data.hostLabel) {
+      setHostLocation({
+        coordinates: Array.isArray(data.hostCoordinates)
+          ? (data.hostCoordinates as [number, number])
+          : null,
+        mapZoom: typeof data.mapZoom === 'number' ? data.mapZoom : null,
+        label: typeof data.hostLabel === 'string' ? data.hostLabel : null,
+      });
+    }
+  };
+
+  // 進頁即取一次主機節點資訊，確保地圖原點正確（即使尚未/不經由本頁跑 trace，
+  // 例如分享連結帶 token、或直接開 /traceroute 而未先逛主監控頁）。
+  useEffect(() => {
+    if (import.meta.env.VITE_USE_MOCK === 'true') return;
+    // 已有 localCountry（例如自主監控頁 SPA 內導覽而來）就不重複請求
+    if (useDnsStore.getState().localCountry) return;
+    const abort = new AbortController();
+    (async () => {
+      try {
+        const resp = await fetch('/api/token', { signal: abort.signal });
+        if (!resp.ok) return;
+        applyHostInfo(await resp.json());
+      } catch {
+        /* 靜默失敗：取不到就維持預設，不影響 trace 主流程 */
+      }
+    })();
+    return () => abort.abort();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // URL params 變更時重跑 trace（包含「開始追蹤」按鈕 navigate 到新 ?target=）
   useEffect(() => {
@@ -109,6 +152,8 @@ const TraceroutePage: React.FC = () => {
           if (!tokenResp.ok) throw new Error(`Token fetch failed: ${tokenResp.status}`);
           const tokenData = await tokenResp.json();
           effectiveToken = tokenData.token;
+          // 同時更新主機節點資訊，確保地圖原點為實際主機所在國（如 JP），而非 fallback TW
+          applyHostInfo(tokenData);
         }
         const res = await fetch(`/api/traceroute?target=${encodeURIComponent(target)}`, {
           headers: { Authorization: `Bearer ${effectiveToken}` },

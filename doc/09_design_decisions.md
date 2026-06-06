@@ -91,20 +91,6 @@ LiveTable 提供「合併重複」開關（toolbar 中 `Layers` icon 按鈕）�
   - 釘選區（pinned section）**直接以 raw records 平鋪呈現**，不做合併。這讓「釘選筆數 = 真實紀錄數」並且 mergeRecords toggle 切換不會讓釘選消失
   - Live 區只把「全 children 都已釘選」的群組移到釘選區；部分釘選的群組仍留在 live（顯示 indeterminate checkbox）
 
-## 海纜地圖功能：完整移除（畫面層）
-歷經「單一 flag → 三個 build-time ENV → runtime UI toggle」三輪迭代後，最終決定**將海纜畫面完全從前端移除**：CyberMap 不再渲染海纜線條 / flow 動畫，Cable Monitor 資訊面板、海纜事件面板、HopTable 海纜推測徽章、Cable Settings popover、相關 i18n 與 ENV / build args 全部清除。
-- **動機**: 三個 flag 維護成本高且 demo 場景使用率低；長期作為「保留但關閉」也讓 codebase 帶著大量 dead path（layer setup / 動畫迴圈 / store / 事件解析），未來重啟前還需重新驗證。
-- **保留項目**: `data/cables/*.json`、`data/events/*.json` 與 `utils/cableInference.ts` 維持原狀，scraper 服務也繼續運行。未來 traceroute 若要做海纜推測，可直接以 `cableInference` 為 utility 起點。
-- **移除清單**:
-  - 元件：`CableEventPanel.tsx`
-  - Store：`useCableStore.ts`、`useDnsStore.cableFlags` + `setCableFlag`
-  - Util：`cableLayer.ts`、`featureFlags.ts`、`geo.ts` 的 `isLikelySubmarine`
-  - CyberMap：cable source/layer/interactions、flow dot 動畫迴圈（`requestAnimationFrame`）、Cable Settings popover、Cable Monitor 面板
-  - HopTable：海纜推測徽章列
-  - i18n：`cable_*` / `event_*` / `confidence_high|medium` / `traceroute_submarine`
-  - 部署：`VITE_CABLE_*` build args + compose env、Dockerfile ARG/ENV
-- **後續若要恢復**: 從 git history 撈即可；資料層與 inference utility 都還在原處，前端只需重接 UI。
-
 ## TraceMap / CyberMap 路徑簡化為「起點→終點」直連
 Traceroute 視覺化（`TraceMap` 與 `CyberMap` 的 trace overlay）改為**只在地圖上渲染起點與終點兩個節點與一條連線**，中間 hop 不再以節點 / 線段呈現。
 - **動機**: 中間 hop 經常是 CDN edge、anycast 入口、跨 ISP transit router，GeoIP 對這類 IP 精度差，導致地圖路徑出現「忽南忽北、跨洲反折」的詭異折線，反而誤導觀察者。

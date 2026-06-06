@@ -28,7 +28,6 @@ graph LR
 - **External Systems**:
     - **Upstream DNS Resolvers**: 上游 DNS 伺服器（預設：1.1.1.1、8.8.8.8、1.0.0.1、8.8.4.4），可透過 `DNS_UPSTREAMS` 環境變數設定。
     - **MaxMind GeoIP Database**: 提供 IP 地理位置、ASN/ISP 查詢（GeoLite2-City + GeoLite2-ASN MMDB）。
-    - **Submarine Cable Data**: GeoJSON 與事件資料保留於 repo / scraper 服務輸出，供未來功能使用（目前前端不渲染）。
 - **External Tools**:
     - **MTR (My Traceroute)**: 呼叫系統 `mtr --report --json --report-cycles 1 --max-ttl 30` 獲取網路路徑追蹤與統計資訊（丟包率、延遲分佈）。支援 TCP/ICMP 模式。
 - **Infrastructure**:

@@ -302,27 +302,14 @@ export const CyberMap: React.FC = () => {
       const end = hops[i+1];
 
       const dist = calculateDistance(start.coords, end.coords);
-      const isSubmarine = dist > 1000;
-
-      if (isSubmarine) {
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: createCurve(start.displayCoords, end.displayCoords)
-          },
-          properties: { type: 'submarine', distance: dist }
-        });
-      } else {
-        features.push({
-          type: 'Feature',
-          geometry: {
-            type: 'LineString',
-            coordinates: [start.displayCoords, end.displayCoords]
-          },
-          properties: { type: 'normal', distance: dist }
-        });
-      }
+      features.push({
+        type: 'Feature',
+        geometry: {
+          type: 'LineString',
+          coordinates: createCurve(start.displayCoords, end.displayCoords)
+        },
+        properties: { type: 'normal', distance: dist }
+      });
     }
 
     source.setData({ type: 'FeatureCollection', features });
@@ -333,22 +320,10 @@ export const CyberMap: React.FC = () => {
         type: 'line',
         source: 'traceroute',
         paint: {
-          'line-color': [
-            'case',
-            ['==', ['get', 'type'], 'submarine'], '#8b5cf6',
-            '#22d3ee'
-          ],
-          'line-width': [
-            'case',
-            ['==', ['get', 'type'], 'submarine'], 3,
-            2
-          ],
+          'line-color': '#22d3ee',
+          'line-width': 2,
           'line-dasharray': [2, 4],
-          'line-blur': [
-            'case',
-            ['==', ['get', 'type'], 'submarine'], 2,
-            0
-          ]
+          'line-blur': 0
         },
         filter: ['==', ['geometry-type'], 'LineString']
       });

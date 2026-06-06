@@ -129,7 +129,6 @@ graph LR
 
 ### Utilities (`frontend/src/utils/`)
 - **geo.ts**: 地理計算（Haversine 距離、曲線生成、同座標跳點散開 `spreadOverlappingHops`、`pickPathEndpoints`）。
-- **cableInference.ts**: 海纜推測 utility（畫面已移除，仍保留供未來 traceroute 整合使用）。
 - **cloudProvider.ts**: ISP/ASN 字串 pattern matching 偵測雲端供應商。
 - **appInfo.ts**: 應用程式詳細資訊查詢。
 - **reportShare.ts**: 報告 URL 壓縮分享工具。

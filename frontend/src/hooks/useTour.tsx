@@ -19,7 +19,7 @@ export const useTour = (theme: 'dark' | 'light') => {
   const { t } = useTranslation();
   const isDark = theme === 'dark';
 
-  // wireframe 4 步：歡迎 + 設定 DNS + 輸入 IP + 看地圖
+  // wireframe 5 步：歡迎 + 選擇起始國家 + 設定 DNS + 輸入 IP + 看地圖
   const tourSteps: Step[] = useMemo(() => [
     {
       target: 'body',
@@ -27,6 +27,13 @@ export const useTour = (theme: 'dark' | 'light') => {
       disableBeacon: true,
       title: t('tour_step0_title'),
       content: formatTourBody(t('tour_step0_body'), isDark),
+    },
+    {
+      target: '#wf-tour-step-origin',
+      placement: 'bottom' as const,
+      disableBeacon: true,
+      title: t('tour_origin_title'),
+      content: formatTourBody(t('tour_origin_body'), isDark),
     },
     {
       target: '#wf-tour-step1',

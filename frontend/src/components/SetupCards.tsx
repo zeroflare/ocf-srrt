@@ -135,7 +135,7 @@ export const SetupCards: React.FC<SetupCardsProps> = ({ ipInput, setIpInput, onS
           >
             {currentNodeCode === '' && <option value="" disabled>{t('host_node_placeholder')}</option>}
             {HOST_NODES.map((n) => (
-              <option key={n.code} value={n.code}>{n.label}</option>
+              <option key={n.code} value={n.code}>{t(`host_node_${n.code}`, { defaultValue: n.label })}</option>
             ))}
           </select>
           <button

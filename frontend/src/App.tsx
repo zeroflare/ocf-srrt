@@ -161,6 +161,11 @@ function App() {
         callback={handleTourCallback}
         styles={joyrideStyles}
         locale={joyrideLocale}
+        scrollToFirstStep
+        // sticky header（SiteHeader：sticky top-0，約 64px 高）會蓋住被導覽的元件。
+        // 加大 scrollOffset，讓 react-joyride 捲動目標時在頂端預留 header 高度 + 緩衝，
+        // 使 spotlight 標的落在 header 下方而非被遮住。
+        scrollOffset={96}
       />
 
       <SiteHeader onTour={replayTour} />

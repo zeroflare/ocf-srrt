@@ -190,8 +190,12 @@ func Run(ctx context.Context, target string, localIP string, opts RunOptions) (*
 		port = "443"
 	}
 
-	// 組裝 mtr 指令參數：模擬 mtr -T -P 443 <target> -r -c 1
-	args := []string{"--report", "--report-cycles", "1", "--max-ttl", "30", "--json"}
+	// 組裝 mtr 指令參數：模擬 mtr -T -P 443 <target> -r -c 1 -n
+	// --no-dns：要求 mtr 回報純 IP。否則 mtr 先做 rDNS 回報主機名，後端再正向
+	// 解析時可能取到別的 IP（如 one.one.one.one → 1.0.0.1 而非 1.1.1.1），或解析
+	// 失敗導致 GeoIP/ASN 缺漏（如 HiNet rDNS 名稱）。主機名顯示不受影響：
+	// 下方迴圈對 Host == IP 的躍點會主動 rDNS 補回。
+	args := []string{"--report", "--report-cycles", "1", "--max-ttl", "30", "--json", "--no-dns"}
 	if mode == "tcp" {
 		args = append(args, "--tcp", "--port", port)
 	}

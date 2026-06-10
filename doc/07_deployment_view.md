@@ -88,6 +88,8 @@ services:
 於 `docker-compose.prod.yml` 或 `.env` 中設定：
 - `LOCAL_COUNTRY`：本地國碼（如 `TW`）。留空時改由 `host-location.json` 的 `country` 決定（見步驟 4.1）；環境變數優先。
 - `DNS_PUBLIC_IP`：VM 公網 IP，供前端顯示 DNS 設定指引
+- `NETWORK_INTERFACE`：封包監聽網卡，依雲商而異（GCP 通常 `ens4`、Azure 通常 `eth0`；Accelerated Networking 的 `enP*` 為 SR-IOV slave，仍填主介面）。預設 `ens4`，非 GCP 節點需覆寫
+- Azure 節點注意：NSG 預設 `DenyAllInBound` 會丟棄 ICMP Time-Exceeded，導致 traceroute 中間躍點全為 `???`。需加 inbound 規則允許 ICMP（Source: Any / Protocol: ICMP / Allow）
 - `NETWORK_INTERFACE`：VM 網卡名稱（GCP 預設 `ens4`）
 - `HOST_LOCATION_PATH`：主機節點設定檔路徑（預設 `data/host-location.json`）
 

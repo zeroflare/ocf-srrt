@@ -55,7 +55,9 @@ services:
       # 仍可用環境變數覆寫，例如 LOCAL_COUNTRY=JP。
       - LOCAL_COUNTRY=${LOCAL_COUNTRY:-}
       - HOST_LOCATION_PATH=data/host-location.json
-      - NETWORK_INTERFACE=ens4 # GCP 預設網卡
+      # 網卡名稱依雲商而異：GCP 通常 ens4、Azure 通常 eth0（Accelerated Networking
+      # 的 enP* 是 SR-IOV slave，仍填主介面 eth0）。用 `ip route get 1.1.1.1` 確認。
+      - NETWORK_INTERFACE=${NETWORK_INTERFACE:-ens4}
       - ASN_DB_PATH=data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=data/GeoLite2-City.mmdb
       - RULES_PATH=data/app.json

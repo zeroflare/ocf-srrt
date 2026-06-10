@@ -60,8 +60,8 @@ graph TB
 | `dns/` | DNS 代理伺服器（UDP/TCP :53），查詢轉發、回應快取、異步富化管線 |
 | `api/` | HTTP 路由（REST + WebSocket）、CORS 中間件、Traceroute handler。WebSocket Hub 支援 `readPump`/`writePump` 雙向通訊，前端可透過 `subscribe` 訊息動態切換監控 IP |
 | `auth/` | Token Store（UUID ↔ IP 雙向映射），自動產生 token |
-| `buffer/` | Per-IP Ring Buffer（5000 筆/session、2000 session 上限、10min 閒置清除） |
-| `geoip/` | IP→位置 + ASN 對應。位置查詢以 **RIPE IPmap** 為主（`ripe.go` HTTP client），MaxMind City/Country 為可選 fallback（預設關），ASN/ISP 由 MaxMind ASN DB 提供。`resolver.go` 統籌查詢流程 + TTL cache（成功 24h / 失敗 1m）|
+| `buffer/` | Per-IP Ring Buffer（5000 筆/session、2000 session 上限、10min 閒置清除）。另以 atomic 記錄最近一筆查詢來源 IP（`LastClientIP()`），僅供 DEV_MODE 預填前端手機 IP 欄位 |
+| `geoip/` | IP→位置 + ASN 對應。位置查詢預設以 **MaxMind GeoLite2** 為主（`GEOIP_PROVIDER=maxmind`），RIPE IPmap（`ripe.go` HTTP client）為可切換來源；主來源失敗且另一來源 enabled 時自動 fallback。ASN/ISP 一律由 MaxMind ASN DB 提供。`resolver.go` 統籌查詢流程 + TTL cache（成功 24h / 失敗 1m）|
 | `recognition/` | 三層應用識別（Exact → Regex → Heuristic） |
 | `osfingerprint/` | DNS 查詢模式 OS 辨識（Android/iOS/Windows） |
 | `traceroute/` | MTR 執行與解析、rDNS PoP 解析、TLD 輔助、結果快取、IPv6→IPv4 自動轉換 |
@@ -90,7 +90,7 @@ graph LR
 | Endpoint | Method | Auth | 用途 |
 |----------|--------|------|------|
 | `/ws` | WebSocket | Token (query param) | 即時 DNS 記錄串流，連線時發送歷史快照。支援 `subscribe` 訊息動態切換監控目標 IP（跨裝置監控） |
-| `/api/token` | GET | None | 取得/建立 session token，回傳 token、client IP、localCountry、dnsPublicIP；若有設定主機節點，另回傳 hostLabel、hostCoordinates、mapZoom |
+| `/api/token` | GET | None | 取得/建立 session token，回傳 token、client IP、localCountry、dnsPublicIP；若有設定主機節點，另回傳 hostLabel、hostCoordinates、mapZoom；`DEV_MODE=true` 時另回傳 `devDnsClientIp`（最近觀測到的 DNS 來源 IP，僅限本機開發，正式環境不得開啟） |
 | `/api/traceroute` | GET | Token (Bearer / query) | 執行 MTR，含快取檢查 + 速率限制 + 併發控制 |
 | `/health` | GET | None | 健康檢查（status、uptime、session count、client count） |
 
@@ -113,6 +113,7 @@ graph LR
 - **TracerouteDrawer**: 側邊抽屜，嵌入 `HopTable`（緊湊模式）顯示 MTR 結果，含歷史紀錄與分享功能。
 - **HopTable**: 共用跳點表格元件（`TraceroutePage` 與 `TracerouteDrawer` 共用）。欄位：# / IP / ASN·ISP / Country·City / Loss% / Avg（含進度條）/ Best / Worst / StDev。支援 `compact` 模式。
 - **TraceMap**: 基於 MapLibre GL 的路徑地圖（僅 `TraceroutePage`）。**地圖只顯示「起點→終點」兩節點 + 一條連線**（中間 hop 因 CDN/anycast 地理失真不在地圖上呈現，完整 hop 資訊仍由 `HopTable` 顯示，見 `doc/09`）。圓形標記依延遲漸變色（綠→黃→紅），Popup 顯示 IP/Country·City/ASN·ISP/延遲，支援自動 fitBounds 與流向動畫。
+- **SetupCards**: 三步驟設定卡片（選擇起始國家/主機節點 → 修改手機 DNS → 輸入手機 IP）。節點清單來自 `config/hostNodes.ts`，選擇後直接跳轉該節點網址；Vite dev mode 額外加入「Local (本機開發)」節點並依 hostname 預設選中。
 - **DnsSetupBanner**: DNS 設定說明，動態讀取 `window.location.hostname`，含一鍵複製。
 - **ReportModal**: 報告產生表單（app metadata、URL、logo），統計國內外流量佔比。
 - **ReportView**: 報告檢視 Overlay，含編輯/關閉操作。
@@ -122,7 +123,7 @@ graph LR
 - **ErrorBoundary**: 錯誤邊界元件。
 
 ### Hooks
-- **useDnsStream**: WebSocket 連線管理，含 token 取得、自動重連（指數退避）、本地國家快取（7 天 TTL）。提供 `sendSubscribe(ip)` 方法，當使用者開始監控時通知後端切換目標 IP。
+- **useDnsStream**: WebSocket 連線管理，含 token 取得、自動重連（指數退避）、本地國家快取（7 天 TTL）。提供 `sendSubscribe(ip)` 方法，當使用者開始監控時通知後端切換目標 IP。手機 IP 預填優先序：`devDnsClientIp`（後端 DEV_MODE 觀測值）> `data.ip`（瀏覽器 clientIP，IPv6 時改查 IPv4）。
 - **useMockDnsStream**: Mock 模式 DNS 串流（`VITE_USE_MOCK=true`）。
 - **useSharedReport**: 解壓 URL `?zdata=` 參數，載入共享的 DNS 記錄與追蹤結果。
 - **useTour**: react-joyride 引導式導覽管理。

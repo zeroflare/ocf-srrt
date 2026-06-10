@@ -127,3 +127,10 @@ Traceroute 視覺化（`TraceMap` 與 `CyberMap` 的 trace overlay）改為**只
 - **實作**: 啟動時載入 `host-location.json`（`country` / `label` / `coordinates` / `mapZoom`）。`country` 在 `LOCAL_COUNTRY` 未設定時驅動境內國家；`label` / `coordinates` / `mapZoom` 經 `/api/token` 回傳前端。同一份映像檔藉由掛載不同設定檔即可部署到不同節點，不需重編譯。
 - **優點**: 設定外部化、單一映像多節點；完全向後相容（設定檔不存在時退回環境變數 / GeoIP）。環境變數仍優先於設定檔，既有部署行為不變。
 - **取捨**: 境內/境外判定的演算法不變（仍由後端 `localCountry` 驅動），本變更只是讓 `localCountry` 多一個設定來源並附帶地圖中心資訊。
+
+## 本機開發模式（DEV_MODE）
+新增 `DEV_MODE` 環境變數（僅 `docker-compose.dev.yml` 開啟），改善 Mac + Docker Desktop 的本機開發體驗。
+- **動機**: Docker Desktop（Mac/Windows）的 port 53 經 userland proxy 轉送，後端看到的 DNS 來源 IP 是 Docker gateway（如 `192.168.65.1`），與瀏覽器經 Vite proxy 取得 token 時的 clientIP 不一致，導致「手機 IP」欄位預填值對不上 DNS 紀錄；且後端自動偵測的公網 IP 無法供同網段手機作為 DNS 指向。
+- **實作**: `buffer` 以 `atomic.Value` 記錄最近一筆查詢來源 IP（`LastClientIP()`）；`DEV_MODE=true` 時 `/api/token` 額外回傳 `devDnsClientIp`，前端優先以此預填。前端另以 `import.meta.env.DEV` 在節點清單加入「Local (本機開發)」選項（production build 會被 tree-shake）。`DNS_PUBLIC_IP` 需手動指定為開發機區網 IP。
+- **優點**: prod 完全不受影響（未設 `DEV_MODE` 時 API 回應不變、Local 節點不存在）；dev 三步驟設定可直接照畫面操作。
+- **取捨 / 安全**: `devDnsClientIp` 會暴露最近一個使用者的 IP，**正式環境嚴禁開啟**。Docker Desktop 下所有 LAN 裝置共用同一來源 IP，無法區分裝置，此為平台限制（Linux host 網路模式無此問題）。

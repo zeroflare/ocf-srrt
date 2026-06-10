@@ -85,7 +85,7 @@ type Hub struct {
 
 func NewHub() *Hub {
 	return &Hub{
-		broadcast:  make(chan BroadcastMessage),
+		broadcast:  make(chan BroadcastMessage, 1024),
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		done:       make(chan struct{}),

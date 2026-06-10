@@ -33,6 +33,18 @@ var GlobalStore = struct {
 
 var onSessionRemoved func(ip string)
 
+// lastClientIP 記錄最近一次寫入紀錄的來源 IP。
+// 僅供本機開發模式（DEV_MODE）預填前端「手機 IP」欄位使用。
+var lastClientIP atomic.Value
+
+// LastClientIP 回傳最近一次 DNS 查詢的來源 IP；尚無任何查詢時回傳空字串。
+func LastClientIP() string {
+	if v, ok := lastClientIP.Load().(string); ok {
+		return v
+	}
+	return ""
+}
+
 // SetOnSessionRemoved 設定 session 被 GC 移除時的回呼函式
 func SetOnSessionRemoved(fn func(ip string)) {
 	onSessionRemoved = fn
@@ -74,6 +86,8 @@ func SessionCount() int {
 
 // Add 加入紀錄 (O(1) 效能，GC 友善)
 func Add(sourceIp string, record interface{}) {
+	lastClientIP.Store(sourceIp)
+
 	// 1. 取得或建立 Session (讀寫分離優化)
 	GlobalStore.mu.RLock()
 	session, exists := GlobalStore.sessions[sourceIp]

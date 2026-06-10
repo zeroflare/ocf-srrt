@@ -15,7 +15,18 @@ export interface HostNode {
   url: string;
 }
 
+/**
+ * 本機開發節點：僅在 Vite dev mode（pnpm dev）加入清單，
+ * url 即當前網址，resolveCurrentNode 會以 hostname 比對而預設選中。
+ */
+const LOCAL_NODE: HostNode = {
+  code: 'LOCAL',
+  label: 'Local (本機開發)',
+  url: typeof window !== 'undefined' ? `${window.location.origin}/` : 'http://localhost/',
+};
+
 export const HOST_NODES: HostNode[] = [
+  ...(import.meta.env.DEV ? [LOCAL_NODE] : []),
   { code: 'TW', label: '台灣 (Google Cloud)', url: 'https://srtt.ocf.tw/' },
   { code: 'JP', label: '日本 (Microsoft Azure)', url: 'https://srtt-jp.ocf.tw/' },
 ];

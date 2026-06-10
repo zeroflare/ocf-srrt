@@ -79,11 +79,34 @@
 支援 Hot Reload。修改 Go 或 React 程式碼後自動更新，無需重啟容器。
 
 ```bash
-docker compose -f docker-compose.dev.yml up --build
+# DNS_PUBLIC_IP 設為本機區網 IP，讓儀表板顯示正確的「手機 DNS」位址
+DNS_PUBLIC_IP=$(ipconfig getifaddr en0) docker compose -f docker-compose.dev.yml up --build -d
+
+# 觀察後端 log（-d 背景執行，log 需另開）
+docker compose -f docker-compose.dev.yml logs -f backend
 ```
 - **Frontend**: http://localhost (Vite Dev Server via port 80)
 - **Backend**: http://localhost:8080 (Air Runner)
-- **DNS**: `localhost:1053` (UDP/TCP)
+- **DNS**: `localhost:53` (UDP/TCP)
+
+開發模式（`docker-compose.dev.yml`）內建：
+- `LOG_LEVEL=debug`：輸出每筆 DNS query log
+- `DEV_MODE=true`：`/api/token` 回傳最近觀測到的 DNS 來源 IP，前端自動預填「手機 IP」欄位（正式環境不得開啟）
+- 起始國家下拉自動出現「Local (本機開發)」選項（僅 Vite dev mode）
+
+##### 用手機測試（Mac + 同一 WiFi）
+
+1. 啟動服務（如上，記得帶 `DNS_PUBLIC_IP`）
+2. 本機先驗證 DNS 有通：`dig @127.0.0.1 google.com`，backend log 應出現 debug 紀錄
+3. 手機 WiFi 的 DNS 改為 Mac 的區網 IP（`ipconfig getifaddr en0`，如 `192.168.1.101`）
+4. 手機隨意瀏覽網頁產生 DNS 查詢
+5. 重新整理儀表板，「手機 IP」欄位會自動預填，按「開始分析」
+
+注意事項：
+- **iPhone**：關閉 iCloud Private Relay（會繞過自訂 DNS）
+- **Android**：關閉「私人 DNS」（DoT 走 853 port，不會打到本機的 53）
+- **macOS 防火牆**：確認未阻擋 Docker 的連入連線
+- **Docker Desktop 限制**：port 53 經 userland proxy 轉送，後端看到的來源 IP 是 Docker gateway（如 `192.168.65.1`），所有 LAN 裝置共用同一來源，無法區分 Mac 與手機流量；部署到 Linux（host 網路模式）才有真實 Client IP
 
 #### 生產環境 (Production)
 使用編譯後的 Go Binary 與 Nginx 靜態服務，啟用 host 網路模式。
@@ -169,6 +192,9 @@ dig @<PUBLIC_IP> google.com
 | `DNS_UPSTREAMS` | 上游 DNS（逗號分隔） | `1.1.1.1:53,8.8.8.8:53,...` |
 | `TRUSTED_PROXIES` | 信任的代理 IP | — |
 | `ALLOWED_ORIGINS` | WebSocket 允許來源 | — |
+| `DNS_PUBLIC_IP` | DNS 伺服器對外 IP（儀表板顯示用）；未設時自動偵測公網 IP，本機開發請設為區網 IP | 自動偵測 |
+| `LOG_LEVEL` | log 等級：`debug` / `info` / `warn` / `error` | `info` |
+| `DEV_MODE` | 開發模式：`/api/token` 額外回傳最近的 DNS 來源 IP（**正式環境不得開啟**） | `false` |
 
 #### Backend / GeoIP 來源（MaxMind 為主、RIPE IPmap 可切換）
 

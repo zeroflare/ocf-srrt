@@ -196,6 +196,14 @@ func main() {
 			"component", "main", "country", hostLocation.Country, "label", hostLocation.Label)
 	}
 
+	// DEV_MODE：本機開發模式。開啟時 /api/token 額外回傳最近觀測到的
+	// DNS 來源 IP（devDnsClientIp），供前端預填「手機 IP」欄位。
+	// 正式環境切勿開啟，避免洩漏其他使用者的 IP。
+	devMode := strings.EqualFold(os.Getenv("DEV_MODE"), "true")
+	if devMode {
+		slog.Warn("DEV_MODE enabled: /api/token will expose last DNS client IP", "component", "main")
+	}
+
 	// 境內國家來源優先序：LOCAL_COUNTRY 環境變數 > host-location.json 的 country。
 	// 維持環境變數優先，確保既有部署行為不變。
 	localCountryOverride := os.Getenv("LOCAL_COUNTRY")
@@ -231,6 +239,15 @@ func main() {
 		}
 		if dnsPublicIP != "" {
 			resp["dnsIp"] = dnsPublicIP
+		}
+		// 開發模式：回傳最近一筆 DNS 查詢的來源 IP。
+		// Docker Desktop (Mac/Windows) 下手機查詢經 userland proxy 轉送，
+		// 來源會是 Docker gateway（如 192.168.65.1），與瀏覽器 clientIP 不同，
+		// 因此需由後端實際觀測值提供預填。
+		if devMode {
+			if lastDnsClient := buffer.LastClientIP(); lastDnsClient != "" {
+				resp["devDnsClientIp"] = lastDnsClient
+			}
 		}
 		// 主機節點資訊：供前端決定地圖中心、縮放與節點顯示名稱。
 		if hostLocation != nil {

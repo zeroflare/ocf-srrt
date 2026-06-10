@@ -2,6 +2,10 @@
 
 ## Docker Environment
 - **Development**: 使用 `docker-compose.dev.yml`，支援 Hot Reload（Backend: Air, Frontend: Vite HMR）。
+  - `LOG_LEVEL=debug`：輸出每筆 DNS query log。
+  - `DEV_MODE=true`：`/api/token` 回傳最近觀測到的 DNS 來源 IP（`devDnsClientIp`），供前端預填手機 IP 欄位。**正式環境不得開啟**（會洩漏其他使用者 IP）。
+  - `DNS_PUBLIC_IP`：本機開發需指定 Mac 區網 IP（手機 DNS 指向用），否則後端會自動偵測成公網 IP，手機無法連回。啟動範例：`DNS_PUBLIC_IP=$(ipconfig getifaddr en0) docker compose -f docker-compose.dev.yml up -d`
+  - 注意：Docker Desktop（Mac/Windows）經 userland proxy 轉送 port 53，後端看到的 DNS 來源 IP 是 Docker gateway（如 `192.168.65.1`），所有 LAN 裝置的查詢會共用同一來源 IP。
 - **Production**: 使用 `docker-compose.prod.yml`，Nginx 反向代理 + HTTPS（Let's Encrypt）+ host 網路模式。
 
 ```mermaid
@@ -34,8 +38,9 @@ graph TB
 - **Volume mounts**: MMDB、app.json 與 host-location.json 以 read-only 掛載。
 
 ## Development Environment
-- Backend port: `1053:53`（DNS）、`8080:8080`（HTTP/WS）
+- Backend port: `53:53`（DNS UDP/TCP）、`8080:8080`（HTTP/WS）
 - Frontend port: `80:5173`（Vite dev server）
+- 開發專用環境變數（`LOG_LEVEL=debug`、`DEV_MODE=true`、`DNS_PUBLIC_IP`）見上方 Docker Environment 一節
 - Backend Hot Reload: Air（`.air.toml`）
 - Frontend Hot Reload: Vite HMR（polling mode for Docker）
 - Go module cache: 使用 named volume `go_cache` 持久化

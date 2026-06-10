@@ -189,8 +189,13 @@ export const useDnsStream = (enabled: boolean = true) => {
         const data = await resp.json();
         tokenRef.current = data.token;
         setToken(data.token);
-        // 後端同時回傳 ip，供前端 IP 欄位預填；若為 IPv6 則嘗試取得 IPv4
-        if (data.ip) {
+        // 開發模式（後端 DEV_MODE）：優先採用後端實際觀測到的 DNS 來源 IP。
+        // Docker Desktop 下手機查詢來源是 Docker gateway（如 192.168.65.1），
+        // 與瀏覽器 clientIP 不同，用觀測值預填才對得上 DNS 紀錄。
+        if (data.devDnsClientIp) {
+          setMyIp(data.devDnsClientIp);
+        } else if (data.ip) {
+          // 後端同時回傳 ip，供前端 IP 欄位預填；若為 IPv6 則嘗試取得 IPv4
           if (isIPv6(data.ip)) {
             fetchIPv4Fallback().then(ipv4 => setMyIp(ipv4 || data.ip));
           } else {

@@ -36,11 +36,19 @@ services:
     command: sh -c "apk add --no-cache mtr && go install github.com/air-verse/air@latest && air -c .air.toml"
 
     ports:
-      - "1053:53/tcp"
-      - "1053:53/udp"
+      - "53:53/tcp"
+      - "53:53/udp"
       - "8080:8080"
 
     environment:
+      # 開發模式開 debug 才看得到每筆 DNS query log（prod 建議 warn）
+      - LOG_LEVEL=debug
+      # 開發模式：/api/token 回傳最近的 DNS 來源 IP，供前端預填手機 IP 欄位
+      # （正式環境切勿開啟，會洩漏其他使用者 IP）
+      - DEV_MODE=true
+      # 本機開發：手機要指向 Mac 的區網 IP，不能用自動偵測的公網 IP
+      # 啟動範例：DNS_PUBLIC_IP=$(ipconfig getifaddr en0) docker compose -f docker-compose.dev.yml up -d
+      - DNS_PUBLIC_IP=${DNS_PUBLIC_IP:-}
       # 境內國家：留空時由 data/host-location.json 的 country 決定；可用環境變數覆寫
       - LOCAL_COUNTRY=${LOCAL_COUNTRY:-}
       - HOST_LOCATION_PATH=/app/data/host-location.json
@@ -48,7 +56,7 @@ services:
       - ASN_DB_PATH=/app/data/GeoLite2-ASN.mmdb
       - GEOIP_DB_PATH=/app/data/GeoLite2-City.mmdb
       - RULES_PATH=/app/data/app.json
-      - CGO_ENABLED=1
+      - CGO_ENABLED=0
       - TRUSTED_PROXIES=
       # ----- GeoIP 來源設定（預設 MaxMind 為主，RIPE IPmap 保留為可切換來源）-----
       # 切到 RIPE：GEOIP_PROVIDER=ripe；主來源失敗會自動 fallback 到另一邊
